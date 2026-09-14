@@ -33,11 +33,11 @@ Notifications use the header bell. Program, event, team, competition, onboarding
 
 ### Home
 
-Guest home combines a concise brand statement, active Fall Soccer Training registration, sport/audience shortcuts, events, announcements, tournaments, and account entry. Signed-in home promotes family/player context, registration status, and the next scheduled commitment.
+Guest home combines a concise brand statement, active Fall Soccer Training registration, and **This Week at ROYALS**. Signed-in home is a **personal briefing**: next child/team commitment, field status, unread announcements, payment/season hub, supporter RSVP. Community lives on Home, not a sixth tab.
 
 ### Programs and registration
 
-Programs are sport-filtered and program-aware. Youth registration is a seven-state consumer checkout:
+Programs are sport-filtered and program-aware. Youth registration is a seven-state consumer checkout, then a durable **Season Hub** (confirmation, payment, assignment, coach, first session, calendar, waiver, contact coach).
 
 1. program overview;
 2. parent/household;
@@ -57,9 +57,7 @@ External leagues can be labeled and linked without presenting ROYALS as their of
 
 ### Communication
 
-Announcements support club, program, team, and competition audiences. The notification center supports registrations, reminders, changes, weather, announcements, and results. Expo notification plumbing is installed without requiring development push credentials.
-
-Real-time chat is deliberately excluded from this MVP. A later feature module must enforce team membership, guardian visibility, moderation, retention, and youth-safe defaults before enabling chat.
+Announcements support club, program, and team audiences with urgency (urgent / high / normal / low). Parents can reply on a team announcement or DM a coach. Unrestricted group chat is excluded.
 
 ### Admin
 

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoCompetitions, demoSchedule } from '@/data/demo';
+import { formatEventParts } from '@/lib/datetime';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function generateStaticParams() {
@@ -28,7 +29,7 @@ export default function CompetitionDetailScreen() {
       </View>
 
       <View style={[styles.hero, competition.type === 'tournament' && styles.tournamentHero]}>
-        <Ionicons name={competition.type === 'tournament' ? 'trophy' : 'shield'} size={42} color={colors.orange} />
+        <Ionicons name={competition.type === 'tournament' ? 'trophy-outline' : 'shield-outline'} size={42} color={colors.orange} />
         <StatusPill label={`${competition.type} · ${competition.status.replace('_', ' ')}`} tone="orange" />
         <Text style={styles.title}>{competition.title}</Text>
         <Text style={styles.organizer}>{competition.organizer}</Text>
@@ -44,7 +45,7 @@ export default function CompetitionDetailScreen() {
       ) : null}
 
       <View style={styles.tabs}>
-        {(['overview', 'fixtures', 'standings'] as const).map((item) => (
+        {(competition.type === 'training' ? (['overview', 'fixtures'] as const) : (['overview', 'fixtures', 'standings'] as const)).map((item) => (
           <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}>
             <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item}</Text>
           </Pressable>
@@ -109,9 +110,9 @@ export default function CompetitionDetailScreen() {
           <Text style={styles.heading}>Fixtures & results</Text>
           {fixtures.length > 0 ? fixtures.map((fixture) => (
             <View key={fixture.id} style={styles.fixture}>
-              <View style={styles.fixtureDate}><Text style={styles.fixtureDay}>{new Date(fixture.startsAt).getDate()}</Text><Text style={styles.fixtureMonth}>SEP</Text></View>
+              <View style={styles.fixtureDate}><Text style={styles.fixtureDay}>{formatEventParts(fixture.startsAt).day}</Text><Text style={styles.fixtureMonth}>{formatEventParts(fixture.startsAt).month}</Text></View>
               <View style={styles.flex}><Text style={styles.fixtureTitle}>{fixture.title}</Text><Text style={styles.fixtureMeta}>{fixture.venue} · Demo</Text></View>
-              <Text style={styles.fixtureResult}>{fixture.result ?? new Date(fixture.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</Text>
+              <Text style={styles.fixtureResult}>{fixture.result ?? formatEventParts(fixture.startsAt).time}</Text>
             </View>
           )) : (
             <View style={styles.empty}><Ionicons name="calendar-outline" size={26} color={colors.orange} /><Text style={styles.emptyTitle}>Fixtures publish after registration</Text><Text style={styles.emptyText}>Approved teams, groups and field slots will appear here.</Text></View>

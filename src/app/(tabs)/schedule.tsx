@@ -1,48 +1,56 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '@/components/motion';
 import { AppHeader, Chip, Screen, StatusPill } from '@/components/ui';
+import { formatEventParts } from '@/lib/datetime';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { ScheduleEvent } from '@/types/domain';
 
-type Filter = 'mine' | 'soccer' | 'cricket' | 'kids' | 'teams';
+type Filter = 'mine' | 'soccer' | 'cricket' | 'fitness' | 'community';
 
 const filters: { id: Filter; label: string }[] = [
   { id: 'mine', label: 'My schedule' },
   { id: 'soccer', label: 'Soccer' },
   { id: 'cricket', label: 'Cricket' },
-  { id: 'kids', label: 'Kids' },
-  { id: 'teams', label: 'Teams' },
+  { id: 'fitness', label: 'Fitness' },
+  { id: 'community', label: 'Club' },
 ];
 
-function matchesFilter(event: ScheduleEvent, filter: Filter) {
-  if (filter === 'soccer' || filter === 'cricket') return event.sport === filter;
-  if (filter === 'kids') return Boolean(event.programId);
-  if (filter === 'teams') return Boolean(event.teamId);
-  return Boolean(event.attendance || event.programId || event.teamId);
+function matchesFilter(event: ScheduleEvent, filter: Filter, followedIds: string[]) {
+  if (filter === 'soccer' || filter === 'cricket' || filter === 'fitness') return event.sport === filter;
+  if (filter === 'community') return event.type === 'club_event' || event.type === 'fitness';
+  return Boolean(
+    event.attendance ||
+      event.supporterGoing ||
+      event.programId ||
+      event.teamId ||
+      (event.programId && followedIds.includes(event.programId)) ||
+      (event.teamId && followedIds.includes(event.teamId)),
+  );
 }
 
 function iconFor(event: ScheduleEvent) {
-  if (event.type === 'training') return 'fitness-outline';
+  if (event.type === 'training' || event.type === 'fitness') return 'fitness-outline';
   if (event.type === 'club_event') return 'people-outline';
-  if (event.sport === 'cricket') return 'radio-outline';
+  if (event.sport === 'cricket') return 'baseball-outline';
   return 'football-outline';
 }
 
 export default function ScheduleScreen() {
-  const { schedule } = useApp();
+  const { schedule, followedIds } = useApp();
   const [filter, setFilter] = useState<Filter>('mine');
   const [showPast, setShowPast] = useState(false);
   const filtered = useMemo(
-    () => schedule.filter((event) => matchesFilter(event, filter) && (showPast || event.status !== 'completed')),
-    [filter, schedule, showPast],
+    () => schedule.filter((event) => matchesFilter(event, filter, followedIds) && (showPast || event.status !== 'completed')),
+    [filter, schedule, showPast, followedIds],
   );
 
   return (
-    <Screen>
+    <Screen tabScene>
       <AppHeader eyebrow="One club calendar" title="Schedule" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
         {filters.map((item) => (
@@ -55,23 +63,23 @@ export default function ScheduleScreen() {
           <Text style={styles.month}>September</Text>
           <Text style={styles.year}>2026</Text>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => setShowPast((value) => !value)} style={styles.pastToggle}>
+        <PressableScale accessibilityRole="button" onPress={() => setShowPast((value) => !value)} style={styles.pastToggle}>
           <Ionicons name={showPast ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={showPast ? colors.orange : colors.stone} />
           <Text style={styles.pastText}>Show results</Text>
-        </Pressable>
+        </PressableScale>
       </View>
 
       <View style={styles.timeline}>
         {filtered.map((event, index) => {
-          const date = new Date(event.startsAt);
-          const day = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-          const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+          const parts = formatEventParts(event.startsAt);
+          const day = parts.weekday;
+          const time = parts.time;
           return (
             <Link key={event.id} href={`/event/${event.id}`} asChild>
-              <Pressable style={styles.eventRow}>
+              <PressableScale style={styles.eventRow}>
                 <View style={styles.dateColumn}>
                   <Text style={styles.day}>{day}</Text>
-                  <Text style={styles.dayNumber}>{date.getDate()}</Text>
+                  <Text style={styles.dayNumber}>{parts.day}</Text>
                   {index < filtered.length - 1 ? <View style={styles.line} /> : null}
                 </View>
                 <View style={[styles.eventCard, event.status === 'completed' && styles.completedCard]}>
@@ -86,7 +94,7 @@ export default function ScheduleScreen() {
                   <Text style={styles.subtitle}>{event.subtitle}</Text>
                   <View style={styles.locationRow}>
                     <Ionicons name="location-outline" size={15} color={colors.stone} />
-                    <Text numberOfLines={1} style={styles.location}>{event.venue}</Text>
+                    <Text numberOfLines={1} style={styles.location}>{event.venue} · Field {event.fieldStatus === 'closed' ? 'Closed' : 'Open'}</Text>
                   </View>
                   {event.result ? (
                     <View style={styles.result}>
@@ -99,7 +107,7 @@ export default function ScheduleScreen() {
                     </View>
                   ) : null}
                 </View>
-              </Pressable>
+              </PressableScale>
             </Link>
           );
         })}

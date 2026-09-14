@@ -24,8 +24,9 @@ Assumptions made for product demonstration:
 - Northern Virginia/Fairfax location labels are intentionally broad where the source does not provide an app-ready venue.
 - Program photography uses organization-hosted website images. Bundle optimized source originals only after the club confirms app usage rights.
 - The geometric “R” mark is an in-app placeholder brand abstraction, not a replacement for the legal Nova Royals crest.
-- The app starts in a seeded parent state so leadership can immediately evaluate the highest-priority experience. Profile role controls expose guest/player/coach/admin states for demonstration only.
-- Demo “payment” records remain pending and never charge a card.
+- The app starts in a seeded parent state so leadership can immediately evaluate the highest-priority experience. Profile role controls expose guest/player/coach/volunteer/admin states. First-run onboarding can still be replayed; “Preview as parent” keeps the board path.
+- Fitness is a program vertical (not a tab). Weather, payments, and calendar writes remain stubs.
+- Demo “payment” records remain pending or locally marked paid and never charge a card.
 - Consent wording in the MVP is concise placeholder language based on the source form’s intent. It requires legal/club approval and versioning before accepting real registrations.
 - Age is not recomputed into public display. Production code should derive eligibility server-side on a specified season cutoff date.
 - External competition data will initially be maintained/imported by authorized club staff and labeled with its source; no official FXA/CCPL API availability is assumed.

@@ -7,7 +7,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
-import { demoPrograms, kidsProgramId } from '@/data/demo';
+import { demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
+import { track } from '@/lib/analytics';
+import { formatEventParts } from '@/lib/datetime';
+import { childRegistrationHints, siblingPrice } from '@/lib/intelligence';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -40,7 +43,7 @@ const steps: { id: Step; label: string }[] = [
 export default function RegistrationScreen() {
   const { programId } = useLocalSearchParams<{ programId: string }>();
   const program = demoPrograms.find((item) => item.id === programId) ?? demoPrograms[0];
-  const { household, addChild, submitRegistration } = useApp();
+  const { household, addChild, submitRegistration, registrations } = useApp();
   const isYouth = program.id === kidsProgramId || program.id === 'travel-soccer';
   const [step, setStep] = useState<Step>('overview');
   const [selected, setSelected] = useState<string[]>([]);
@@ -75,7 +78,10 @@ export default function RegistrationScreen() {
   }
 
   const goNext = async () => {
-    if (step === 'overview') setStep('household');
+    if (step === 'overview') {
+      track(registrations.some((item) => item.programId === program.id) ? 're_registration' : 'registration_started', { programId: program.id });
+      setStep('household');
+    }
     if (step === 'household') {
       const valid = await form.trigger(['guardianName', 'email', 'phone', 'address']);
       if (valid) setStep('children');
@@ -120,17 +126,21 @@ export default function RegistrationScreen() {
   };
 
   if (step === 'confirmation') {
+    const first = demoSchedule.find((item) => item.id === 'kids-session-1');
+    const firstParts = first ? formatEventParts(first.startsAt) : null;
+    const lead = selectedChildren.length === 1 ? `${selectedChildren[0].firstName} is joining ROYALS.` : `${selectedChildren.map((child) => child.firstName).join(' and ')} are joining ROYALS.`;
     return (
       <Screen contentStyle={styles.confirmationPage}>
         <View style={styles.confirmIcon}><Ionicons name="checkmark" size={44} color={colors.white} /></View>
         <StatusPill label="Submitted · Demo checkout" tone="success" />
-        <Text style={styles.confirmTitle}>Welcome to the{'\n'}Royals family.</Text>
+        <Text style={styles.confirmTitle}>{lead}</Text>
         <Text style={styles.confirmCopy}>
-          We received {selectedChildren.length === 1 ? `${selectedChildren[0].firstName}’s` : 'your children’s'} registration for {program.title}.
+          We received the registration for {program.title}. Next: {firstParts ? `Session 1 · ${firstParts.weekday} ${firstParts.time} · ${first?.venue}` : 'Check the season hub for session 1'}.
         </Text>
         <View style={styles.confirmCard}>
           <SummaryRow label="Registration" value={submittedId?.slice(-8).toUpperCase() ?? 'DEMO'} />
           <SummaryRow label="Participants" value={selectedChildren.map((child) => child.firstName).join(', ')} />
+          <SummaryRow label="Recommended group" value={childRegistrationHints(selectedChildren).map((item) => `${item.name} ${item.group}`).join(' · ')} />
           <SummaryRow label="Amount due" value={`$${subtotal}`} />
           <SummaryRow label="Status" value="Pending review" last />
         </View>
@@ -138,8 +148,9 @@ export default function RegistrationScreen() {
           <Ionicons name="information-circle-outline" size={21} color={colors.info} />
           <Text style={styles.noticeText}>No real payment was processed. Your demo registration is saved on this device.</Text>
         </View>
-        <Button label="Go to my profile" onPress={() => router.replace('/(tabs)/profile')} style={styles.fullButton} />
-        <Button label="View schedule" variant="secondary" onPress={() => router.replace('/(tabs)/schedule')} style={styles.fullButton} />
+          <Button label="Open season hub" onPress={() => router.replace(`/season/${submittedId}` as never)} style={styles.fullButton} />
+          {first ? <Button label="Open first session" variant="secondary" onPress={() => router.replace(`/event/${first.id}` as never)} style={styles.fullButton} /> : null}
+          <Button label="View schedule" variant="ghost" onPress={() => router.replace('/(tabs)/schedule')} style={styles.fullButton} />
       </Screen>
     );
   }
@@ -207,8 +218,9 @@ export default function RegistrationScreen() {
           <Text style={styles.stepTitle}>Who’s playing?</Text>
           <Text style={styles.stepBody}>Select saved children or add a new profile. The sibling rate updates automatically.</Text>
           <View style={styles.childList}>
-            {household.children.map((child, index) => {
+          {household.children.map((child, index) => {
               const checked = selected.includes(child.id);
+              const hint = childRegistrationHints([child])[0];
               return (
                 <Pressable key={child.id} onPress={() => toggleChild(child.id)} style={[styles.childChoice, checked && styles.childSelected]}>
                   <View style={[styles.checkbox, checked && styles.checkboxActive]}>
@@ -216,7 +228,8 @@ export default function RegistrationScreen() {
                   </View>
                   <View style={styles.flex}>
                     <Text style={styles.childName}>{child.firstName} {child.lastName}</Text>
-                    <Text style={styles.childMeta}>Saved child profile · Birth date private</Text>
+                    <Text style={styles.childMeta}>Age {hint.ages} · recommended {hint.group}</Text>
+                    {hint.warning ? <Text style={styles.selectionError}>{hint.warning}</Text> : null}
                   </View>
                   <Text style={styles.childPrice}>{selected.indexOf(child.id) > 0 ? '$60' : checked ? '$120' : index === 0 ? '$120' : '$60+'}</Text>
                 </Pressable>
@@ -241,6 +254,7 @@ export default function RegistrationScreen() {
             </Pressable>
           )}
           {selected.length === 0 ? <Text style={styles.selectionError}>Select at least one child to continue.</Text> : null}
+          <Text style={styles.stepBody}>{siblingPrice(selected.length).note}</Text>
           <PriceCard count={selected.length} total={subtotal} discount={discount} />
         </View>
       )}
@@ -262,7 +276,7 @@ export default function RegistrationScreen() {
             <CheckRow label="I authorize emergency treatment" checked={field.value} onPress={() => field.onChange(!field.value)} error={fieldState.error?.message} />
           )} />
           <Controller control={form.control} name="signature" render={({ field, fieldState }) => (
-            <Field label="Typed legal signature" placeholder="Full name" value={field.value} onChangeText={field.onChange} error={fieldState.error?.message} hint={`Signed electronically on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`} />
+            <Field label="Typed legal signature" placeholder="Full name" value={field.value} onChangeText={field.onChange} error={fieldState.error?.message} hint="Typed name is the demo electronic signature. No payment is processed." />
           )} />
         </View>
       )}

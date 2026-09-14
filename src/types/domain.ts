@@ -1,10 +1,12 @@
-export type SportCode = 'soccer' | 'cricket';
-export type UserRole = 'guest' | 'adult_player' | 'guardian' | 'coach' | 'competition_manager' | 'admin';
+export type SportCode = 'soccer' | 'cricket' | 'fitness';
+export type UserRole = 'guest' | 'adult_player' | 'guardian' | 'coach' | 'volunteer' | 'competition_manager' | 'admin';
 export type CompetitionType = 'league' | 'tournament' | 'friendly' | 'pickup' | 'training';
-export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'training' | 'open_play' | 'club_event';
+export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'training' | 'open_play' | 'club_event' | 'fitness';
 export type RegistrationStatus = 'draft' | 'submitted' | 'pending' | 'approved' | 'waitlisted' | 'rejected' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded';
 export type AttendanceStatus = 'going' | 'maybe' | 'not_going';
+export type FieldStatus = 'open' | 'closed' | 'delayed';
+export type NoticeUrgency = 'urgent' | 'high' | 'normal' | 'low';
 
 export interface Program {
   id: string;
@@ -23,6 +25,9 @@ export interface Program {
   facts: { label: string; value: string }[];
   includes: string[];
   factual: boolean;
+  whatToBring?: string[];
+  coachName?: string;
+  coachContact?: string;
 }
 
 export interface Person {
@@ -56,6 +61,10 @@ export interface Registration {
   discountAmount: number;
   paymentStatus: PaymentStatus;
   demo: boolean;
+  teamId?: string;
+  coachName?: string;
+  waiverVersion?: string;
+  firstSessionEventId?: string;
 }
 
 export interface Team {
@@ -72,6 +81,15 @@ export interface Team {
   memberCount: number;
   roster: Person[];
   managed?: boolean;
+  coachName?: string;
+  coachContact?: string;
+}
+
+export interface AttendanceMark {
+  personId: string;
+  personName: string;
+  present: boolean;
+  status: 'present' | 'absent' | 'late';
 }
 
 export interface ScheduleEvent {
@@ -90,6 +108,16 @@ export interface ScheduleEvent {
   status: 'scheduled' | 'live' | 'completed' | 'cancelled' | 'postponed';
   result?: string;
   attendance?: AttendanceStatus;
+  supporterGoing?: boolean;
+  supporterCount?: number;
+  goingCount?: number;
+  fieldStatus?: FieldStatus;
+  parkingNotes?: string;
+  weatherSummary?: string;
+  whatToBring?: string;
+  coachName?: string;
+  checkIns?: AttendanceMark[];
+  volunteerSpots?: number;
   demo?: boolean;
 }
 
@@ -127,6 +155,14 @@ export interface Competition {
   bracketReady?: boolean;
 }
 
+export interface AnnouncementReply {
+  id: string;
+  authorName: string;
+  authorRole: UserRole;
+  body: string;
+  createdAt: string;
+}
+
 export interface Announcement {
   id: string;
   title: string;
@@ -135,6 +171,20 @@ export interface Announcement {
   scopeLabel: string;
   publishedAt: string;
   pinned?: boolean;
+  urgency?: NoticeUrgency;
+  teamId?: string;
+  programId?: string;
+  eventId?: string;
+  replies?: AnnouncementReply[];
+}
+
+export interface DirectMessage {
+  id: string;
+  threadId: string;
+  fromRole: UserRole;
+  fromName: string;
+  body: string;
+  createdAt: string;
 }
 
 export interface AppNotification {
@@ -145,4 +195,22 @@ export interface AppNotification {
   createdAt: string;
   read: boolean;
   route?: string;
+  urgency?: NoticeUrgency;
+  wouldPush?: boolean;
+}
+
+export interface NotificationPrefs {
+  urgent: boolean;
+  team: boolean;
+  community: boolean;
+  locationShare: boolean;
+}
+
+export interface HouseholdDocument {
+  id: string;
+  title: string;
+  kind: 'waiver' | 'receipt' | 'policy';
+  status: string;
+  updatedAt: string;
+  registrationId?: string;
 }

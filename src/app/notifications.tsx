@@ -1,8 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui';
+import { notificationsForRole } from '@/lib/membership';
+import { formatEventParts } from '@/lib/datetime';
+import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -16,7 +20,9 @@ const icons = {
 } as const;
 
 export default function NotificationsScreen() {
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useApp();
+  const { notifications, markNotificationRead, markAllNotificationsRead, role } = useApp();
+  const visible = notificationsForRole(role, notifications);
+  const reduced = useReducedMotion();
 
   return (
     <Screen>
@@ -31,7 +37,8 @@ export default function NotificationsScreen() {
       </View>
       <Text style={styles.section}>RECENT</Text>
       <View style={styles.list}>
-        {notifications.map((notice) => (
+        {visible.map((notice, index) => (
+          <Animated.View key={notice.id} entering={reduced || index > 0 ? undefined : FadeInDown.duration(240)}>
           <Pressable
             key={notice.id}
             onPress={() => {
@@ -49,9 +56,10 @@ export default function NotificationsScreen() {
                 {!notice.read ? <View style={styles.dot} /> : null}
               </View>
               <Text style={styles.noticeBody}>{notice.body}</Text>
-              <Text style={styles.time}>{new Date(notice.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+              <Text style={styles.time}>{formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}{notice.type === 'announcement' ? ' · Club-wide' : ''}{notice.urgency ? ` · ${notice.urgency}` : ''}{notice.wouldPush ? ' · would push' : ''}</Text>
             </View>
           </Pressable>
+          </Animated.View>
         ))}
       </View>
       <View style={styles.safety}>

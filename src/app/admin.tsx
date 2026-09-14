@@ -1,27 +1,54 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms, demoTeams } from '@/data/demo';
+import { funnelCounts, getEvents } from '@/lib/analytics';
+import { formatEventParts } from '@/lib/datetime';
+import { can } from '@/lib/capabilities';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
+import type { NoticeUrgency } from '@/types/domain';
 
 type AdminTab = 'registrations' | 'announcements' | 'teams' | 'games';
 
 export default function AdminScreen() {
-  const { role, registrations, schedule, announcements, updateRegistrationStatus, updateEventResult, createAnnouncement } = useApp();
+  const {
+    role,
+    registrations,
+    schedule,
+    announcements,
+    updateRegistrationStatus,
+    updateEventResult,
+    createAnnouncement,
+    assignRegistrationTeam,
+    setFieldStatus,
+    upsertEvent,
+  } = useApp();
   const [tab, setTab] = useState<AdminTab>('registrations');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [result, setResult] = useState('');
+  const [urgency, setUrgency] = useState<NoticeUrgency>('normal');
+  const [newTitle, setNewTitle] = useState('');
+  const [newVenue, setNewVenue] = useState('');
+  const [funnel, setFunnel] = useState<string>('');
   const allowed = role === 'admin' || role === 'coach' || role === 'competition_manager';
+
+  useEffect(() => {
+    getEvents().then((events) => {
+      const counts = funnelCounts(events);
+      setFunnel(`${counts.programViewed} views · ${counts.registrationStarted} starts · ${counts.registrationCompleted} completions`);
+    });
+  }, [registrations]);
 
   if (!allowed) {
     return (
       <Screen contentStyle={styles.denied}>
-        <Ionicons name="lock-closed" size={40} color={colors.orange} />
+        <Ionicons name="lock-closed-outline" size={40} color={colors.orange} />
         <Text style={styles.deniedTitle}>Staff access required</Text>
         <Text style={styles.deniedCopy}>Management routes are role protected in the client and reinforced by row-level security in Supabase.</Text>
         <Button label="Return to profile" onPress={() => router.replace('/(tabs)/profile')} />
@@ -31,7 +58,7 @@ export default function AdminScreen() {
 
   const publish = () => {
     if (!title.trim() || !body.trim()) return;
-    createAnnouncement({ title, body, audience: 'club', scopeLabel: 'Nova Royals' });
+    createAnnouncement({ title, body, audience: urgency === 'urgent' ? 'club' : 'team', scopeLabel: 'Nova Royals', urgency });
     setTitle('');
     setBody('');
   };
@@ -47,7 +74,7 @@ export default function AdminScreen() {
       <View style={styles.metrics}>
         <Metric value={String(registrations.length)} label="REGISTRATIONS" />
         <Metric value={String(demoTeams.length)} label="TEAMS" />
-        <Metric value={String(schedule.length)} label="EVENTS" />
+        <Metric value={funnel ? 'FUNNEL' : '—'} label={funnel || 'ANALYTICS'} />
       </View>
 
       <View style={styles.tabs}>
@@ -79,6 +106,9 @@ export default function AdminScreen() {
               <View style={styles.inline}>
                 <Button label="Approve" variant={registration.status === 'approved' ? 'primary' : 'secondary'} onPress={() => updateRegistrationStatus(registration.id, 'approved')} style={styles.flex} />
                 <Button label="Waitlist" variant="secondary" onPress={() => updateRegistrationStatus(registration.id, 'waitlisted')} style={styles.flex} />
+                {can(role, 'assign_child_team') ? (
+                  <Button label="Assign U8" variant="secondary" onPress={() => assignRegistrationTeam(registration.id, 'nova-royals-kids-u8', 'Coach Priya Sharma')} />
+                ) : null}
               </View>
             </View>
           ))}
@@ -92,14 +122,15 @@ export default function AdminScreen() {
           <View style={styles.form}>
             <Field label="Headline" value={title} onChangeText={setTitle} placeholder="What should members know?" />
             <Field label="Message" value={body} onChangeText={setBody} multiline numberOfLines={4} placeholder="Keep it clear and actionable." />
+            <Field label="Urgency (urgent / high / normal / low)" value={urgency} onChangeText={(value) => setUrgency((value as NoticeUrgency) || 'normal')} />
             <Button label="Publish demo announcement" icon="megaphone-outline" disabled={!title || !body} onPress={publish} />
           </View>
           <Text style={styles.subheading}>Published</Text>
-          {announcements.map((announcement) => (
-            <View key={announcement.id} style={styles.announcement}>
+          {announcements.map((announcement, index) => (
+            <Animated.View key={announcement.id} entering={index === 0 ? FadeInDown.duration(240) : undefined} style={styles.announcement}>
               <Ionicons name="megaphone-outline" size={20} color={colors.orangeDark} />
-              <View style={styles.flex}><Text style={styles.cardTitle}>{announcement.title}</Text><Text style={styles.cardMeta}>{announcement.scopeLabel} · {new Date(announcement.publishedAt).toLocaleDateString()}</Text></View>
-            </View>
+              <View style={styles.flex}><Text style={styles.cardTitle}>{announcement.title}</Text><Text style={styles.cardMeta}>{announcement.scopeLabel} · {formatEventParts(announcement.publishedAt).month} {formatEventParts(announcement.publishedAt).day}</Text></View>
+            </Animated.View>
           ))}
         </View>
       )}
@@ -128,8 +159,38 @@ export default function AdminScreen() {
               <Text style={styles.cardMeta}>{event.venue} · {event.status}</Text>
               <Field label="Result / score line" value={event.id === schedule.find((item) => item.teamId)?.id ? result : event.result ?? ''} onChangeText={setResult} placeholder="ROYALS 2–1 OPPONENT" />
               <Button label="Save result" variant="secondary" disabled={!result} onPress={() => { updateEventResult(event.id, result); setResult(''); }} />
+              {can(role, 'urgent_field_closure') ? (
+                <Button label={event.fieldStatus === 'closed' ? 'Reopen field' : 'Close field'} variant="ghost" onPress={() => setFieldStatus(event.id, event.fieldStatus === 'closed' ? 'open' : 'closed')} />
+              ) : null}
             </View>
           ))}
+          {can(role, 'edit_schedules') ? (
+            <View style={styles.form}>
+              <Text style={styles.subheading}>ADD SESSION</Text>
+              <Field label="Title" value={newTitle} onChangeText={setNewTitle} placeholder="Saturday training" />
+              <Field label="Venue" value={newVenue} onChangeText={setNewVenue} placeholder="Sully Highlands" />
+              <Button
+                label="Save to club schedule"
+                disabled={!newTitle || !newVenue}
+                onPress={() => {
+                  upsertEvent({
+                    id: `event-${Date.now()}`,
+                    type: 'training',
+                    sport: 'soccer',
+                    title: newTitle,
+                    subtitle: 'Staff added · demo',
+                    startsAt: new Date(Date.now() + 86400000).toISOString(),
+                    venue: newVenue,
+                    status: 'scheduled',
+                    fieldStatus: 'open',
+                    demo: true,
+                  });
+                  setNewTitle('');
+                  setNewVenue('');
+                }}
+              />
+            </View>
+          ) : null}
         </View>
       )}
     </Screen>

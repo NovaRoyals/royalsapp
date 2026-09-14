@@ -3,16 +3,21 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader, Button, DemoBadge, Screen, SectionHeading, StatusPill } from '@/components/ui';
-import { demoPrograms } from '@/data/demo';
+import { demoPrograms, followCatalog } from '@/data/demo';
+import { funnelCounts, getEvents } from '@/lib/analytics';
+import { completedAttendance, mayaAttendanceHistory } from '@/lib/attendance';
+import { can, isStaff } from '@/lib/capabilities';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { UserRole } from '@/types/domain';
+import { useEffect, useState } from 'react';
 
 const roleLabels: Record<UserRole, string> = {
   guest: 'Guest',
   adult_player: 'Adult player',
   guardian: 'Parent / guardian',
   coach: 'Coach / manager',
+  volunteer: 'Volunteer',
   competition_manager: 'Competition manager',
   admin: 'Club administrator',
 };
@@ -25,11 +30,34 @@ const menu = [
 ];
 
 export default function ProfileScreen() {
-  const { role, setRole, household, registrations, resetDemo } = useApp();
-  const isStaff = role === 'coach' || role === 'competition_manager' || role === 'admin';
+  const {
+    role,
+    setRole,
+    household,
+    registrations,
+    resetDemo,
+    documents,
+    notificationPrefs,
+    setNotificationPrefs,
+    followedIds,
+    setFollowedIds,
+    schedule,
+  } = useApp();
+  const staff = isStaff(role);
+  const parentView = role === 'guardian';
+  const [funnel, setFunnel] = useState<ReturnType<typeof funnelCounts> | null>(null);
+  const attendance = completedAttendance(mayaAttendanceHistory);
+  const kidsEvent = schedule.find((event) => event.id === 'kids-session-1');
+  const recorded = kidsEvent?.checkIns ?? [];
+  const presentNow = recorded.filter((item) => item.present).length;
+  const unrecorded = Math.max(0, 12 - recorded.length);
+
+  useEffect(() => {
+    getEvents().then((events) => setFunnel(funnelCounts(events)));
+  }, [registrations]);
 
   return (
-    <Screen>
+    <Screen tabScene>
       <AppHeader eyebrow="Account" title="Profile" />
       <View style={styles.identity}>
         <View style={styles.avatar}>
@@ -41,7 +69,7 @@ export default function ProfileScreen() {
           <DemoBadge />
         </View>
         <Pressable accessibilityLabel="Edit profile" style={styles.editButton}>
-          <Ionicons name="pencil" size={17} color={colors.ink} />
+          <Ionicons name="pencil-outline" size={17} color={colors.ink} />
         </Pressable>
       </View>
 
@@ -53,6 +81,8 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <>
+          {parentView ? (
+            <>
           <SectionHeading title="Household" />
           <View style={styles.children}>
             {household.children.map((child) => (
@@ -65,7 +95,7 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={18} color={colors.stone} />
               </View>
             ))}
-            <Pressable onPress={() => router.push('/registration/fall-kids-2026')} style={styles.addChild}>
+            <Pressable onPress={() => { if (can(role, 'register_child')) router.push('/registration/fall-kids-2026'); }} style={styles.addChild}>
               <Ionicons name="add-circle-outline" size={20} color={colors.orangeDark} />
               <Text style={styles.addChildText}>Add a child</Text>
             </Pressable>
@@ -77,35 +107,119 @@ export default function ProfileScreen() {
               const program = demoPrograms.find((item) => item.id === registration.programId);
               return (
                 <View key={registration.id} style={styles.registration}>
-                  <View style={styles.registrationTop}>
-                    <View style={styles.flex}>
-                      <Text style={styles.registrationTitle}>{program?.title ?? 'Program registration'}</Text>
-                      <Text style={styles.registrationPeople}>{registration.participantNames.join(', ')}</Text>
+                  <Pressable onPress={() => router.push(`/season/${registration.id}` as never)}>
+                    <View style={styles.registrationTop}>
+                      <View style={styles.flex}>
+                        <Text style={styles.registrationTitle}>{program?.title ?? 'Program registration'}</Text>
+                        <Text style={styles.registrationPeople}>{registration.participantNames.join(', ')}</Text>
+                      </View>
+                      <StatusPill
+                        label={registration.status}
+                        tone={registration.status === 'approved' ? 'success' : 'warning'}
+                      />
                     </View>
-                    <StatusPill
-                      label={registration.status}
-                      tone={registration.status === 'approved' ? 'success' : 'warning'}
-                    />
-                  </View>
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>Payment</Text>
-                    <Text style={styles.paymentValue}>${registration.amountDue} · {registration.paymentStatus}</Text>
-                  </View>
+                    <View style={styles.paymentRow}>
+                      <Text style={styles.paymentLabel}>Season hub</Text>
+                      <Text style={styles.paymentValue}>${registration.amountDue} · {registration.paymentStatus}</Text>
+                    </View>
+                  </Pressable>
                 </View>
               );
             })}
           </View>
+            </>
+          ) : null}
+
+          {parentView ? (
+            <>
+              <SectionHeading title="Maya’s attendance" />
+              <View style={styles.registration}>
+                <Text style={styles.registrationTitle}>{attendance.attended} of {attendance.total} sessions</Text>
+                <Text style={styles.registrationPeople}>{attendance.percent}% · Fall Soccer Training</Text>
+                <View style={styles.history}>
+                  {mayaAttendanceHistory.map((row) => (
+                    <View key={row.id} style={styles.historyRow}>
+                      <Text style={styles.menuLabel}>{row.label}</Text>
+                      <StatusPill
+                        label={row.status}
+                        tone={row.status === 'present' ? 'success' : row.status === 'absent' ? 'warning' : 'neutral'}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </>
+          ) : null}
+
+          {role === 'coach' || role === 'admin' ? (
+            <>
+              <SectionHeading title="Session attendance" />
+              <Pressable onPress={() => router.push('/event/kids-session-1')} style={styles.registration}>
+                <Text style={styles.registrationTitle}>Take attendance · U8</Text>
+                <Text style={styles.registrationPeople}>{presentNow} present · {unrecorded} not recorded</Text>
+              </Pressable>
+            </>
+          ) : null}
+
+          {parentView ? (
+            <>
+          <SectionHeading title="Bills & documents" />
+          <View style={styles.menu}>
+            {documents.map((doc, index) => (
+              <View key={doc.id} style={[styles.menuRow, index < documents.length - 1 && styles.menuBorder]}>
+                <Ionicons name={doc.kind === 'waiver' ? 'document-text-outline' : 'card-outline'} size={21} color={colors.orangeDark} />
+                <View style={styles.flex}>
+                  <Text style={styles.menuLabel}>{doc.title}</Text>
+                  <Text style={styles.menuDetail}>{doc.status}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+            </>
+          ) : null}
+
+          <SectionHeading title="Followed" />
+          <View style={styles.roleGrid}>
+            {followCatalog.map((item) => {
+              const active = followedIds.includes(item.id);
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setFollowedIds(active ? followedIds.filter((id) => id !== item.id) : [...followedIds, item.id])}
+                  style={[styles.roleChip, active && styles.roleActive]}
+                >
+                  <Text style={[styles.roleChipText, active && styles.roleActiveText]}>{item.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <SectionHeading title="Notification preferences" />
+          <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, team: !notificationPrefs.team })} style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Team alerts {notificationPrefs.team ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, community: !notificationPrefs.community })} style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Community {notificationPrefs.community ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, locationShare: !notificationPrefs.locationShare })} style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Location for travel {notificationPrefs.locationShare ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Text style={styles.previewNote}>Location stays opt-in. Drive times remain a Fairfax stub until maps are connected. Urgent field closures always appear in-app.</Text>
         </>
       )}
 
-      {isStaff && (
+      {staff && (
         <>
           <SectionHeading title="Club tools" />
           <Pressable onPress={() => router.push('/admin')} style={styles.adminCard}>
             <View style={styles.adminIcon}><Ionicons name="settings-outline" size={22} color={colors.white} /></View>
             <View style={styles.flex}>
               <Text style={styles.adminTitle}>Open management</Text>
-              <Text style={styles.adminCopy}>Registrations, teams, games and announcements</Text>
+              <Text style={styles.adminCopy}>
+                {funnel
+                  ? `Funnel · views ${funnel.programViewed} · starts ${funnel.registrationStarted} · completions ${funnel.registrationCompleted}`
+                  : 'Registrations, fields, attendance, announcements'}
+              </Text>
             </View>
             <Ionicons name="arrow-forward" size={20} color={colors.orange} />
           </Pressable>
@@ -115,7 +229,11 @@ export default function ProfileScreen() {
       <SectionHeading title="Account & settings" />
       <View style={styles.menu}>
         {menu.map((item, index) => (
-          <Pressable key={item.label} style={[styles.menuRow, index < menu.length - 1 && styles.menuBorder]}>
+          <Pressable
+            key={item.label}
+            onPress={item.label === 'Waivers & consents' || item.label === 'Payments' ? () => undefined : undefined}
+            style={[styles.menuRow, index < menu.length - 1 && styles.menuBorder]}
+          >
             <Ionicons name={item.icon} size={21} color={colors.orangeDark} />
             <View style={styles.flex}>
               <Text style={styles.menuLabel}>{item.label}</Text>
@@ -125,11 +243,25 @@ export default function ProfileScreen() {
           </Pressable>
         ))}
       </View>
+      <Pressable onPress={() => router.push('/about')} style={[styles.adminCard, { marginTop: 12 }]}>
+        <View style={styles.flex}>
+          <Text style={styles.adminTitle}>About ROYALS</Text>
+          <Text style={styles.adminCopy}>About, Support Us, Sponsors, Volunteer, Contact</Text>
+        </View>
+        <Ionicons name="arrow-forward" size={20} color={colors.orange} />
+      </Pressable>
 
       <SectionHeading title="Preview roles" />
       <Text style={styles.previewNote}>Demo-only controls for reviewing role-aware experiences.</Text>
+      <Pressable onPress={() => router.push('/lab')} style={[styles.adminCard, { marginBottom: 16 }]}>
+        <View style={styles.flex}>
+          <Text style={styles.adminTitle}>Open Interaction Lab</Text>
+          <Text style={styles.adminCopy}>Compare RSVP, supporter, attendance and calendar variants. Not in tab navigation.</Text>
+        </View>
+        <Ionicons name="flask-outline" size={20} color={colors.orange} />
+      </Pressable>
       <View style={styles.roleGrid}>
-        {(['guest', 'guardian', 'adult_player', 'coach', 'admin'] as UserRole[]).map((item) => (
+        {(['guest', 'guardian', 'adult_player', 'coach', 'volunteer', 'admin'] as UserRole[]).map((item) => (
           <Pressable key={item} onPress={() => setRole(item)} style={[styles.roleChip, role === item && styles.roleActive]}>
             <Text style={[styles.roleChipText, role === item && styles.roleActiveText]}>{roleLabels[item]}</Text>
           </Pressable>
@@ -184,4 +316,6 @@ const styles = StyleSheet.create({
   roleChipText: { color: colors.charcoal, fontSize: 11, ...typography.label },
   roleActiveText: { color: colors.white },
   reset: { marginTop: spacing.lg },
+  history: { marginTop: spacing.md, gap: spacing.xs },
+  historyRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

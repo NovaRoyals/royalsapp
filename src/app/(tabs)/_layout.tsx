@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { onTabPressHaptic, TabBarIcon } from '@/components/motion';
 import { colors, typography } from '@/theme/tokens';
 
 const iconMap = {
@@ -28,17 +28,25 @@ export default function TabsLayout() {
           backgroundColor: colors.paper,
           borderTopColor: colors.border,
         },
-        tabBarIcon: ({ color, focused, size }) => {
+        tabBarIcon: ({ focused, size }) => {
           const icons = iconMap[route.name as keyof typeof iconMap] ?? iconMap.index;
-          return <Ionicons name={icons[focused ? 1 : 0]} size={size} color={color} />;
+          return <TabBarIcon outline={icons[0]} filled={icons[1]} focused={focused} size={size} />;
         },
       })}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="programs" options={{ title: 'Programs' }} />
-      <Tabs.Screen name="schedule" options={{ title: 'Schedule' }} />
-      <Tabs.Screen name="teams" options={{ title: 'Teams' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      {(['index', 'programs', 'schedule', 'teams', 'profile'] as const).map((name) => (
+        <Tabs.Screen
+          key={name}
+          name={name}
+          options={{ title: name === 'index' ? 'Home' : name[0].toUpperCase() + name.slice(1) }}
+          listeners={({ navigation, route }) => ({
+            tabPress: () => {
+              const state = navigation.getState();
+              onTabPressHaptic(state.routes[state.index]?.name === route.name);
+            },
+          })}
+        />
+      ))}
     </Tabs>
   );
 }

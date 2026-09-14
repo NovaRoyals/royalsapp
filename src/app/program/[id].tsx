@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Button, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms } from '@/data/demo';
+import { track } from '@/lib/analytics';
+import { can } from '@/lib/capabilities';
+import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function generateStaticParams() {
@@ -14,8 +18,13 @@ export function generateStaticParams() {
 
 export default function ProgramDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { role } = useApp();
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
+
+  useEffect(() => {
+    track('program_viewed', { programId: program.id });
+  }, [program.id]);
 
   return (
     <Screen contentStyle={styles.page}>
@@ -92,7 +101,11 @@ export default function ProgramDetailScreen() {
         <Button
           label={program.registrationOpen ? 'Register' : 'Join list'}
           icon="arrow-forward"
-          onPress={() => router.push(`/registration/${program.id}`)}
+          onPress={() => {
+            if (isYouth && !can(role, 'register_child')) router.push('/onboarding');
+            else if (!isYouth && !can(role, 'register_self')) router.push('/onboarding');
+            else router.push(`/registration/${program.id}`);
+          }}
         />
       </View>
     </Screen>

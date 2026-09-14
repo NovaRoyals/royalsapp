@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '@/components/motion';
 import { AppHeader, Chip, Screen, StatusPill, textStyles } from '@/components/ui';
 import { demoPrograms } from '@/data/demo';
+import { track } from '@/lib/analytics';
+import { haptic } from '@/lib/haptics';
 import { colors, radius, shadow, spacing, typography } from '@/theme/tokens';
 import type { SportCode } from '@/types/domain';
 
@@ -14,30 +17,50 @@ export default function ProgramsScreen() {
   const programs = useMemo(() => demoPrograms.filter((program) => program.sport === sport), [sport]);
   const featured = programs[0];
 
+  useEffect(() => {
+    if (featured) track('program_viewed', { programId: featured.id });
+  }, [featured]);
+
   return (
-    <Screen>
+    <Screen tabScene>
       <AppHeader eyebrow="Discover" title="Programs" />
       <Text style={styles.lead}>A clear path into the club—whether you’re registering a child, joining a team or finding your next game.</Text>
       <View style={styles.sportSwitch}>
-        <Pressable
-          onPress={() => setSport('soccer')}
+        <PressableScale
+          onPress={() => {
+            if (sport !== 'soccer') haptic('light');
+            setSport('soccer');
+          }}
           style={[styles.sportOption, sport === 'soccer' && styles.sportActive]}
         >
-          <Ionicons name="football-outline" size={19} color={sport === 'soccer' ? colors.white : colors.stone} />
+          <Ionicons name={sport === 'soccer' ? 'football' : 'football-outline'} size={19} color={sport === 'soccer' ? colors.white : colors.stone} />
           <Text style={[styles.sportText, sport === 'soccer' && styles.sportTextActive]}>Soccer</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setSport('cricket')}
+        </PressableScale>
+        <PressableScale
+          onPress={() => {
+            if (sport !== 'cricket') haptic('light');
+            setSport('cricket');
+          }}
           style={[styles.sportOption, sport === 'cricket' && styles.sportActive]}
         >
-          <Ionicons name="radio-outline" size={19} color={sport === 'cricket' ? colors.white : colors.stone} />
+          <Ionicons name={sport === 'cricket' ? 'baseball' : 'baseball-outline'} size={19} color={sport === 'cricket' ? colors.white : colors.stone} />
           <Text style={[styles.sportText, sport === 'cricket' && styles.sportTextActive]}>Cricket</Text>
-        </Pressable>
+        </PressableScale>
+        <PressableScale
+          onPress={() => {
+            if (sport !== 'fitness') haptic('light');
+            setSport('fitness');
+          }}
+          style={[styles.sportOption, sport === 'fitness' && styles.sportActive]}
+        >
+          <Ionicons name={sport === 'fitness' ? 'barbell' : 'barbell-outline'} size={19} color={sport === 'fitness' ? colors.white : colors.stone} />
+          <Text style={[styles.sportText, sport === 'fitness' && styles.sportTextActive]}>Fitness</Text>
+        </PressableScale>
       </View>
 
       {featured ? (
         <Link href={`/program/${featured.id}`} asChild>
-          <Pressable style={styles.featured}>
+          <PressableScale style={styles.featured}>
             <Image source={{ uri: featured.heroImage }} style={styles.featuredImage} contentFit="cover" />
             <View style={styles.featuredBody}>
               <View style={styles.featuredTop}>
@@ -51,7 +74,7 @@ export default function ProgramsScreen() {
                 <Text style={styles.meta}>{featured.dates}</Text>
               </View>
             </View>
-          </Pressable>
+          </PressableScale>
         </Link>
       ) : null}
 
@@ -68,7 +91,7 @@ export default function ProgramsScreen() {
       <View style={styles.list}>
         {programs.slice(1).map((program) => (
           <Link key={program.id} href={`/program/${program.id}`} asChild>
-            <Pressable style={styles.programCard}>
+            <PressableScale style={styles.programCard}>
               <Image source={{ uri: program.heroImage }} style={styles.cardImage} contentFit="cover" />
               <View style={styles.cardBody}>
                 <View style={styles.titleRow}>
@@ -82,7 +105,7 @@ export default function ProgramsScreen() {
                   {program.registrationOpen ? <View style={styles.openDot} /> : null}
                 </View>
               </View>
-            </Pressable>
+            </PressableScale>
           </Link>
         ))}
       </View>
@@ -90,7 +113,13 @@ export default function ProgramsScreen() {
       {sport === 'cricket' && (
         <View style={styles.cricketNote}>
           <Ionicons name="information-circle-outline" size={22} color={colors.info} />
-          <Text style={styles.cricketText}>Cricket uses the same Royals team, schedule and competition experience, with sport-specific stats ready to extend.</Text>
+          <Text style={styles.cricketText}>Cricket uses the same Royals team and schedule model. CCPL is an external competition — ROYALS does not invent official tables.</Text>
+        </View>
+      )}
+      {sport === 'fitness' && (
+        <View style={styles.cricketNote}>
+          <Ionicons name="information-circle-outline" size={22} color={colors.info} />
+          <Text style={styles.cricketText}>Fitness is a club pillar, not a league. No standings — just sessions, RSVP and community.</Text>
         </View>
       )}
     </Screen>

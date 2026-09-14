@@ -17,7 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabScene } from '@/components/motion';
+import { haptic } from '@/lib/haptics';
+import { notificationsForRole } from '@/lib/membership';
+import { useReducedMotion } from '@/lib/reducedMotion';
 import { backendModeLabel } from '@/lib/supabase';
+import { useApp } from '@/state/AppProvider';
+import { motion } from '@/theme/motion';
 import { colors, layout, radius, shadow, spacing, typography } from '@/theme/tokens';
 
 export function Screen({
@@ -26,12 +32,14 @@ export function Screen({
   style,
   contentStyle,
   scrollKey,
+  tabScene = false,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
   scrollKey?: string | number;
+  tabScene?: boolean;
 }) {
   const scrollRef = useRef<ScrollView>(null);
   const pathname = usePathname();
@@ -43,21 +51,23 @@ export function Screen({
   }, [resetKey]);
 
   const content = <View style={[styles.content, contentStyle]}>{children}</View>;
+  const body = scroll ? (
+    <ScrollView
+      ref={scrollRef}
+      style={Platform.OS === 'web' ? ({ overflowAnchor: 'none' } as ViewStyle) : undefined}
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {content}
+    </ScrollView>
+  ) : (
+    content
+  );
+
   return (
     <SafeAreaView edges={['top']} style={[styles.safe, style]}>
-      {scroll ? (
-        <ScrollView
-          ref={scrollRef}
-          style={Platform.OS === 'web' ? ({ overflowAnchor: 'none' } as ViewStyle) : undefined}
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {content}
-        </ScrollView>
-      ) : (
-        content
-      )}
+      {tabScene ? <TabScene>{body}</TabScene> : body}
     </SafeAreaView>
   );
 }
@@ -82,6 +92,9 @@ export function AppHeader({
   title?: string;
   action?: React.ReactNode;
 }) {
+  const { hydrated, notifications, role } = useApp();
+  const unread = hydrated ? notificationsForRole(role, notifications).filter((item) => !item.read).length : 0;
+  const reduced = useReducedMotion();
   return (
     <View style={styles.header}>
       <View>
@@ -90,9 +103,12 @@ export function AppHeader({
       </View>
       {action ?? (
         <Link href={'/notifications' as Href} asChild>
-          <Pressable accessibilityLabel="Open notifications" style={styles.iconButton}>
+          <Pressable
+            accessibilityLabel="Open notifications"
+            style={({ pressed }) => [styles.iconButton, pressed && !reduced && styles.pressed]}
+          >
             <Ionicons name="notifications-outline" size={22} color={colors.ink} />
-            <View style={styles.notificationDot} />
+            {unread > 0 ? <View style={styles.notificationDot} /> : null}
           </Pressable>
         </Link>
       )}
@@ -117,6 +133,7 @@ export function Button({
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const reduced = useReducedMotion();
   return (
     <Pressable
       accessibilityRole="button"
@@ -126,7 +143,7 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         styles[`button_${variant}`],
-        pressed && styles.pressed,
+        pressed && !reduced && styles.pressed,
         (disabled || loading) && styles.disabled,
         style,
       ]}
@@ -181,16 +198,22 @@ export function Chip({
   onPress?: () => void;
   tone?: 'neutral' | 'orange' | 'success';
 }) {
+  const reduced = useReducedMotion();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[
+      onPress={() => {
+        if (!onPress) return;
+        if (!active) haptic('light');
+        onPress();
+      }}
+      style={({ pressed }) => [
         styles.chip,
         tone === 'orange' && styles.chipOrange,
         tone === 'success' && styles.chipSuccess,
         active && styles.chipActive,
+        pressed && !reduced && styles.pressed,
       ]}
     >
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
@@ -323,7 +346,7 @@ const styles = StyleSheet.create({
   buttonLabel_secondary: { color: colors.ink },
   buttonLabel_dark: { color: colors.white },
   buttonLabel_ghost: { color: colors.ink },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
+  pressed: { opacity: motion.press.opacity, transform: [{ scale: motion.press.scale }] },
   disabled: { opacity: 0.45 },
   sectionHeading: {
     flexDirection: 'row',

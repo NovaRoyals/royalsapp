@@ -30,6 +30,7 @@ export default function RootLayout() {
             headerShown: false,
             contentStyle: { backgroundColor: colors.cream },
             animation: 'slide_from_right',
+            animationDuration: 220,
           }}
         >
           <Stack.Screen name="(tabs)" />
@@ -38,9 +39,13 @@ export default function RootLayout() {
           <Stack.Screen name="team/[id]" />
           <Stack.Screen name="competition/[id]" />
           <Stack.Screen name="event/[id]" />
+          <Stack.Screen name="season/[registrationId]" />
+          <Stack.Screen name="message/[id]" />
+          <Stack.Screen name="about" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="admin" />
+          <Stack.Screen name="lab" />
         </Stack>
       </AppProvider>
     </QueryClientProvider>

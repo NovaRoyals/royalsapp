@@ -3,7 +3,8 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Screen, SectionHeading, StatusPill } from '@/components/ui';
-import { demoAnnouncements, demoTeams } from '@/data/demo';
+import { demoTeams } from '@/data/demo';
+import { privacyName } from '@/lib/attendance';
 import { formatEventParts } from '@/lib/datetime';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
@@ -14,11 +15,13 @@ export function generateStaticParams() {
 
 export default function TeamDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { schedule } = useApp();
+  const { schedule, announcements, role } = useApp();
   const team = demoTeams.find((item) => item.id === id) ?? demoTeams[0];
   const next = schedule.find((event) => event.teamId === team.id && event.status === 'scheduled');
   const recent = schedule.find((event) => event.teamId === team.id && event.status === 'completed');
   const nextParts = next ? formatEventParts(next.startsAt) : null;
+  const teamNote = announcements.find((item) => item.teamId === team.id);
+  const authorized = role === 'coach' || role === 'admin' || role === 'guardian';
 
   return (
     <Screen>
@@ -36,25 +39,29 @@ export default function TeamDetailScreen() {
           <View style={styles.statRule} />
           <View><Text style={styles.statValue}>{team.memberCount}</Text><Text style={styles.statLabel}>SQUAD</Text></View>
           <View style={styles.statRule} />
-          <View><Text style={styles.statValue}>—</Text><Text style={styles.statLabel}>TABLE</Text></View>
+          <View><Text style={styles.statValue}>{team.id === 'nova-royals-kids-u8' || team.id === 'nova-royals-men' ? '—' : team.record}</Text><Text style={styles.statLabel}>{team.id === 'nova-royals-kids-u8' ? 'TRAINING' : team.id === 'nova-royals-men' ? 'TABLE' : 'RECORD'}</Text></View>
         </View>
       </View>
 
       <View style={styles.actions}>
         <Button label="Schedule" icon="calendar-outline" variant="secondary" style={styles.flex} onPress={() => router.push('/(tabs)/schedule')} />
-        <Button label="Announcement" icon="megaphone-outline" variant="secondary" style={styles.flex} />
+        <Button label="Announcement" icon="megaphone-outline" variant="secondary" style={styles.flex} onPress={() => router.push((teamNote ? `/message/${teamNote.id}` : '/(tabs)/schedule') as never)} />
       </View>
 
       {next && (
         <>
-          <SectionHeading title="Next game" />
+          <SectionHeading title={team.id === 'nova-royals-kids-u8' ? 'Next session' : 'Next game'} />
           <Link href={`/event/${next.id}`} asChild>
             <Pressable style={styles.nextCard}>
               <View style={styles.nextDate}><Text style={styles.nextDay}>{nextParts?.day}</Text><Text style={styles.nextMonth}>{nextParts?.month}</Text></View>
               <View style={styles.flex}>
                 <Text style={styles.nextTitle}>{next.title}</Text>
                 <Text style={styles.nextMeta}>{nextParts?.time} · {next.venue}</Text>
-                <StatusPill label={next.attendance ? `RSVP · ${next.attendance.replace('_', ' ')}` : 'Respond'} tone="warning" />
+                {role === 'guardian' || role === 'adult_player' ? (
+                  <StatusPill label={next.attendance ? `RSVP · ${next.attendance.replace('_', ' ')}` : 'Respond'} tone="warning" />
+                ) : (
+                  <StatusPill label={`${next.goingCount ?? 0} going`} tone="neutral" />
+                )}
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.stone} />
             </Pressable>
@@ -79,20 +86,32 @@ export default function TeamDetailScreen() {
           <View key={person.id} style={styles.player}>
             <View style={styles.number}><Text style={styles.numberText}>{person.jerseyNumber ?? index + 1}</Text></View>
             <View style={styles.flex}>
-              <Text style={styles.playerName}>{person.displayName}</Text>
+              <Text style={styles.playerName}>{privacyName(person, authorized)}</Text>
               <Text style={styles.position}>{person.position ?? 'Squad'}</Text>
             </View>
-            {team.managed ? <Ionicons name="checkmark-circle-outline" size={19} color={colors.success} /> : null}
+            {team.managed ? <Ionicons name="checkmark-circle" size={19} color={colors.success} /> : null}
           </View>
         ))}
-        <View style={styles.privateRoster}><Ionicons name="lock-closed-outline" size={15} color={colors.stone} /><Text style={styles.privateText}>Contact details restricted to authorized team staff</Text></View>
+        <View style={styles.privateRoster}><Ionicons name="lock-closed-outline" size={15} color={colors.stone} /><Text style={styles.privateText}>Youth names use initials outside authorized guardian and staff views</Text></View>
       </View>
 
-      <SectionHeading title="Team update" />
-      <View style={styles.announcement}>
-        <Ionicons name="megaphone-outline" size={22} color={colors.orangeDark} />
-        <View style={styles.flex}><Text style={styles.announcementTitle}>{demoAnnouncements[1].title}</Text><Text style={styles.announcementBody}>{demoAnnouncements[1].body}</Text></View>
-      </View>
+      {teamNote ? (
+        <>
+          <SectionHeading title="Team update" />
+          <Pressable onPress={() => router.push(`/message/${teamNote.id}` as never)} style={styles.announcement}>
+            <Ionicons name="megaphone-outline" size={22} color={colors.orangeDark} />
+            <View style={styles.flex}><Text style={styles.announcementTitle}>{teamNote.title}</Text><Text style={styles.announcementBody}>{teamNote.body}</Text></View>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <SectionHeading title="Team update" />
+          <View style={styles.announcement}>
+            <Ionicons name="megaphone-outline" size={22} color={colors.orangeDark} />
+            <View style={styles.flex}><Text style={styles.announcementTitle}>No team-only update yet</Text><Text style={styles.announcementBody}>Club-wide notes stay on Home and Notifications, marked Club-wide.</Text></View>
+          </View>
+        </>
+      )}
     </Screen>
   );
 }

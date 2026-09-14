@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '@/components/motion';
 import { AppHeader, DemoBadge, Screen, SectionHeading, StatusPill } from '@/components/ui';
 import { demoCompetitions, demoTeams } from '@/data/demo';
+import { useApp } from '@/state/AppProvider';
 import { colors, radius, shadow, spacing, typography } from '@/theme/tokens';
 
 export default function TeamsScreen() {
   const league = demoCompetitions[0];
+  const { followedIds } = useApp();
 
   return (
-    <Screen>
+    <Screen tabScene>
       <AppHeader eyebrow="Squads & competition" title="Teams" />
       <View style={styles.contextRow}>
         <Text style={styles.lead}>Follow your Royals teams, fixtures, squad and season progress.</Text>
@@ -21,13 +24,14 @@ export default function TeamsScreen() {
       <View style={styles.list}>
         {demoTeams.map((team, index) => (
           <Link key={team.id} href={`/team/${team.id}`} asChild>
-            <Pressable style={styles.teamCard}>
+            <PressableScale style={styles.teamCard}>
               <View style={[styles.mark, { backgroundColor: team.accent }]}>
                 <Text style={styles.markText}>{index === 2 ? 'RC' : index === 1 ? 'RW' : 'RM'}</Text>
               </View>
               <View style={styles.teamCopy}>
                 <View style={styles.titleRow}>
                   <Text style={styles.teamName}>{team.name}</Text>
+                  {followedIds.includes(team.id) ? <StatusPill label="Following" tone="success" /> : null}
                   {team.managed ? <StatusPill label="Manage" tone="orange" /> : null}
                 </View>
                 <Text style={styles.competition}>{team.competitionName}</Text>
@@ -38,20 +42,20 @@ export default function TeamsScreen() {
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.stone} />
-            </Pressable>
+            </PressableScale>
           </Link>
         ))}
       </View>
 
       <SectionHeading title="Competition snapshot" />
       <Link href={`/competition/${league.id}`} asChild>
-        <Pressable style={styles.standingsCard}>
+        <PressableScale style={styles.standingsCard}>
           <View style={styles.standingsHeader}>
             <View>
               <Text style={styles.eyebrow}>LEAGUE</Text>
               <Text style={styles.standingsTitle}>{league.title}</Text>
             </View>
-            <Ionicons name="stats-chart" size={24} color={colors.orange} />
+            <Ionicons name="stats-chart-outline" size={24} color={colors.orange} />
           </View>
           {league.standings?.length ? (
             league.standings.slice(0, 3).map((row) => (
@@ -66,7 +70,7 @@ export default function TeamsScreen() {
             <Text style={styles.standingTeam}>Fixtures are live. Table updates after verified results — no placeholder scores.</Text>
           )}
           <Text style={styles.viewTable}>View fixtures →</Text>
-        </Pressable>
+        </PressableScale>
       </Link>
 
       <View style={styles.privacy}>

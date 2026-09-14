@@ -3,17 +3,22 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
+import { FieldChangeBanner } from '@/components/interactions/ContextCards';
+import { CalendarConfirmButton, SupporterButton } from '@/components/interactions/SupporterButton';
+import { RsvpChoices } from '@/components/interactions/RsvpChoices';
 import { Button, Screen, StatusPill } from '@/components/ui';
-import { demoSchedule } from '@/data/demo';
+import { demoSchedule, demoTeams } from '@/data/demo';
+import { estimatedTravelStub, formatEventParts, formatEventWhen } from '@/lib/datetime';
+import { can } from '@/lib/capabilities';
+import { gameDayBrief, isGameDayWindow, leaveByIso, travelMinutesStub } from '@/lib/intelligence';
+import { canPlayerRsvp, COACH_TEAM_ID } from '@/lib/membership';
+import { calendarGateway } from '@/services/calendar';
+import { mapsSearchUrl } from '@/services/maps';
+import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import type { AttendanceStatus } from '@/types/domain';
-
-const options: { id: AttendanceStatus; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'going', label: 'Going', icon: 'checkmark' },
-  { id: 'maybe', label: 'Maybe', icon: 'help' },
-  { id: 'not_going', label: 'Can’t go', icon: 'close' },
-];
+import type { AttendanceMark } from '@/types/domain';
 
 export function generateStaticParams() {
   return demoSchedule.map((item) => ({ id: item.id }));
@@ -21,10 +26,24 @@ export function generateStaticParams() {
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { schedule, setAttendance } = useApp();
+  const { schedule, setAttendance, setSupporter, setFieldStatus, recordCheckIn, recordAllPresent, role, registrations } = useApp();
   const event = schedule.find((item) => item.id === id) ?? schedule[0];
   const [calendarAdded, setCalendarAdded] = useState(false);
-  const date = new Date(event.startsAt);
+  const parts = formatEventParts(event.startsAt);
+  const weather = weatherForEvent(event);
+  const staffAttendance =
+    can(role, 'record_attendance') && Boolean(event.teamId) && (role === 'admin' || event.teamId === COACH_TEAM_ID);
+  const canClose = can(role, 'urgent_field_closure');
+  const showPlayerRsvp = canPlayerRsvp(role, event, registrations);
+  const showSupporter = !showPlayerRsvp && !staffAttendance;
+  const isTraining = event.type === 'training' || event.type === 'fitness';
+  const team = demoTeams.find((item) => item.id === event.teamId);
+  const roster = team?.roster ?? [];
+  const authorizedNames = role === 'coach' || role === 'admin' || role === 'guardian';
+  const recorded = event.checkIns ?? [];
+  const gameDay = isGameDayWindow(event) ? gameDayBrief(event) : null;
+  const leave = formatEventParts(leaveByIso(event.startsAt, event.venue));
+  const missingRsvpIds = roster.filter((person) => !recorded.some((item) => item.personId === person.id)).map((person) => person.id);
 
   return (
     <Screen>
@@ -35,56 +54,111 @@ export default function EventDetailScreen() {
       </View>
       <View style={styles.hero}>
         <View style={styles.date}>
-          <Text style={styles.day}>{date.getDate()}</Text>
-          <Text style={styles.month}>{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</Text>
+          <Text style={styles.day}>{parts.day}</Text>
+          <Text style={styles.month}>{parts.month}</Text>
         </View>
         <StatusPill label={event.type.replace('_', ' ')} tone="orange" />
         <Text style={styles.title}>{event.title}</Text>
         <Text style={styles.subtitle}>{event.subtitle}</Text>
       </View>
 
+      <FieldChangeBanner closed={event.fieldStatus === 'closed'} venue={event.venue} />
+
+      <View style={styles.statusRow}>
+        <StatusPill label={`Field ${fieldStatusLabel(event.fieldStatus)}`} tone={event.fieldStatus === 'closed' ? 'warning' : 'success'} />
+        {event.demo ? <StatusPill label="Demo" /> : null}
+      </View>
+
+      <View style={styles.travel}>
+        <Text style={styles.travelKicker}>GETTING THERE</Text>
+        {gameDay ? <Text style={styles.travelTime}>{gameDay.leaveBy}</Text> : <Text style={styles.travelTime}>{estimatedTravelStub(event.venue)}</Text>}
+        <Text style={styles.travelMeta}>
+          {travelMinutesStub(event.venue)}-minute drive stub · Leave by {leave.time} · Field {fieldStatusLabel(event.fieldStatus)} · {event.parkingNotes ?? 'Parking notes closer to kickoff'}
+        </Text>
+        <Button label="Open directions" icon="navigate-outline" variant="secondary" onPress={() => Linking.openURL(mapsSearchUrl(event.venue, event.address))} />
+      </View>
+
       <View style={styles.details}>
-        <Detail icon="time-outline" label="When" value={`${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`} />
+        <Detail icon="time-outline" label="When" value={formatEventWhen(event.startsAt)} />
         <Detail icon="location-outline" label="Where" value={`${event.venue}${event.address ? `\n${event.address}` : ''}`} />
-        <Detail icon="shirt-outline" label="For" value={event.subtitle} last />
+        <Detail icon="cloud-outline" label="Weather" value={`${weather.summary} · ${weather.source}`} />
+        <Detail icon="car-outline" label="Parking" value={event.parkingNotes ?? 'Notes post closer to kickoff'} />
+        {event.coachName ? <Detail icon="person-outline" label="Coach" value={event.coachName} /> : null}
+        {event.whatToBring ? <Detail icon="bag-outline" label="Bring" value={event.whatToBring} last /> : <Detail icon="shirt-outline" label="For" value={event.subtitle} last />}
       </View>
 
       {event.status === 'completed' ? (
-        <View style={styles.result}><Text style={styles.resultLabel}>FINAL</Text><Text style={styles.resultValue}>{event.result}</Text></View>
-      ) : (
+        <View style={styles.result}><Text style={styles.resultLabel}>{event.demo ? 'FINAL · DEMO' : 'FINAL'}</Text><Text style={styles.resultValue}>{event.result}</Text></View>
+      ) : showPlayerRsvp ? (
         <>
           <Text style={styles.sectionTitle}>Can you make it?</Text>
-          <View style={styles.rsvpOptions}>
-            {options.map((option) => {
-              const active = event.attendance === option.id;
-              return (
-                <Pressable key={option.id} onPress={() => setAttendance(event.id, option.id)} style={[styles.rsvp, active && styles.rsvpActive]}>
-                  <Ionicons name={option.icon} size={20} color={active ? colors.white : colors.stone} />
-                  <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>{option.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Text style={styles.hint}>Player availability for this roster — not spectator support.</Text>
+          <RsvpChoices value={event.attendance} goingCount={event.goingCount ?? 0} onChange={(status) => setAttendance(event.id, status)} />
         </>
-      )}
+      ) : null}
+
+      {showSupporter ? (
+        <View style={styles.support}>
+          <Text style={styles.sectionTitle}>Coming to support?</Text>
+          <Text style={styles.hint}>Spectators and club members who are not on this roster.</Text>
+          <SupporterButton
+            going={Boolean(event.supporterGoing)}
+            count={event.supporterCount ?? 0}
+            onToggle={(next) => setSupporter(event.id, next)}
+          />
+        </View>
+      ) : null}
+
+      {staffAttendance && roster.length ? (
+        <View style={styles.staff}>
+          <Text style={styles.sectionTitle}>Take attendance</Text>
+          <Text style={styles.hint}>U8 roster for this session. Mark everyone present, then record exceptions. Unrecorded names are treated as missing RSVP in this demo.</Text>
+          <AttendanceRoster
+            roster={roster}
+            recorded={recorded}
+            authorizedNames={authorizedNames}
+            missingRsvpIds={missingRsvpIds}
+            onMark={(person, status) =>
+              recordCheckIn(event.id, {
+                personId: person.id,
+                personName: person.displayName,
+                status,
+                present: status !== 'absent',
+              } satisfies AttendanceMark)
+            }
+            onMarkAllPresent={() => recordAllPresent(event.id, roster)}
+          />
+          {canClose ? (
+            <Button
+              label={event.fieldStatus === 'closed' ? 'Reopen field' : 'Close field (urgent alert)'}
+              variant="secondary"
+              onPress={() => setFieldStatus(event.id, event.fieldStatus === 'closed' ? 'open' : 'closed')}
+              style={styles.secondary}
+            />
+          ) : null}
+        </View>
+      ) : canClose ? (
+        <Button
+          label={event.fieldStatus === 'closed' ? 'Reopen field' : 'Close field (urgent alert)'}
+          variant="secondary"
+          onPress={() => setFieldStatus(event.id, event.fieldStatus === 'closed' ? 'open' : 'closed')}
+          style={styles.secondary}
+        />
+      ) : null}
 
       <Text style={styles.sectionTitle}>Plan ahead</Text>
-      <Button
-        label={calendarAdded ? 'Added to calendar' : 'Add to calendar'}
-        icon={calendarAdded ? 'checkmark' : 'calendar-outline'}
-        variant={calendarAdded ? 'secondary' : 'primary'}
-        onPress={() => setCalendarAdded(true)}
+      <CalendarConfirmButton
+        added={calendarAdded}
+        labelIdle={isTraining ? 'Add season session to calendar' : 'Add to calendar'}
+        onAdd={() => {
+          calendarGateway.add(event);
+          setCalendarAdded(true);
+        }}
       />
-      <Button
-        label="Open location"
-        icon="navigate-outline"
-        variant="secondary"
-        onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(`${event.venue} ${event.address ?? ''}`)}`)}
-        style={styles.secondary}
-      />
+      {event.coachName ? <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} /> : null}
       <View style={styles.demoNote}>
         <Ionicons name="flask-outline" size={19} color={colors.warning} />
-        <Text style={styles.demoText}>This is demo schedule data. Calendar state is simulated until native calendar permissions are enabled.</Text>
+        <Text style={styles.demoText}>Travel time is a stub until live maps are configured. Weather and calendar write are stubs. Field status is staff-controlled in demo.</Text>
       </View>
     </Screen>
   );
@@ -103,25 +177,37 @@ const styles = StyleSheet.create({
   topbar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   topTitle: { color: colors.ink, fontSize: 15, ...typography.heading },
-  hero: { minHeight: 270, padding: spacing.xl, marginTop: spacing.md, borderRadius: radius.lg, backgroundColor: colors.ink, justifyContent: 'flex-end', alignItems: 'flex-start' },
+  hero: { minHeight: 240, padding: spacing.xl, marginTop: spacing.md, borderRadius: radius.lg, backgroundColor: colors.ink, justifyContent: 'flex-end', alignItems: 'flex-start' },
   date: { position: 'absolute', top: spacing.xl, right: spacing.xl, width: 68, height: 74, borderRadius: radius.md, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
   day: { color: colors.white, fontSize: 29, lineHeight: 31, ...typography.heading },
   month: { color: colors.white, fontSize: 10, ...typography.label, letterSpacing: 1 },
   title: { color: colors.white, fontSize: 27, lineHeight: 31, marginTop: spacing.md, ...typography.heading },
   subtitle: { color: colors.sand, fontSize: 13, marginTop: 5, ...typography.body },
-  details: { marginTop: spacing.xl, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper },
+  statusRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  travel: { marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper, gap: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  travelKicker: { color: colors.orangeDark, fontSize: 10, ...typography.label },
+  travelTime: { color: colors.ink, fontSize: 18, ...typography.heading },
+  travelMeta: { color: colors.stone, fontSize: 12, lineHeight: 18, ...typography.body },
+  details: { marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper },
   detailRow: { paddingVertical: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   detailBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   detailIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center' },
   detailLabel: { color: colors.stone, fontSize: 10, textTransform: 'uppercase', ...typography.label },
   detailValue: { color: colors.ink, fontSize: 13, lineHeight: 19, marginTop: 3, ...typography.heading },
   flex: { flex: 1 },
-  sectionTitle: { color: colors.ink, fontSize: 19, marginTop: spacing.xxl, marginBottom: spacing.md, ...typography.heading },
+  counts: { marginTop: spacing.md, gap: 2 },
+  countLine: { color: colors.charcoal, fontSize: 13, ...typography.body },
+  sectionTitle: { color: colors.ink, fontSize: 19, marginTop: spacing.xxl, marginBottom: spacing.sm, ...typography.heading },
+  hint: { color: colors.stone, fontSize: 12, lineHeight: 17, marginBottom: spacing.md, ...typography.body },
   rsvpOptions: { flexDirection: 'row', gap: spacing.sm },
   rsvp: { flex: 1, minHeight: 72, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   rsvpActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   rsvpText: { color: colors.charcoal, fontSize: 11, ...typography.label },
   rsvpTextActive: { color: colors.white },
+  support: { marginTop: spacing.md, gap: spacing.md },
+  staff: { marginTop: spacing.md },
+  checkRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border },
+  checkName: { color: colors.ink, ...typography.heading },
   result: { marginTop: spacing.xl, padding: spacing.xl, borderRadius: radius.md, backgroundColor: colors.orangeSoft, alignItems: 'center' },
   resultLabel: { color: colors.orangeDark, fontSize: 10, ...typography.label, letterSpacing: 1 },
   resultValue: { color: colors.ink, fontSize: 21, marginTop: spacing.sm, ...typography.heading },
