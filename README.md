@@ -1,56 +1,73 @@
-# Welcome to your Expo app 👋
+# ROYALS
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The cross-platform club app for Nova Royals Athletic Club. This first substantial MVP covers program discovery, a multi-child youth registration checkout, household profiles, schedules, attendance, teams, league tables, tournament entry, notifications, announcements, and initial staff tools.
 
-## Get started
+## Run immediately (demo mode)
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Requirements: Node.js 22.13 or newer and npm.
 
 ```bash
-npm run reset-project
+npm install
+npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Then open the URL printed by Expo (normally `http://localhost:8081`). No backend credentials are required. Demo registrations, attendance responses, role previews, status edits, results, and announcements persist in local storage.
 
-### Other setup steps
+Other platforms:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npm run android
+npm run ios
+```
 
-## Learn more
+The iOS command requires macOS/Xcode; Android requires an emulator or connected device. Expo Go support depends on SDK compatibility, while a development build supports the full notification configuration.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Connect Supabase
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Create a Supabase project.
+2. Copy `.env.example` to `.env`.
+3. Add the project URL and publishable key. Never use a secret/service-role key in the app.
+4. Apply `supabase/migrations/20260913200157_core_schema.sql` to the project.
+5. Generate database types and replace the temporary repository DTO casts before production launch.
 
-## Join the community
+For local Supabase development (Docker required):
 
-Join our community of developers creating universal apps.
+```bash
+npx supabase start
+npx supabase db reset
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The app automatically selects demo mode unless both public Supabase variables are present.
+
+## Environment
+
+```text
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+EXPO_PUBLIC_PAYMENT_MODE=demo
+```
+
+Public/publishable Supabase keys are safe in a client only because database RLS is mandatory. Payment provider secrets and Supabase service-role keys belong in server-side functions, never in Expo environment variables.
+
+## Quality checks
+
+```bash
+npm run typecheck
+npm run lint
+```
+
+## Structure
+
+- `src/app/` — Expo Router screens and navigation
+- `src/components/` — reusable design-system components
+- `src/data/` — demo fixtures and repository abstraction
+- `src/state/` — local interactive demo state
+- `src/theme/` — athletic visual tokens
+- `src/types/` — domain contracts
+- `src/lib/` — backend setup
+- `supabase/` — local config, SQL migrations, and seed entrypoint
+- `docs/` — product, data, security, and assumption records
+
+## Production gaps
+
+Demo mode is fully navigable but is not a production backend. Supabase Auth screens, generated database types/mappers, server-side registration finalization, transactional payment webhooks, production push credentials, native calendar permissions, finalized legal waiver text, and approved/bundled club imagery still need configuration and validation.
