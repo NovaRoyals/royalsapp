@@ -5,13 +5,13 @@ import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { CricketMark } from "@/components/icons/CricketMark";
 import { Button, Chip, Screen, StatusPill } from "@/components/ui";
 import { cricketSquad } from "@/data/ccpl";
-import { ccplScorecardUrl, displayCricketName, getMatchDetail, subscribeLive, type CricketBall, type CricketMatch } from "@/lib/cricket";
+import { ccplScorecardUrl, displayCricketName, getMatchDetail, isTrustedLive, subscribeLive, type CricketBall, type CricketMatch } from "@/lib/cricket";
 import { safeBack } from "@/lib/nav";
 import { useApp } from "@/state/AppProvider";
 import { colors, radius, spacing, typography } from "@/theme/tokens";
 
 export function generateStaticParams() {
-  return [{ id: "4806" }, { id: "4777" }, { id: "4762" }, { id: "4721" }, { id: "blitz" }, { id: "aces" }, { id: "warriors" }, { id: "shockers" }];
+  return [{ id: "4806" }, { id: "4777" }, { id: "4762" }, { id: "4721" }, { id: "blitz" }, { id: "aces" }, { id: "shockers" }];
 }
 
 function oversFromBalls(balls: CricketBall[]) {
@@ -36,22 +36,36 @@ export default function CricketMatchScreen() {
   const { role } = useApp();
   const signedIn = role !== "guest";
   const [match, setMatch] = useState<CricketMatch | undefined>();
+  const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<"scorecard" | "balls" | "overs" | "info">("scorecard");
 
   const load = () => {
-    if (id) getMatchDetail(id).then(setMatch);
+    if (!id) {
+      setReady(true);
+      return;
+    }
+    getMatchDetail(id).then(setMatch).finally(() => setReady(true));
   };
 
   useEffect(() => {
     load();
   }, [id]);
 
+  const trustedLive = match ? isTrustedLive(match) : false;
   useEffect(() => {
-    if (!match || match.status !== "live") return undefined;
-    return subscribeLive(match.id, load);
-  }, [match?.id, match?.status]);
+    if (!trustedLive) return undefined;
+    return subscribeLive(match?.rowId ?? match?.id ?? "", load);
+  }, [trustedLive, match?.rowId, match?.id]);
 
   const overGroups = useMemo(() => oversFromBalls(match?.balls ?? []), [match?.balls]);
+
+  if (!ready) {
+    return (
+      <Screen>
+        <Text style={styles.body}>Loading match…</Text>
+      </Screen>
+    );
+  }
 
   if (!match) {
     return (
@@ -71,10 +85,14 @@ export default function CricketMatchScreen() {
       </Pressable>
       <View style={styles.header}>
         <CricketMark size={22} color={colors.orange} />
-        <StatusPill label={match.status} tone={match.status === "live" ? "orange" : "neutral"} />
-        <Text style={styles.title}>vs {match.opponentName}</Text>
+        <StatusPill label={trustedLive ? "live" : match.status === "scheduled" ? "upcoming" : match.status} tone={trustedLive ? "orange" : "neutral"} />
+        <Text style={styles.title}>{match.opponentName}</Text>
         <Text style={styles.meta}>{match.playedAt}{match.venue ? ` · ${match.venue}` : ""}</Text>
-        {match.resultText ? <Text style={styles.result}>{match.resultText}</Text> : null}
+        {trustedLive && match.live?.scoreText ? <Text style={styles.result}>{match.live.scoreText}</Text> : null}
+        {!trustedLive && match.resultText ? <Text style={styles.result}>{match.resultText}</Text> : null}
+        {match.status === "live" && !trustedLive ? (
+          <Text style={styles.body}>Live score waits on a fresh CCPL poll. Until then, use the official scorecard.</Text>
+        ) : null}
         {official ? (
           <Pressable onPress={() => Linking.openURL(official)}>
             <Text style={styles.official}>View official scorecard on CCPL</Text>
@@ -97,7 +115,11 @@ export default function CricketMatchScreen() {
 
       {tab === "scorecard" ? (
         (match.innings ?? []).length === 0 ? (
-          <Text style={styles.body}>Full batting and bowling land after CCPL backfill. Result above is from the official results page.</Text>
+          <Text style={styles.body}>
+            {match.status === "completed"
+              ? "Full batting and bowling land after CCPL backfill. Result above is from the official results page."
+              : "Scorecard waits on a CCPL backfill. Use the official scorecard until then."}
+          </Text>
         ) : (
           (match.innings ?? []).map((inn) => (
             <View key={inn.inningsNo} style={styles.card}>

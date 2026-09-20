@@ -3,37 +3,85 @@ import { privacyName } from "@/lib/attendance";
 import {
   ccplMatches,
   cricketSquad,
+  isPublishedMatch,
   type CricketMatch,
   type CricketPlayer,
 } from "@/data/ccpl";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-export { seasonRecord, ccplScorecardUrl } from "@/data/ccpl";
+export { seasonRecord, ccplScorecardUrl, isTrustedLive, isPublishedMatch } from "@/data/ccpl";
 export type { CricketMatch, CricketPlayer, CricketBall } from "@/data/ccpl";
 
+type NameParts = { firstName: string; lastName: string; displayName: string; isMinor?: boolean };
+
+function partsFromFullName(fullName: string): NameParts {
+  const tokens = fullName.trim().split(/\s+/);
+  const lastName = tokens.at(-1) ?? "";
+  const firstName = tokens.slice(0, -1).join(" ") || tokens[0] || "";
+  return { firstName, lastName, displayName: fullName, isMinor: false };
+}
+
+function maskWithLastChars(person: NameParts, lastChars: number) {
+  const slice = person.lastName.slice(0, Math.max(1, lastChars));
+  return slice ? `${person.firstName} ${slice}.` : person.firstName;
+}
+
+/** Guest view: first + last initial, extra last letters when two squad names collide. */
+export function cricketPrivacyName(person: NameParts, authorized: boolean, peers: NameParts[]) {
+  if (authorized || person.isMinor) {
+    return privacyName(person, authorized);
+  }
+  let chars = 1;
+  while (chars < person.lastName.length) {
+    const label = maskWithLastChars(person, chars);
+    const clashes = peers.filter((peer) => maskWithLastChars(peer, chars) === label);
+    if (clashes.length <= 1) return label;
+    chars += 1;
+  }
+  return person.displayName;
+}
+
 export function displayCricketName(fullName: string, signedIn: boolean) {
-  const parts = fullName.trim().split(/\s+/);
-  const last = parts.at(-1) ?? "";
-  const first = parts.slice(0, -1).join(" ") || parts[0];
-  return privacyName(
-    { firstName: first, lastName: last, displayName: fullName, isMinor: false },
-    signedIn,
-  );
+  const person = partsFromFullName(fullName);
+  const peers = cricketSquad.map((item) => partsFromFullName(item.fullName));
+  return cricketPrivacyName(person, signedIn, peers);
+}
+
+function demoMatches() {
+  return [...ccplMatches].filter(isPublishedMatch).sort((a, b) => b.playedAt.localeCompare(a.playedAt));
 }
 
 export async function getMatches(): Promise<CricketMatch[]> {
-  if (!supabase) {
-    return [...ccplMatches].sort((a, b) => b.playedAt.localeCompare(a.playedAt));
-  }
+  if (!supabase) return demoMatches();
   const { data, error } = await supabase.from("cricket_matches").select("*").order("played_at", { ascending: false });
-  if (error || !data?.length) {
-    return [...ccplMatches].sort((a, b) => b.playedAt.localeCompare(a.playedAt));
-  }
-  return data.map(mapMatchRow);
+  if (error || !data?.length) return demoMatches();
+  const mapped = data.map(mapMatchRow).filter(isPublishedMatch);
+  return attachLiveState(mapped);
+}
+
+async function attachLiveState(matches: CricketMatch[]): Promise<CricketMatch[]> {
+  if (!supabase) return matches;
+  const liveRows = matches.filter((item) => item.status === "live" && item.rowId);
+  if (!liveRows.length) return matches;
+  const { data } = await supabase.from("cricket_live_state").select("*").in("match_id", liveRows.map((item) => item.rowId));
+  const byRow = new Map((data ?? []).map((row) => [String(row.match_id), row]));
+  return matches.map((item) => {
+    const live = item.rowId ? byRow.get(item.rowId) : undefined;
+    if (!live) return item;
+    return {
+      ...item,
+      live: {
+        scoreText: live.score_text,
+        batsmen: typeof live.batsmen === "string" ? live.batsmen : JSON.stringify(live.batsmen ?? ""),
+        currentBowler: live.current_bowler,
+        updatedAt: live.updated_at,
+      },
+    };
+  });
 }
 
 export async function getMatchDetail(id: string): Promise<CricketMatch | undefined> {
-  const local = ccplMatches.find((item) => item.id === id || String(item.ccplMatchId) === id);
+  const local = demoMatches().find((item) => item.id === id || String(item.ccplMatchId) === id);
   if (!supabase) return local;
   const ccplId = Number(id);
   const query = supabase.from("cricket_matches").select("*");
@@ -42,9 +90,11 @@ export async function getMatchDetail(id: string): Promise<CricketMatch | undefin
     : await query.eq("id", id).maybeSingle();
   if (!match) return local;
   const mapped = mapMatchRow(match);
+  if (!isPublishedMatch(mapped) && mapped.status !== "live" && mapped.status !== "scheduled") return undefined;
+  const withLive = (await attachLiveState([mapped]))[0];
   const { data: innings } = await supabase.from("cricket_innings").select("*").eq("match_id", match.id).order("innings_no");
   const inningsRows = innings ?? [];
-  mapped.innings = await Promise.all(
+  withLive.innings = await Promise.all(
     inningsRows.map(async (inn) => {
       const [{ data: batting }, { data: bowling }] = await Promise.all([
         supabase!.from("cricket_batting").select("*").eq("innings_id", inn.id).order("batting_order"),
@@ -82,7 +132,7 @@ export async function getMatchDetail(id: string): Promise<CricketMatch | undefin
     }),
   );
   const { data: balls } = await supabase.from("cricket_balls").select("*").eq("match_id", match.id).order("innings_no").order("seq");
-  mapped.balls = (balls ?? []).map((row) => ({
+  withLive.balls = (balls ?? []).map((row) => ({
     inningsNo: row.innings_no,
     seq: row.seq,
     overLabel: row.over_label,
@@ -93,16 +143,7 @@ export async function getMatchDetail(id: string): Promise<CricketMatch | undefin
     extras: row.extras,
     commentary: row.commentary ?? "",
   }));
-  const { data: live } = await supabase.from("cricket_live_state").select("*").eq("match_id", match.id).maybeSingle();
-  if (live) {
-    mapped.live = {
-      scoreText: live.score_text,
-      batsmen: typeof live.batsmen === "string" ? live.batsmen : JSON.stringify(live.batsmen ?? ""),
-      currentBowler: live.current_bowler,
-      updatedAt: live.updated_at,
-    };
-  }
-  return mapped;
+  return withLive;
 }
 
 export async function getPlayerProfile(id: string): Promise<{
@@ -171,8 +212,8 @@ export function subscribeLive(matchId: string, onChange: () => void): () => void
   if (!supabase) return () => undefined;
   const channel: RealtimeChannel = supabase
     .channel(`cricket-live-${matchId}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "cricket_balls" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "cricket_live_state" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "cricket_balls", filter: `match_id=eq.${matchId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "cricket_live_state", filter: `match_id=eq.${matchId}` }, onChange)
     .subscribe();
   return () => {
     supabase?.removeChannel(channel);
@@ -182,6 +223,7 @@ export function subscribeLive(matchId: string, onChange: () => void): () => void
 function mapMatchRow(row: Record<string, unknown>): CricketMatch {
   return {
     id: String(row.ccpl_match_id || row.id),
+    rowId: String(row.id),
     ccplMatchId: Number(row.ccpl_match_id),
     playedAt: String(row.played_at ?? ""),
     venue: row.venue as string | undefined,

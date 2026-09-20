@@ -68,6 +68,7 @@ export type CricketBall = {
 
 export type CricketMatch = {
   id: string;
+  rowId?: string;
   ccplMatchId: number;
   playedAt: string;
   venue?: string;
@@ -128,6 +129,7 @@ export const cricketSquad: CricketPlayer[] = [
   p("Suraj Kandel", "all_rounder"),
 ];
 
+/** Verbatim CCPL results only. No live snapshot, no unpublished fixtures. */
 export const ccplMatches: CricketMatch[] = [
   {
     id: "4806",
@@ -136,9 +138,7 @@ export const ccplMatches: CricketMatch[] = [
     venue: "Manassas Field 2",
     opponentName: "LM Tigers",
     homeAway: "away",
-    resultText: "NOVA Royals Athletic Club: 56/4 (10.5/20 ov)",
-    status: "live",
-    live: { scoreText: "NOVA Royals Athletic Club: 56/4 (10.5/20 ov)", updatedAt: "2026-09-20T16:40:00Z" },
+    status: "scheduled",
   },
   {
     id: "4777",
@@ -148,26 +148,6 @@ export const ccplMatches: CricketMatch[] = [
     resultText: "Won by 20 runs",
     resultType: "win",
     status: "completed",
-    innings: [
-      {
-        inningsNo: 2,
-        battingSide: "Orange Army",
-        batting: [
-          {
-            playerName: "Anudeep Mallaboina",
-            battingOrder: 1,
-            runs: 6,
-            balls: 19,
-            fours: 0,
-            sixes: 0,
-            dismissal: "c †Binod B b Biplav G",
-          },
-        ],
-        bowling: [
-          { playerId: "biplav-gautam", playerName: "Biplav Gautam", overs: 4, maidens: 0, runs: 22, wickets: 1 },
-        ],
-      },
-    ],
   },
   {
     id: "4762",
@@ -206,15 +186,6 @@ export const ccplMatches: CricketMatch[] = [
     status: "completed",
   },
   {
-    id: "warriors",
-    ccplMatchId: 0,
-    playedAt: "2026-08-16",
-    opponentName: "Global Warriors",
-    resultText: "No fixture on CCPL results page — no result recorded",
-    resultType: "no_result",
-    status: "completed",
-  },
-  {
     id: "shockers",
     ccplMatchId: 0,
     playedAt: "2026-09-26",
@@ -236,4 +207,22 @@ export function seasonRecord(matches: CricketMatch[]) {
       .sort((a, b) => a.playedAt.localeCompare(b.playedAt))
       .map((item) => (item.resultType === "win" ? "W" : item.resultType === "tie" ? "T" : "L")),
   };
+}
+
+export function isPublishedMatch(match: CricketMatch) {
+  if (match.resultType === "no_result") return false;
+  if (match.status === "completed" && !match.resultText) return false;
+  return true;
+}
+
+const LIVE_FRESH_MS = 120_000;
+
+export function isTrustedLive(match: CricketMatch, now = Date.now()) {
+  if (match.status !== "live" || !match.ccplMatchId) return false;
+  const updated = match.live?.updatedAt;
+  const score = match.live?.scoreText?.trim();
+  if (!updated || !score) return false;
+  const ts = Date.parse(updated);
+  if (!Number.isFinite(ts)) return false;
+  return now - ts <= LIVE_FRESH_MS;
 }

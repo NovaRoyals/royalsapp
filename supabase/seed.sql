@@ -104,7 +104,7 @@ insert into public.competitions (
   (select id from public.sports where code = 'cricket'),
   '10000000-0000-0000-0000-000000000002',
   'CCPL · Manassas1', 'league', 'Capital Cricket Premier League',
-  true, 'External T20 league. Club fixtures and published scorecards only. Aug 16 vs Global Warriors has no recorded result.', 'T20 · Manassas1 · 8 matches',
+  true, 'External T20 league. Club fixtures and published scorecards only.', 'T20 · Manassas1',
   '2026-08-02', '2026-09-26', 'Manassas, VA', 'active', true, '{}'::jsonb
 );
 
@@ -194,13 +194,6 @@ insert into public.events (
   'NOVA Royals vs Blitz', '40000000-0000-0000-0000-000000000003',
   'Blitz', '2026-08-08 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
   'completed', null, null, 'Tied — Blitz won the super over', true
-),
-(
-  (select id from public.sports where code = 'cricket'),
-  null, '30000000-0000-0000-0000-000000000003', 'league_match',
-  'NOVA Royals vs Global Warriors', '40000000-0000-0000-0000-000000000003',
-  'Global Warriors', '2026-08-16 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'No fixture on CCPL results page — no result recorded', true
 ),
 (
   (select id from public.sports where code = 'cricket'),

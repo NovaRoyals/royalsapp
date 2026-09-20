@@ -2,50 +2,56 @@ import { Href, Link } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { CricketMark } from "@/components/icons/CricketMark";
 import { StatusPill } from "@/components/ui";
 import { ccplScorecardUrl } from "@/data/ccpl";
-import { getMatches, seasonRecord, subscribeLive, type CricketMatch } from "@/lib/cricket";
+import { getMatches, isTrustedLive, seasonRecord, subscribeLive, type CricketMatch } from "@/lib/cricket";
 import { colors, radius, spacing, typography } from "@/theme/tokens";
 
 export function CricketMatchesPane() {
   const [matches, setMatches] = useState<CricketMatch[]>([]);
+  const [ready, setReady] = useState(false);
 
   const load = () => {
-    getMatches().then(setMatches);
+    getMatches()
+      .then(setMatches)
+      .finally(() => setReady(true));
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const live = matches.find((item) => item.status === "live");
+  const live = ready ? matches.find((item) => isTrustedLive(item)) : undefined;
   useEffect(() => {
     if (!live) return undefined;
-    return subscribeLive(live.id, load);
-  }, [live?.id]);
+    return subscribeLive(live.rowId ?? live.id, load);
+  }, [live?.rowId, live?.id]);
 
   const record = useMemo(() => seasonRecord(matches), [matches]);
-  const completed = matches.filter((item) => item.status === "completed");
-  const upcoming = matches.filter((item) => item.status === "scheduled");
+  const completed = matches.filter((item) => item.status === "completed" && item.resultType && item.resultType !== "no_result");
+  const upcoming = matches.filter((item) => item.status === "scheduled" || (item.status === "live" && !isTrustedLive(item)));
+
+  if (!ready) {
+    return (
+      <View style={styles.wrap}>
+        <Text style={styles.hint}>Loading CCPL results…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
       {live ? (
         <View style={styles.liveCard}>
           <View style={styles.liveTop}>
-            <CricketMark size={18} color={colors.orange} />
             <StatusPill label="Live" tone="orange" />
           </View>
-          <Text style={styles.liveTitle}>vs {live.opponentName}</Text>
-          <Text style={styles.liveScore}>{live.live?.scoreText ?? live.resultText}</Text>
-          {live.ccplMatchId ? (
-            <Pressable onPress={() => Linking.openURL(ccplScorecardUrl(live.ccplMatchId))}>
-              <Text style={styles.link}>Scores via CCPL (CricClubs)</Text>
-            </Pressable>
-          ) : (
-            <Text style={styles.attr}>Scores via CCPL (CricClubs)</Text>
-          )}
+          <Text style={styles.liveTitle}>{live.opponentName}</Text>
+          <Text style={styles.liveScore}>{live.live?.scoreText}</Text>
+          {live.live?.currentBowler ? <Text style={styles.attr}>{live.live.currentBowler}</Text> : null}
+          <Pressable onPress={() => Linking.openURL(ccplScorecardUrl(live.ccplMatchId))}>
+            <Text style={styles.link}>Scores via CCPL (CricClubs)</Text>
+          </Pressable>
           <Link href={`/cricket/match/${live.id}` as Href} asChild>
             <Pressable><Text style={styles.link}>Open match</Text></Pressable>
           </Link>
@@ -54,7 +60,7 @@ export function CricketMatchesPane() {
 
       <Text style={styles.record}>
         {record.won}W – {record.lost}L – {record.tied}T
-        {record.form.length ? ` · ${record.form.join("")}` : ""}
+        {record.form.length ? ` · ${record.form.join(" ")}` : ""}
       </Text>
       <Text style={styles.hint}>Record from CCPL results. No invented table or NRR.</Text>
 
@@ -64,10 +70,10 @@ export function CricketMatchesPane() {
           <Pressable style={styles.row}>
             <View style={styles.flex}>
               <Text style={styles.when}>{item.playedAt}</Text>
-              <Text style={styles.opp}>vs {item.opponentName}</Text>
+              <Text style={styles.opp}>{item.opponentName}</Text>
               <Text style={styles.result}>{item.resultText}</Text>
             </View>
-            <StatusPill label={item.resultType === "win" ? "W" : item.resultType === "tie" ? "T" : item.resultType === "no_result" ? "NR" : "L"} tone={item.resultType === "win" ? "success" : "neutral"} />
+            <StatusPill label={item.resultType === "win" ? "W" : item.resultType === "tie" ? "T" : "L"} tone={item.resultType === "win" ? "success" : "neutral"} />
           </Pressable>
         </Link>
       ))}
@@ -78,7 +84,7 @@ export function CricketMatchesPane() {
           <Pressable style={styles.row}>
             <View style={styles.flex}>
               <Text style={styles.when}>{item.playedAt}{item.homeAway ? ` · ${item.homeAway}` : ""}</Text>
-              <Text style={styles.opp}>vs {item.opponentName}</Text>
+              <Text style={styles.opp}>{item.opponentName}</Text>
               {item.venue ? <Text style={styles.result}>{item.venue}</Text> : null}
             </View>
           </Pressable>

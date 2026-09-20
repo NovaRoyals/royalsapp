@@ -11,6 +11,7 @@ import { Button, Chip, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms, demoTeams } from '@/data/demo';
 import { track } from '@/lib/analytics';
 import { safeBack } from '@/lib/nav';
+import { cricketPrivacyName } from '@/lib/cricket';
 import { privacyName } from '@/lib/attendance';
 import { formatEventParts } from '@/lib/datetime';
 import { canSeeFullRoster } from '@/lib/membership';
@@ -108,7 +109,7 @@ export default function ProgramDetailScreen() {
                     <>
                     <View style={styles.number}><Text style={styles.numberText}>{person.jerseyNumber ?? index + 1}</Text></View>
                     <View style={styles.flex}>
-                      <Text style={styles.playerName}>{privacyName(person, authorized)}</Text>
+                    <Text style={styles.playerName}>{cricket ? cricketPrivacyName(person, authorized, group.people) : privacyName(person, authorized)}</Text>
                       <Text style={styles.position}>{person.position ?? 'Squad'}</Text>
                     </View>
                     {person.position?.startsWith('Captain') ? <StatusPill label="C" tone="orange" /> : null}

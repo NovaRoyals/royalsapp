@@ -46,15 +46,18 @@ export default function CricketPlayerScreen() {
         {player.isViceCaptain ? <StatusPill label="VC" /> : null}
         {player.isKeeper ? <StatusPill label="WK" /> : null}
       </View>
-      <View style={styles.stats}>
-        <Stat label="Matches" value={String(profile.matches)} />
-        <Stat label="Runs" value={String(profile.runs)} />
-        <Stat label="Avg" value={profile.average == null ? "—" : String(profile.average)} />
-        <Stat label="SR" value={profile.strikeRate == null ? "—" : String(profile.strikeRate)} />
-        <Stat label="50/100" value={`${profile.fifties}/${profile.hundreds}`} />
-        <Stat label="Wkts" value={String(profile.wickets)} />
-      </View>
-      <Text style={styles.hint}>Aggregates fill as CCPL scorecards backfill. Empty is not a zero invention.</Text>
+      {profile.matches > 0 && (profile.runs > 0 || profile.wickets > 0) ? (
+        <View style={styles.stats}>
+          <Stat label="Matches" value={String(profile.matches)} />
+          <Stat label="Runs" value={String(profile.runs)} />
+          <Stat label="Avg" value={profile.average == null ? "—" : String(profile.average)} />
+          <Stat label="SR" value={profile.strikeRate == null ? "—" : String(profile.strikeRate)} />
+          <Stat label="50/100" value={`${profile.fifties}/${profile.hundreds}`} />
+          <Stat label="Wkts" value={String(profile.wickets)} />
+        </View>
+      ) : (
+        <Text style={styles.hint}>Career figures appear after CCPL scorecards backfill. Empty is not a zero.</Text>
+      )}
       {log.map((row) => (
         <Link key={`${row.matchId}-${row.date}`} href={`/cricket/match/${row.matchId}` as Href} asChild>
           <Pressable style={styles.log}>

@@ -190,7 +190,7 @@ export const demoPrograms: Program[] = [
     priceLabel: 'Player interest',
     registrationOpen: true,
     badge: 'CCPL T20',
-    heroImage: 'https://www.novaroyalsac.com/images/cricket-team-himalayan-knights.jpg',
+    heroImage: 'https://www.novaroyalsac.com/images/community-group-outdoor.jpg',
     facts: [
       { label: 'Format', value: 'T20' },
       { label: 'Division', value: 'Manassas1' },
@@ -198,7 +198,7 @@ export const demoPrograms: Program[] = [
     ],
     includes: ['CCPL T20 fixtures', 'Published scorecards', 'Squad and match-day notes'],
     factual: true,
-    coachName: 'Sujit Khanal · captain',
+    coachName: 'Sujit Khanal',
     teamId: 'nova-royals-cricket',
   },
 ];
@@ -447,7 +447,7 @@ export const demoCompetitions: Competition[] = [
     description:
       'Nova Royals’ Fall 2026 CCPL campaign in the Manassas1 division. Results follow the CCPL results page.',
     externalDisclaimer:
-      'CCPL publishes official tables. ROYALS shows club fixtures and published scorecards only. Record from CCPL: 2W–2L–1T. Aug 16 vs Global Warriors is not on the results page.',
+      'CCPL publishes official tables. ROYALS shows club fixtures and published scorecards only. Record from CCPL: 2W–2L–1T.',
     teamIds: ['nova-royals-cricket'],
   },
   {
@@ -659,22 +659,6 @@ const ccplMatches: ScheduleEvent[] = [
     competitionId: 'ccpl-manassas1',
     status: 'completed',
     result: 'Tied — Blitz won the super over',
-    fieldStatus: 'open',
-  },
-  {
-    id: 'ccpl-2026-08-16',
-    type: 'league_match',
-    sport: 'cricket',
-    title: 'NOVA Royals vs Global Warriors',
-    subtitle: 'Not on CCPL results page',
-    startsAt: '2026-08-16T11:45:00-04:00',
-    endsAt: '2026-08-16T15:15:00-04:00',
-    venue: 'Manassas cricket fields',
-    address: 'Manassas, VA',
-    teamId: 'nova-royals-cricket',
-    competitionId: 'ccpl-manassas1',
-    status: 'completed',
-    result: 'No fixture on CCPL results page — no result recorded',
     fieldStatus: 'open',
   },
   {
