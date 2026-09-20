@@ -42,3 +42,9 @@ example
 # generated native folders
 /ios
 /android
+
+# cricket sync
+cricket-sync/.pytest_cache/
+cricket-sync/__pycache__/
+*.pyc
+

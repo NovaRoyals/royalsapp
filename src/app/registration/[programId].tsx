@@ -268,7 +268,7 @@ export default function RegistrationScreen() {
         <ConfirmationPeak
           name={name}
           program={program.title}
-          sessionLine={first ? 'Sunday · 4:00 PM · First session' : 'First session posts with the season calendar'}
+          sessionLine={first ? 'Sunday · 9:00 AM · Arrowhead 3A' : 'First session posts with the season calendar'}
           onCalendar={() => {
             if (first) calendarGateway.add(first);
           }}
@@ -323,7 +323,7 @@ export default function RegistrationScreen() {
             <SummaryRow label="Program" value={program.title} />
             <SummaryRow label="Ages" value="3–16" />
             <SummaryRow label="Dates" value="Sep 13 – Nov 22" />
-            <SummaryRow label="Sessions" value="12 Sundays" />
+            <SummaryRow label="Sessions" value="11 Sundays · 9–10 AM" />
             <SummaryRow label="Price" value="$120 first · $60 siblings" last />
           </View>
           <View style={styles.trustRow}>
@@ -504,7 +504,7 @@ export default function RegistrationScreen() {
             <Text style={styles.totalLabel}>TOTAL DUE</Text>
             <Text style={styles.totalValue}>${subtotal}</Text>
             {discount > 0 ? <Text style={styles.saved}>You saved ${discount} with sibling pricing</Text> : null}
-            <Text style={styles.saved}>$10/session across 12 Sundays</Text>
+            <Text style={styles.saved}>$10/session across 11 Sundays</Text>
           </View>
           <View style={styles.demoCheckout}>
             <Ionicons name="flask-outline" size={24} color={colors.warning} />

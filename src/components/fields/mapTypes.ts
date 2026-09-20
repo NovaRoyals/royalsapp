@@ -15,6 +15,7 @@ export type PitchMapProps = {
   frameKey: string;
   flyNonce: number;
   sizeKey?: string | number;
+  wheelZoom?: boolean;
   onSelect: (id: string) => void;
   onBackground?: () => void;
 };

@@ -36,7 +36,7 @@ import type {
   UserRole,
 } from '@/types/domain';
 
-const STORAGE_KEY = '@royals/demo-state/v7';
+const STORAGE_KEY = '@royals/demo-state/v9';
 const LEGACY_STORAGE_KEYS = [
   '@royals/demo-state/v1',
   '@royals/demo-state/v2',
@@ -44,6 +44,8 @@ const LEGACY_STORAGE_KEYS = [
   '@royals/demo-state/v4',
   '@royals/demo-state/v5',
   '@royals/demo-state/v6',
+  '@royals/demo-state/v7',
+  '@royals/demo-state/v8',
 ];
 
 export const defaultNotificationPrefs: NotificationPrefs = {
@@ -53,7 +55,7 @@ export const defaultNotificationPrefs: NotificationPrefs = {
   locationShare: false,
 };
 
-export const defaultFollowedIds = ['fall-kids-2026', 'nova-royals-men', 'nova-royals-cricket'];
+export const defaultFollowedIds = ['fall-kids-2026', 'nova-royals-women', 'nova-royals-men', 'nova-royals-cricket'];
 
 export type Persona = 'visitor' | 'demo';
 
@@ -117,18 +119,22 @@ interface AppState extends PersistedState {
 }
 
 function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
-  const extra = overlays.filter((item) => !demoSchedule.some((event) => event.id === item.id));
+  const catalogIds = new Set(demoSchedule.map((event) => event.id));
+  const extra = overlays.filter((item) => !catalogIds.has(item.id) && !item.demo && item.id !== 'club-event-1');
   return [
     ...demoSchedule.map((event) => {
       const overlay = overlays.find((item) => item.id === event.id);
       if (!overlay) return event;
       return {
         ...event,
-        ...overlay,
-        title: event.title,
-        subtitle: overlay.subtitle ?? event.subtitle,
-        venue: overlay.venue || event.venue,
-        startsAt: overlay.startsAt || event.startsAt,
+        attendance: overlay.attendance ?? event.attendance,
+        supporterGoing: overlay.supporterGoing ?? event.supporterGoing,
+        supporterCount: overlay.supporterCount ?? event.supporterCount,
+        goingCount: overlay.goingCount ?? event.goingCount,
+        fieldStatus: overlay.fieldStatus ?? event.fieldStatus,
+        checkIns: overlay.checkIns ?? event.checkIns,
+        result: overlay.result ?? event.result,
+        status: overlay.status ?? event.status,
       };
     }),
     ...extra,
@@ -150,7 +156,7 @@ function visitorSeed(role: UserRole = 'guest'): PersistedState {
     announcements: demoAnnouncements,
     messages: [],
     documents: [],
-    followedIds: [],
+    followedIds: defaultFollowedIds,
     notificationPrefs: defaultNotificationPrefs,
     onboardingCompleted: false,
     introCompleted: false,

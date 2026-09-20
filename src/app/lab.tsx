@@ -121,7 +121,7 @@ export default function InteractionLabScreen() {
         <ConfirmationPeak
           name="Maya"
           program="Fall Soccer Training 2026"
-          sessionLine="Sunday · 4:00 PM · First session"
+          sessionLine="Sunday · 9:00 AM · Arrowhead 3A"
           onCalendar={() => undefined}
           onCoach={() => undefined}
           onSeason={() => undefined}

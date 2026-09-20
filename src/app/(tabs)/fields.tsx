@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -27,7 +27,9 @@ import {
   clubDateFromPosted,
   formatUpdatedAgo,
   isUpdatedStale,
+  collapseSplitPitches,
   minutesForTime,
+  resolveSuggestionId,
   sortPitches,
 } from '@/lib/fields';
 import { haptic } from '@/lib/haptics';
@@ -43,7 +45,7 @@ export default function FieldsScreen() {
   const windowEnd = coverage.data?.coverageEnd;
   const [date, setDate] = useState(today);
   const [time, setTime] = useState<(typeof PITCH_TIMES)[number]>(DEFAULT_PITCH_TIME);
-  const [turfOnly, setTurfOnly] = useState(false);
+  const [turfOnly, setTurfOnly] = useState(true);
   const [selectedId, setSelectedId] = useState<string>();
   const [expandedId, setExpandedId] = useState<string>();
   const [flyNonce, setFlyNonce] = useState(0);
@@ -53,8 +55,8 @@ export default function FieldsScreen() {
   const [now, setNow] = useState(Date.now());
   const reduced = useReducedMotion();
   const pickupMinutes = minutesForTime(time);
-  const scrollRef = useRef<ScrollView>(null);
   const { width } = useWindowDimensions();
+  const twoCol = width >= 640;
   const panelWidth = Math.min(width * 0.8, 340);
   const webFull: ViewStyle | undefined = fullscreen
     ? Platform.OS === 'web'
@@ -78,8 +80,9 @@ export default function FieldsScreen() {
 
   useEffect(() => {
     if (!windowStart || !windowEnd) return;
-    setDate((current) => (current < windowStart ? windowStart : current > windowEnd ? windowEnd : current));
-  }, [windowStart, windowEnd]);
+    const floor = today < windowStart ? windowStart : today > windowEnd ? windowEnd : today;
+    setDate((current) => (current < floor ? floor : current > windowEnd ? windowEnd : current));
+  }, [today, windowStart, windowEnd]);
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 30_000);
@@ -91,9 +94,18 @@ export default function FieldsScreen() {
   }, [date, time, turfOnly]);
 
   const day = usePitchDay(date, pickupMinutes, turfOnly, Boolean(windowStart));
-  const dates = windowStart && windowEnd ? eachDate(windowStart, windowEnd) : [];
-  const pitches = useMemo(() => locatePitches(sortPitches(day.data?.pitches ?? [], day.data?.suggestionId)), [day.data]);
-  const suggestionId = day.data?.suggestionId;
+  const dates =
+    windowStart && windowEnd
+      ? eachDate(today < windowStart ? windowStart : today > windowEnd ? windowEnd : today, windowEnd)
+      : [];
+  const pitches = useMemo(
+    () => locatePitches(sortPitches(collapseSplitPitches(day.data?.pitches ?? []))),
+    [day.data],
+  );
+  const suggestionId = useMemo(
+    () => resolveSuggestionId(pitches, day.data?.suggestionId),
+    [pitches, day.data?.suggestionId],
+  );
   const selected = pitches.find((item) => item.id === selectedId) ?? pitches.find((item) => item.id === suggestionId) ?? pitches[0];
   const suggestion = pitches.find((item) => item.id === suggestionId);
 
@@ -201,6 +213,7 @@ export default function FieldsScreen() {
         frameKey={`${date}|${pickupMinutes}|${turfOnly}`}
         flyNonce={flyNonce}
         sizeKey={fullscreen ? 'full' : 'inline'}
+        wheelZoom={fullscreen}
         onSelect={selectPitch}
         onBackground={onMapBackground}
       />
@@ -239,15 +252,7 @@ export default function FieldsScreen() {
   );
 
   return (
-    <Screen scroll={false} tabScene>
-      <ScrollView
-        ref={scrollRef}
-        scrollEnabled={!fullscreen}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scroll}
-        style={Platform.OS === 'web' ? ({ overflowAnchor: 'none' } as ViewStyle) : undefined}
-      >
+    <Screen tabScene>
         <AppHeader
           eyebrow="Pickup & planning"
           title="Fields"
@@ -294,9 +299,9 @@ export default function FieldsScreen() {
         {emptyDay ? <Text style={styles.empty}>No public-schedule events this day.</Text> : null}
 
         <Text style={styles.section}>PITCHES · {pitches.length} pitches</Text>
-        <View style={styles.list} accessibilityLabel="Tap a glowing pin to preview the pitch — green is clear at your time, orange has something on.">
+        <View style={[styles.list, twoCol && styles.listGrid]} accessibilityLabel="Tap a glowing pin to preview the pitch — green is clear at your time, orange has something on.">
           {day.isPending && !day.data
-            ? [0, 1, 2].map((item) => <View key={item} style={styles.skeleton} />)
+            ? [0, 1, 2, 3].map((item) => <View key={item} style={[styles.skeleton, twoCol && styles.half]} />)
             : pitches.map((pitch) => (
                 <PitchRow
                   key={pitch.id}
@@ -304,6 +309,7 @@ export default function FieldsScreen() {
                   time={time}
                   expanded={expandedId === pitch.id}
                   isTopPick={pitch.id === suggestionId}
+                  twoCol={twoCol}
                   onToggle={() => toggleRow(pitch.id)}
                 />
               ))}
@@ -314,13 +320,11 @@ export default function FieldsScreen() {
           <Text style={styles.noteText}>{coverage.data?.disclaimer ?? PITCH_DISCLAIMER}</Text>
         </View>
         <Text style={styles.footer}>Data: Fieldchecker API · source health</Text>
-      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingBottom: spacing.xxl },
   lead: { color: colors.stone, fontSize: 15, lineHeight: 22, marginTop: -spacing.sm, marginBottom: spacing.lg, ...typography.body },
   hint: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: spacing.sm, marginBottom: spacing.md, ...typography.body },
   mapCard: {
@@ -425,8 +429,10 @@ const styles = StyleSheet.create({
   panelSub: { color: colors.orangeDark, fontSize: 11, marginBottom: spacing.sm, ...typography.label, textTransform: 'uppercase' },
   empty: { color: colors.stone, fontSize: 14, marginBottom: spacing.md, ...typography.body },
   section: { color: colors.stone, fontSize: 10, marginBottom: spacing.md, ...typography.label },
-  list: { gap: spacing.md },
-  skeleton: { height: 88, borderRadius: radius.lg, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
+  list: { gap: spacing.sm },
+  listGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  half: { width: '48%', flexGrow: 1 },
+  skeleton: { height: 64, borderRadius: radius.lg, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

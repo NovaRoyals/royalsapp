@@ -89,7 +89,7 @@ export default function EventDetailScreen() {
         <Text style={styles.subtitle}>{event.subtitle}</Text>
         {event.subtitle.includes('Session') ? (
           <View style={styles.path}>
-            {Array.from({ length: 12 }).map((_, index) => (
+            {Array.from({ length: 11 }).map((_, index) => (
               <View key={index} style={[styles.pathDot, index === 0 && styles.pathDotOn]} />
             ))}
           </View>

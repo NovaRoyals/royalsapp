@@ -1,0 +1,89 @@
+# CCPL cricket sync (CricClubs). Scores via CCPL — never invent tables.
+
+name: cricket-sync
+on:
+  schedule:
+    - cron: "0 6 * * *"
+    - cron: "*/5 10-19 * * 0,6"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: backfill, discover, or poll
+        default: backfill
+        type: choice
+        options: [backfill, discover, poll]
+      match_id:
+        description: CCPL matchId (required for poll)
+        required: false
+
+concurrency:
+  group: cricket-sync-${{ github.event.inputs.command || github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.command == 'backfill' || github.event.schedule == '0 6 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r cricket-sync/requirements.txt supabase
+      - run: python -m playwright install chromium --with-deps
+      - run: python sync.py backfill
+        working-directory: cricket-sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+  discover:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.command == 'discover' || github.event.schedule == '*/5 10-19 * * 0,6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      match_id: ${{ steps.live.outputs.match_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r cricket-sync/requirements.txt supabase
+      - run: python -m playwright install chromium --with-deps
+      - id: live
+        working-directory: cricket-sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          MID=$(python sync.py discover | tail -n 1)
+          echo "match_id=$MID" >> "$GITHUB_OUTPUT"
+
+  poll:
+    needs: discover
+    if: |
+      always() && (
+        (needs.discover.result == 'success' && needs.discover.outputs.match_id != '') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.command == 'poll' && github.event.inputs.match_id != '')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    concurrency:
+      group: cricket-ccpl-poller
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r cricket-sync/requirements.txt supabase
+      - run: python -m playwright install chromium --with-deps
+      - working-directory: cricket-sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          MID="${{ github.event.inputs.match_id }}"
+          if [ -z "$MID" ]; then MID="${{ needs.discover.outputs.match_id }}"; fi
+          python sync.py poll --match-id "$MID"

@@ -97,6 +97,7 @@ export default function PitchMap({
   frameKey,
   flyNonce,
   sizeKey,
+  wheelZoom,
   onSelect,
   onBackground,
 }: PitchMapProps) {
@@ -128,7 +129,7 @@ export default function PitchMap({
       host.style.height = '100%';
       host.style.width = '100%';
       host.innerHTML = '';
-      map = L.map(host, { zoomControl: true, attributionControl: true, scrollWheelZoom: true });
+      map = L.map(host, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
       L.tileLayer(LIGHT_TILES, {
         attribution: '&copy; OpenStreetMap &copy; Esri',
         maxZoom: 16,
@@ -174,6 +175,13 @@ export default function PitchMap({
     const timer = setTimeout(() => map.invalidateSize(), 420);
     return () => clearTimeout(timer);
   }, [sizeKey]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (wheelZoom) map.scrollWheelZoom.enable();
+    else map.scrollWheelZoom.disable();
+  }, [wheelZoom]);
 
   useEffect(() => {
     if (skipFly.current) {

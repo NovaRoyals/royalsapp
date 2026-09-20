@@ -1,16 +1,23 @@
 import type { CalendarStatus, PitchDay, PitchDayResult } from '@/services/fields';
 
-export const PITCH_TIMES = ['8:00AM', '9:30AM', '12:00PM', '4:00PM', '6:30PM', '8:00PM'] as const;
-export const DEFAULT_PITCH_TIME = '6:30PM';
+function clockLabel(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, '0')}${period}`;
+}
 
-export const PITCH_TIME_MINUTES: Record<(typeof PITCH_TIMES)[number], number> = {
-  '8:00AM': 480,
-  '9:30AM': 570,
-  '12:00PM': 720,
-  '4:00PM': 960,
-  '6:30PM': 1110,
-  '8:00PM': 1200,
-};
+function buildPitchTimes(startMinutes: number, endMinutes: number, step: number) {
+  const times: string[] = [];
+  for (let minutes = startMinutes; minutes <= endMinutes; minutes += step) {
+    times.push(clockLabel(minutes));
+  }
+  return times;
+}
+
+export const PITCH_TIMES = buildPitchTimes(7 * 60, 23 * 60, 30);
+export const DEFAULT_PITCH_TIME = '6:30PM';
 
 export const PITCH_DISCLAIMER =
   'Public league calendars only — private teams and game bookings aren’t checked. Treat this as a starting point, not a hold on the pitch.';
@@ -18,7 +25,11 @@ export const PITCH_DISCLAIMER =
 export const PITCH_FILTER_HINT = 'Green is clear at your time · Orange has something on · Map starts on the best pick';
 
 export function minutesForTime(time: string) {
-  return PITCH_TIME_MINUTES[time as (typeof PITCH_TIMES)[number]] ?? 1110;
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return 1110;
+  let hours = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hours += 12;
+  return hours * 60 + Number(match[2]);
 }
 
 export function clubDateFromPosted(postedIso: string) {
@@ -96,17 +107,108 @@ export function pitchLabel(pitch: { name: string; pitch: string }) {
   return `${pitch.name} · ${pitch.pitch}`;
 }
 
-export function sortPitches(pitches: PitchDay[], suggestionId: string | undefined) {
+/** Short mark beside the park name: "1A turf", not "Turf Field 1A · TURF". */
+export function compactPitchMark(pitch: { pitch: string; surface: string }) {
+  const body = pitch.pitch
+    .replace(/turf\s*field/gi, ' ')
+    .replace(/\bfields?\b/gi, ' ')
+    .replace(/\bturf\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!body) return pitch.surface.toLowerCase();
+  return `${body} ${pitch.surface.toLowerCase()}`;
+}
+
+function parsePitchCode(label: string) {
+  const match = label.match(/(\d+)\s*([A-Za-z])?\s*$/);
+  if (!match) return null;
+  return { n: Number(match[1]), letter: (match[2] ?? '').toUpperCase() };
+}
+
+/** Drop full-field duplicates of 8v8 splits, and extra C+ overlays of the same turf. */
+export function collapseSplitPitches(pitches: PitchDay[]) {
+  const groups = new Map<string, PitchDay[]>();
+  for (const pitch of pitches) {
+    const list = groups.get(pitch.name) ?? [];
+    list.push(pitch);
+    groups.set(pitch.name, list);
+  }
+
+  const next: PitchDay[] = [];
+  for (const list of groups.values()) {
+    const letters = new Map<number, Set<string>>();
+    for (const pitch of list) {
+      const code = parsePitchCode(pitch.pitch);
+      if (!code?.letter) continue;
+      const set = letters.get(code.n) ?? new Set<string>();
+      set.add(code.letter);
+      letters.set(code.n, set);
+    }
+
+    for (const pitch of list) {
+      const code = parsePitchCode(pitch.pitch);
+      if (!code) {
+        next.push(pitch);
+        continue;
+      }
+      const kids = letters.get(code.n);
+      if (!code.letter && kids?.size) continue;
+      if (code.letter > 'B' && kids?.has('A') && kids.has('B')) continue;
+      next.push(pitch);
+    }
+  }
+  return next;
+}
+
+export function resolveSuggestionId(pitches: PitchDay[], suggestionId?: string) {
+  if (suggestionId && pitches.some((item) => item.id === suggestionId)) return suggestionId;
+  if (suggestionId) {
+    const kids = pitches.filter((item) => item.id.startsWith(suggestionId));
+    const clear = kids.find((item) => item.status === 'no_conflict');
+    if (clear) return clear.id;
+    if (kids[0]) return kids[0].id;
+  }
+  return pitches.find((item) => item.status === 'no_conflict')?.id;
+}
+
+const PITCH_VENUE_ORDER = [
+  'chantilly high',
+  'greenbriar',
+  'poplar tree',
+  'lawrence',
+  'westfield',
+  'arrowhead',
+  'centreville',
+  'oakton high',
+  'sully',
+  'stringfellow',
+  'oakmont',
+  'oak marr',
+  'arrowbrook',
+  'lake fairfax',
+  'nottoway',
+  'cunningham',
+  'freedom',
+  'byrne',
+  'hanson',
+  'champe',
+  'braddock',
+];
+
+function venueRank(name: string) {
+  const hay = name.toLowerCase();
+  const index = PITCH_VENUE_ORDER.findIndex((key) => hay.includes(key));
+  return index === -1 ? PITCH_VENUE_ORDER.length : index;
+}
+
+export function sortPitches(pitches: PitchDay[]) {
   const copy = [...pitches];
   copy.sort((a, b) => {
-    if (suggestionId) {
-      if (a.id === suggestionId) return -1;
-      if (b.id === suggestionId) return 1;
-    }
-    if (a.status !== b.status) return a.status === 'no_conflict' ? -1 : 1;
+    const venue = venueRank(a.name) - venueRank(b.name);
+    if (venue) return venue;
     const park = a.name.localeCompare(b.name);
     if (park) return park;
-    return a.pitch.localeCompare(b.pitch);
+    return a.pitch.localeCompare(b.pitch, undefined, { numeric: true });
   });
   return copy;
 }

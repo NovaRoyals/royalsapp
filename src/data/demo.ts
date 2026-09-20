@@ -14,12 +14,41 @@ import type {
 export const kidsProgramId = 'fall-kids-2026';
 
 export const followCatalog = [
-  { id: kidsProgramId, label: 'Kids Soccer', detail: 'Fall training' },
+  { id: kidsProgramId, label: 'Kids Soccer', detail: 'Sundays 9–10 AM · Arrowhead 3A' },
   { id: 'nova-royals-men', label: 'Open Soccer', detail: 'Sunday evenings' },
   { id: 'veterans-soccer', label: '35+ Soccer', detail: 'Veterans pathway' },
-  { id: 'nova-royals-women', label: 'Women’s Soccer', detail: 'Adult team' },
+  { id: 'nova-royals-women', label: 'Women’s Soccer', detail: 'Sunday practice 8:00–8:30 AM' },
   { id: 'nova-royals-cricket', label: 'ROYALS Cricket', detail: 'CCPL T20 · Manassas1' },
 ] as const;
+
+export const ARROWHEAD_3A = {
+  venue: 'Arrowhead Park · Field 3A',
+  address: '5200 Arrowhead Park Dr, Centreville, VA 20120',
+  parkingNotes: 'Arrowhead Park lot at 5200 Arrowhead Park Drive. Field 3A is the left 8v8 half of turf Field 3, farthest from the playground side.',
+} as const;
+
+function eachSunday(startYmd: string, endYmd: string) {
+  const days: string[] = [];
+  const [year, month, day] = startYmd.split('-').map(Number);
+  const cursor = new Date(Date.UTC(year, month - 1, day));
+  const [endYear, endMonth, endDay] = endYmd.split('-').map(Number);
+  const last = Date.UTC(endYear, endMonth - 1, endDay);
+  while (cursor.getTime() <= last) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return days;
+}
+
+function nyOffset(ymd: string) {
+  return ymd >= '2026-11-01' ? '-05:00' : '-04:00';
+}
+
+function atEastern(ymd: string, clock: string) {
+  return `${ymd}T${clock}:00${nyOffset(ymd)}`;
+}
+
+const FALL_SUNDAYS_2026 = eachSunday('2026-09-13', '2026-11-22');
 
 export const demoPrograms: Program[] = [
   {
@@ -28,19 +57,19 @@ export const demoPrograms: Program[] = [
     title: 'Fall Soccer Training',
     sport: 'soccer',
     audience: 'Ages 3–16',
-    summary: 'Twelve energetic Sunday sessions built for confidence, skill and belonging.',
+    summary: 'Sunday mornings at Arrowhead 3A — skill, small-sided play, and a club to belong to.',
     description:
-      'A welcoming fall training program for new and developing players. Age-aware groups help every child build technique, game understanding and a genuine love for the sport.',
+      'A welcoming fall training program for new and developing players. Age-aware groups meet every Sunday from 9:00–10:00 AM at Arrowhead Park Field 3A, Centreville.',
     dates: 'Sep 13 – Nov 22, 2026',
-    venue: 'Northern Virginia · Field assignment follows',
+    venue: ARROWHEAD_3A.venue,
     priceLabel: '$120 first child · $60 siblings',
     registrationOpen: true,
     badge: 'Registration open',
     heroImage: 'https://www.novaroyalsac.com/images/kids-soccer.jpg',
     facts: [
-      { label: 'Schedule', value: '12 sessions' },
-      { label: 'Age range', value: '3–16 years' },
-      { label: 'Sibling rate', value: '50% off' },
+      { label: 'Schedule', value: 'Sundays 9–10 AM' },
+      { label: 'Field', value: 'Arrowhead 3A' },
+      { label: 'Sessions', value: `${FALL_SUNDAYS_2026.length} Sundays` },
     ],
     includes: ['Age-appropriate coaching', 'Structured skill development', 'Small-sided play', 'A positive club community'],
     factual: true,
@@ -55,17 +84,22 @@ export const demoPrograms: Program[] = [
     title: "Women's Soccer",
     sport: 'soccer',
     audience: 'Adult players',
-    summary: 'Competitive, welcoming football for women across Northern Virginia.',
-    description: 'Train, compete and build community with the Royals women’s program.',
-    dates: 'Seasonal',
-    venue: 'Northern Virginia',
-    priceLabel: 'Details on registration',
+    summary: 'Sunday morning practice at Arrowhead — no match season right now.',
+    description:
+      'Women’s training runs every Sunday, 8:00–8:30 AM, on the same Arrowhead Park turf the kids use at 9:00. There is no women’s match season posted yet; this is practice only.',
+    dates: 'Sunday practice · no match season',
+    venue: ARROWHEAD_3A.venue,
+    priceLabel: 'Club training',
     registrationOpen: true,
-    badge: 'Join the team',
+    badge: 'Sunday practice',
     heroImage: 'https://www.novaroyalsac.com/images/womens-soccer.jpg',
-    facts: [{ label: 'Format', value: 'Team play' }, { label: 'Level', value: 'Open' }],
-    includes: ['Organized training', 'Matches', 'Team communication'],
-    factual: false,
+    facts: [
+      { label: 'Practice', value: 'Sundays 8:00–8:30 AM' },
+      { label: 'Field', value: 'Arrowhead 3A' },
+      { label: 'Season', value: 'Training only' },
+    ],
+    includes: ['Weekly Sunday training', 'Shared Arrowhead 3A pitch with kids', 'Team communication'],
+    factual: true,
     teamId: 'nova-royals-women',
   },
   {
@@ -148,9 +182,9 @@ export const demoPrograms: Program[] = [
     title: 'CCPL Cricket',
     sport: 'cricket',
     audience: 'Adult · Manassas1',
-    summary: 'Capital Cricket Premier League T20 — Fall 2026, Manassas1 division. Eight league matches at the Manassas fields.',
+    summary: 'Capital Cricket Premier League T20 — Fall 2026, Manassas1 division. Results follow the CCPL results page.',
     description:
-      'Nova Royals play T20 in CCPL’s Manassas1 division. Captain Sujit Khanal and vice captain Biplav Gautam lead a 29-player verified squad. Results follow published scorecards; ROYALS does not invent a league table.',
+      'Nova Royals play T20 in CCPL’s Manassas1 division. Captain Sujit Khanal and vice captain Biplav Gautam lead a 29-player verified squad. Results follow published scorecards; ROYALS does not invent a league table. CCPL record: 2W–2L–1T.',
     dates: 'Aug 2 – Sep 26, 2026',
     venue: 'Manassas Field 1 · Manassas Field 2',
     priceLabel: 'Player interest',
@@ -160,9 +194,9 @@ export const demoPrograms: Program[] = [
     facts: [
       { label: 'Format', value: 'T20' },
       { label: 'Division', value: 'Manassas1' },
-      { label: 'Record', value: '3W–2L–1NR' },
+      { label: 'Record', value: '2W–2L–1T' },
     ],
-    includes: ['Eight league T20s', 'Published scorecards', 'Squad and match-day notes'],
+    includes: ['CCPL T20 fixtures', 'Published scorecards', 'Squad and match-day notes'],
     factual: true,
     coachName: 'Sujit Khanal · captain',
     teamId: 'nova-royals-cricket',
@@ -337,17 +371,14 @@ export const demoTeams: Team[] = [
     shortName: 'ROYALS W',
     sport: 'soccer',
     audience: 'Adult Women',
-    competitionId: 'womens-open-series',
-    competitionName: "Women's Open Series · Demo",
-    season: 'Fall 2026',
-    record: '2W · 2D · 0L',
+    competitionId: 'womens-practice',
+    competitionName: 'Sunday practice',
+    season: 'Open training',
+    record: 'Practice',
     accent: '#A54218',
-    memberCount: 16,
-    roster: [
-      { id: 'w1', firstName: 'Taylor', lastName: 'James', displayName: 'Taylor J.', jerseyNumber: 7, position: 'Forward' },
-      { id: 'w2', firstName: 'Nia', lastName: 'Brooks', displayName: 'Nia B.', jerseyNumber: 5, position: 'Midfielder' },
-      { id: 'w3', firstName: 'Elena', lastName: 'Ortiz', displayName: 'Elena O.', jerseyNumber: 2, position: 'Defender' },
-    ],
+    memberCount: 0,
+    managed: true,
+    roster: [],
   },
   {
     id: 'nova-royals-cricket',
@@ -358,7 +389,7 @@ export const demoTeams: Team[] = [
     competitionId: 'ccpl-manassas1',
     competitionName: 'CCPL · Manassas1 · Fall 2026',
     season: 'Fall 2026',
-    record: '3W–2L–1NR',
+    record: '2W–2L–1T',
     accent: '#2F7D59',
     memberCount: cricketRoster.length,
     coachName: 'Sujit Khanal',
@@ -412,11 +443,11 @@ export const demoCompetitions: Competition[] = [
     status: 'active',
     dates: 'Aug 2 – Sep 26, 2026',
     location: 'Manassas, VA',
-    format: 'T20 · Manassas1 division · 8 matches',
+    format: 'T20 · Manassas1 division',
     description:
-      'Nova Royals’ Fall 2026 CCPL campaign in the Manassas1 division. All league games are T20s at Manassas Field 1 and Field 2.',
+      'Nova Royals’ Fall 2026 CCPL campaign in the Manassas1 division. Results follow the CCPL results page.',
     externalDisclaimer:
-      'CCPL publishes official tables. ROYALS shows club fixtures and published scorecards only. Aug 16 vs Global Warriors has no recorded result.',
+      'CCPL publishes official tables. ROYALS shows club fixtures and published scorecards only. Record from CCPL: 2W–2L–1T. Aug 16 vs Global Warriors is not on the results page.',
     teamIds: ['nova-royals-cricket'],
   },
   {
@@ -428,10 +459,24 @@ export const demoCompetitions: Competition[] = [
     organizer: 'Nova Royals Athletic Club',
     status: 'active',
     dates: 'Sep 13 – Nov 22, 2026',
-    location: 'Northern Virginia',
-    format: 'Age-aware training groups',
-    description: 'Twelve Sunday sessions. This is a training program, not a league — no standings table.',
+    location: 'Arrowhead Park · Field 3A, Centreville, VA',
+    format: 'Sunday training 9:00–10:00 AM',
+    description: 'Kids fall training every Sunday from September 13 through November 22. Not a league — no standings table.',
     teamIds: ['nova-royals-kids-u8'],
+  },
+  {
+    id: 'womens-practice',
+    title: 'Women’s Sunday practice',
+    type: 'training',
+    sport: 'soccer',
+    season: 'Open training',
+    organizer: 'Nova Royals Athletic Club',
+    status: 'active',
+    dates: 'Sundays · 8:00–8:30 AM',
+    location: 'Arrowhead Park · Field 3A, Centreville, VA',
+    format: 'Practice only · no match season',
+    description: 'Women’s training on Sunday mornings at Arrowhead 3A, right before the kids session. No fixtures are posted.',
+    teamIds: ['nova-royals-women'],
   },
 ];
 
@@ -597,7 +642,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Lost by 41 runs · Aces 112/6 · Royals 71/10',
+    result: 'Lost — Golmaal Aces won by 15 runs',
     fieldStatus: 'open',
   },
   {
@@ -613,7 +658,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Lost by 6 wickets · Royals 69/10 · Blitz 75/4',
+    result: 'Tied — Blitz won the super over',
     fieldStatus: 'open',
   },
   {
@@ -621,7 +666,7 @@ const ccplMatches: ScheduleEvent[] = [
     type: 'league_match',
     sport: 'cricket',
     title: 'NOVA Royals vs Global Warriors',
-    subtitle: 'CCPL T20 · Manassas1 · no result',
+    subtitle: 'Not on CCPL results page',
     startsAt: '2026-08-16T11:45:00-04:00',
     endsAt: '2026-08-16T15:15:00-04:00',
     venue: 'Manassas cricket fields',
@@ -629,7 +674,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'No result recorded · scorecard unpublished',
+    result: 'No fixture on CCPL results page — no result recorded',
     fieldStatus: 'open',
   },
   {
@@ -645,7 +690,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Won by 6 wickets · Legends 56/10 · Royals 57/4',
+    result: 'Lost — Galaxy Legends won by 28 runs',
     fieldStatus: 'open',
   },
   {
@@ -661,7 +706,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Won by 25 runs · Royals 112/10 · Statesmen all out 18.3 ov',
+    result: 'Won by 12 runs',
     fieldStatus: 'open',
   },
   {
@@ -677,7 +722,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Won by 20 runs · Royals 87/10 · Orange Army 67/8',
+    result: 'Won by 20 runs',
     fieldStatus: 'open',
   },
   {
@@ -722,65 +767,59 @@ const ccplMatches: ScheduleEvent[] = [
   },
 ];
 
+const kidsFallSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd, index) => ({
+  id: index === 0 ? 'kids-session-1' : `kids-${ymd}`,
+  type: 'training',
+  sport: 'soccer',
+  title: 'Fall Soccer Training',
+  subtitle: `Session ${index + 1} of ${FALL_SUNDAYS_2026.length} · Kids · 9–10 AM`,
+  startsAt: atEastern(ymd, '09:00'),
+  endsAt: atEastern(ymd, '10:00'),
+  venue: ARROWHEAD_3A.venue,
+  address: ARROWHEAD_3A.address,
+  programId: kidsProgramId,
+  teamId: 'nova-royals-kids-u8',
+  competitionId: 'kids-training-2026',
+  status: 'scheduled',
+  fieldStatus: 'open',
+  parkingNotes: ARROWHEAD_3A.parkingNotes,
+  weatherSummary: 'Check Sunday morning conditions',
+  whatToBring: 'Shin guards, water, labeled jacket',
+  coachName: 'Coach Priya Sharma',
+}));
+
+const womensPracticeSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd) => ({
+  id: `women-practice-${ymd}`,
+  type: 'training',
+  sport: 'soccer',
+  title: 'Women’s Sunday practice',
+  subtitle: 'Training · 8:00–8:30 AM · no match season',
+  startsAt: atEastern(ymd, '08:00'),
+  endsAt: atEastern(ymd, '08:30'),
+  venue: ARROWHEAD_3A.venue,
+  address: ARROWHEAD_3A.address,
+  programId: 'womens-soccer',
+  teamId: 'nova-royals-women',
+  competitionId: 'womens-practice',
+  status: 'scheduled',
+  fieldStatus: 'open',
+  parkingNotes: ARROWHEAD_3A.parkingNotes,
+  weatherSummary: 'Check Sunday morning conditions',
+  whatToBring: 'Cleats, water, training kit',
+}));
+
 export const demoSchedule: ScheduleEvent[] = [
-  {
-    id: 'kids-session-1',
-    type: 'training',
-    sport: 'soccer',
-    title: 'Fall Soccer Training',
-    subtitle: 'Session 1 of 12 · Kids Soccer',
-    startsAt: '2026-09-13T16:00:00-04:00',
-    endsAt: '2026-09-13T17:15:00-04:00',
-    venue: 'Royals Training Field',
-    address: 'Fairfax, VA',
-    programId: kidsProgramId,
-    teamId: 'nova-royals-kids-u8',
-    status: 'scheduled',
-    fieldStatus: 'open',
-    parkingNotes: 'Park in the main lot. Overflow on the gravel shoulder. Do not block the fire lane.',
-    weatherSummary: 'Mild · good for training',
-    whatToBring: 'Shin guards, water, labeled jacket',
-    coachName: 'Coach Priya Sharma',
-    supporterCount: 6,
-    goingCount: 11,
-    checkIns: [
-      { personId: 'child-maya', personName: 'Maya W.', present: true, status: 'present' },
-      { personId: 'u8-ap', personName: 'Aria P.', present: true, status: 'present' },
-      { personId: 'u8-jl', personName: 'Jonah L.', present: true, status: 'present' },
-      { personId: 'u8-sk', personName: 'Samir K.', present: true, status: 'present' },
-      { personId: 'u8-em', personName: 'Elena M.', present: true, status: 'present' },
-      { personId: 'u8-nw', personName: 'Noah W.', present: true, status: 'present' },
-      { personId: 'u8-lc', personName: 'Lila C.', present: true, status: 'present' },
-      { personId: 'u8-ob', personName: 'Omar B.', present: true, status: 'present' },
-      { personId: 'u8-ih', personName: 'Ivy H.', present: true, status: 'present' },
-      { personId: 'u8-td', personName: 'Theo D.', present: true, status: 'present' },
-    ],
-    demo: true,
-  },
+  ...kidsFallSessions,
+  ...womensPracticeSessions,
   ...mensOpenMatches,
   ...ccplMatches,
-  {
-    id: 'club-event-1',
-    type: 'club_event',
-    sport: 'soccer',
-    title: 'Royals Family Field Day',
-    subtitle: 'Club community event · Demo',
-    startsAt: '2026-09-27T13:00:00-04:00',
-    venue: 'Community Field',
-    address: 'Fairfax, VA',
-    status: 'scheduled',
-    fieldStatus: 'open',
-    volunteerSpots: 3,
-    supporterCount: 18,
-    demo: true,
-  },
 ].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()) as ScheduleEvent[];
 
 export const demoAnnouncements: Announcement[] = [
   {
     id: 'announcement-1',
     title: 'Fall training begins today',
-    body: 'Welcome, Royals families. Check your session card before leaving home for the latest field details.',
+    body: 'Kids train 9:00–10:00 AM at Arrowhead Park Field 3A. Women’s practice is 8:00–8:30 AM on the same pitch.',
     audience: 'club',
     scopeLabel: 'Nova Royals',
     publishedAt: '2026-09-13T09:00:00-04:00',
@@ -809,10 +848,10 @@ export const demoAnnouncements: Announcement[] = [
   },
   {
     id: 'announcement-3',
-    title: 'U8 practice field note',
-    body: 'Kids U8 stays on the main training pitch this Sunday. Bring labeled water bottles.',
+    title: 'Sunday at Arrowhead 3A',
+    body: 'Kids Fall Soccer Training is 9:00–10:00 AM at Arrowhead Park Field 3A. Women’s practice is 8:00–8:30 AM on the same turf.',
     audience: 'program',
-    scopeLabel: 'Fall Soccer Training · Ages 7–8',
+    scopeLabel: 'Fall Soccer Training · Arrowhead 3A',
     publishedAt: '2026-09-12T12:00:00-04:00',
     urgency: 'normal',
     programId: kidsProgramId,
@@ -830,7 +869,7 @@ export const demoAnnouncements: Announcement[] = [
         id: 'reply-2',
         authorName: 'Coach Priya Sharma',
         authorRole: 'coach',
-        body: 'Yes — tents go up on the south sideline. See you at 4.',
+        body: 'Yes — tents go up on the south sideline. See you at 9.',
         createdAt: '2026-09-12T13:05:00-04:00',
       },
     ],
@@ -880,7 +919,7 @@ export const demoNotifications: AppNotification[] = [
     id: 'notification-1',
     type: 'reminder',
     title: 'Training starts in 3 hours',
-    body: 'Maya’s Fall Soccer Training session begins at 4:00 PM.',
+    body: 'Maya’s Fall Soccer Training session begins at 9:00 AM at Arrowhead Park Field 3A.',
     createdAt: '2026-09-13T13:00:00-04:00',
     read: false,
     route: '/event/kids-session-1',

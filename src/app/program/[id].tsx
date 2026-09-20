@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { Href, Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { CricketMatchesPane } from '@/components/cricket/MatchesPane';
 import { KenBurnsImage } from '@/components/media/KenBurnsImage';
 import { CricketMark } from '@/components/icons/CricketMark';
 import { Button, Chip, Screen, StatusPill } from '@/components/ui';
@@ -25,7 +26,7 @@ export default function ProgramDetailScreen() {
   const { role, schedule } = useApp();
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
   const team = program.teamId ? demoTeams.find((item) => item.id === program.teamId) : undefined;
-  const [pane, setPane] = useState<'about' | 'squad'>('about');
+  const [pane, setPane] = useState<'about' | 'squad' | 'matches'>('about');
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
   const authorized = canSeeFullRoster(role, team?.id);
   const next = team ? schedule.find((event) => event.teamId === team.id && event.status === 'scheduled') : undefined;
@@ -71,10 +72,13 @@ export default function ProgramDetailScreen() {
         <View style={styles.paneRow}>
           <Chip label="About" active={pane === 'about'} onPress={() => setPane('about')} />
           <Chip label="Squad" active={pane === 'squad'} onPress={() => setPane('squad')} />
+          {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPane('matches')} /> : null}
         </View>
       ) : null}
 
-      {pane === 'squad' && team ? (
+      {pane === 'matches' && cricket ? (
+        <CricketMatchesPane />
+      ) : pane === 'squad' && team ? (
         <View style={styles.squadWrap}>
           <View style={styles.squadMeta}>
             <Text style={styles.sectionTitle}>{team.name}</Text>
@@ -99,8 +103,9 @@ export default function ProgramDetailScreen() {
             {squadGroups.map((group) => (
               <View key={group.title}>
                 {squadGroups.length > 1 ? <Text style={styles.groupTitle}>{group.title}</Text> : null}
-                {group.people.map((person, index) => (
-                  <View key={person.id} style={styles.player}>
+                {group.people.map((person, index) => {
+                  const row = (
+                    <>
                     <View style={styles.number}><Text style={styles.numberText}>{person.jerseyNumber ?? index + 1}</Text></View>
                     <View style={styles.flex}>
                       <Text style={styles.playerName}>{privacyName(person, authorized)}</Text>
@@ -108,8 +113,17 @@ export default function ProgramDetailScreen() {
                     </View>
                     {person.position?.startsWith('Captain') ? <StatusPill label="C" tone="orange" /> : null}
                     {person.position?.startsWith('Vice') ? <StatusPill label="VC" tone="neutral" /> : null}
-                  </View>
-                ))}
+                    </>
+                  );
+                  const slug = person.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                  return cricket ? (
+                    <Link key={person.id} href={`/cricket/player/${slug}` as Href} asChild>
+                      <Pressable style={styles.player}>{row}</Pressable>
+                    </Link>
+                  ) : (
+                    <View key={person.id} style={styles.player}>{row}</View>
+                  );
+                })}
               </View>
             ))}
             <View style={styles.privateRoster}>
@@ -138,13 +152,13 @@ export default function ProgramDetailScreen() {
         <InfoRow icon="calendar-outline" label="Dates" value={program.dates} />
         <InfoRow icon="location-outline" label="Venue" value={program.venue} />
         <InfoRow icon="person-outline" label={cricket ? 'Captain' : 'Coach'} value={program.coachName ?? (team?.coachName ?? 'Club staff')} />
-        <InfoRow icon="wallet-outline" label="Price" value={program.id === 'fall-kids-2026' ? `${program.priceLabel} · $10/session across 12 Sundays` : program.priceLabel} last />
+        <InfoRow icon="wallet-outline" label="Price" value={program.id === 'fall-kids-2026' ? `${program.priceLabel} · $10/session across 11 Sundays` : program.priceLabel} last />
       </View>
 
       {program.id === 'fall-kids-2026' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>What to bring</Text>
-          <Text style={styles.body}>Shin guards, water, and a labeled jacket. First session Sunday · 4:00 PM at Royals Training Field.</Text>
+          <Text style={styles.body}>Shin guards, water, and a labeled jacket. Sundays 9:00–10:00 AM at Arrowhead Park Field 3A, 5200 Arrowhead Park Drive, Centreville.</Text>
         </View>
       ) : null}
 

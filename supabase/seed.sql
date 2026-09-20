@@ -17,8 +17,8 @@ insert into public.programs (
   'fall-soccer-training-2026',
   'Fall Soccer Training',
   'Ages 3–16',
-  'Twelve fall soccer training sessions for youth players.',
-  3, 16, 12, '2026-09-13 16:00:00-04', '2026-11-22 17:15:00-05',
+  'A welcoming fall soccer training program. Sundays 9:00–10:00 AM at Arrowhead Park Field 3A.',
+  3, 16, 11, '2026-09-13 09:00:00-04', '2026-11-22 10:00:00-05',
   true, true,
   '{"source":"Nova Royals website","factual":true}'::jsonb
 ),
@@ -27,8 +27,8 @@ insert into public.programs (
   (select id from public.sports where code = 'soccer'),
   '10000000-0000-0000-0000-000000000001',
   'womens-soccer', 'Women''s Soccer', 'Adult players',
-  'Competitive, welcoming football for women.', null, null, null, null, null,
-  true, true, '{"demo":true}'::jsonb
+  'Sunday morning practice at Arrowhead 3A. No match season posted.', null, null, null, null, null,
+  true, true, '{"factual":true}'::jsonb
 ),
 (
   '20000000-0000-0000-0000-000000000003',
@@ -186,42 +186,42 @@ insert into public.events (
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
   'NOVA Royals vs Golmaal Aces', '40000000-0000-0000-0000-000000000003',
   'Golmaal Aces', '2026-08-02 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'Lost by 41 runs · Aces 112/6 · Royals 71/10', true
+  'completed', null, null, 'Lost — Golmaal Aces won by 15 runs', true
 ),
 (
   (select id from public.sports where code = 'cricket'),
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
   'NOVA Royals vs Blitz', '40000000-0000-0000-0000-000000000003',
   'Blitz', '2026-08-08 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'Lost by 6 wickets · Royals 69/10 · Blitz 75/4', true
+  'completed', null, null, 'Tied — Blitz won the super over', true
 ),
 (
   (select id from public.sports where code = 'cricket'),
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
   'NOVA Royals vs Global Warriors', '40000000-0000-0000-0000-000000000003',
   'Global Warriors', '2026-08-16 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'No result recorded · scorecard unpublished', true
+  'completed', null, null, 'No fixture on CCPL results page — no result recorded', true
 ),
 (
   (select id from public.sports where code = 'cricket'),
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
   'NOVA Royals vs Galaxy Legends', '40000000-0000-0000-0000-000000000003',
   'Galaxy Legends', '2026-08-22 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'Won by 6 wickets · Legends 56/10 · Royals 57/4', true
+  'completed', null, null, 'Lost — Galaxy Legends won by 28 runs', true
 ),
 (
   (select id from public.sports where code = 'cricket'),
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
   'NOVA Royals vs Statesmen', '40000000-0000-0000-0000-000000000003',
   'Statesmen', '2026-08-30 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'Won by 25 runs · Royals 112/10 · Statesmen all out 18.3 ov', true
+  'completed', null, null, 'Won by 12 runs', true
 ),
 (
   (select id from public.sports where code = 'cricket'),
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
   'NOVA Royals vs Orange Army', '40000000-0000-0000-0000-000000000003',
   'Orange Army', '2026-09-12 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
-  'completed', null, null, 'Won by 20 runs · Royals 87/10 · Orange Army 67/8', true
+  'completed', null, null, 'Won by 20 runs', true
 ),
 (
   (select id from public.sports where code = 'cricket'),
