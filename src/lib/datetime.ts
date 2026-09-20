@@ -59,7 +59,7 @@ export function formatEventWhen(iso: string) {
 export function estimatedTravelStub(venue: string) {
   if (venue.toLowerCase().includes('nottoway')) return '18 min from Fairfax (stub · live maps off)';
   if (venue.toLowerCase().includes('lawrence')) return '24 min from Fairfax (stub · live maps off)';
-  if (venue.toLowerCase().includes('cricket')) return '32 min from Fairfax (stub · live maps off)';
+  if (venue.toLowerCase().includes('manassas') || venue.toLowerCase().includes('cricket')) return '38 min from Fairfax (stub · live maps off)';
   return '22 min from Fairfax (stub · live maps off)';
 }
 

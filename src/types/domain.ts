@@ -1,7 +1,7 @@
-export type SportCode = 'soccer' | 'cricket' | 'fitness';
+export type SportCode = 'soccer' | 'cricket';
 export type UserRole = 'guest' | 'adult_player' | 'guardian' | 'coach' | 'volunteer' | 'competition_manager' | 'admin';
 export type CompetitionType = 'league' | 'tournament' | 'friendly' | 'pickup' | 'training';
-export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'training' | 'open_play' | 'club_event' | 'fitness';
+export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'training' | 'open_play' | 'club_event';
 export type RegistrationStatus = 'draft' | 'submitted' | 'pending' | 'approved' | 'waitlisted' | 'rejected' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded';
 export type AttendanceStatus = 'going' | 'maybe' | 'not_going';
@@ -28,6 +28,7 @@ export interface Program {
   whatToBring?: string[];
   coachName?: string;
   coachContact?: string;
+  teamId?: string;
 }
 
 export interface Person {

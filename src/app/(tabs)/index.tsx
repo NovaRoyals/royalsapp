@@ -72,9 +72,9 @@ export default function HomeScreen() {
       : week[0];
 
   const tiles: { label: string; detail: string; icon: keyof typeof Ionicons.glyphMap; tint: Tint; href: string }[] = [
-    { label: 'Programs', detail: 'Find a session', icon: 'grid', tint: 'green', href: '/(tabs)/programs' },
+    { label: 'Programs', detail: 'Soccer & cricket', icon: 'grid', tint: 'green', href: '/(tabs)/programs' },
     { label: 'Schedule', detail: 'View upcoming', icon: 'calendar', tint: 'blue', href: '/(tabs)/schedule' },
-    { label: 'Teams', detail: 'Your teams', icon: 'shield', tint: 'teal', href: '/(tabs)/teams' },
+    { label: 'Club', detail: 'About Royals', icon: 'heart', tint: 'teal', href: '/about' },
     {
       label: role === 'guardian' && !hasChildren ? 'Register' : 'Updates',
       detail: role === 'guardian' && !hasChildren ? 'Add a player' : 'News & alerts',

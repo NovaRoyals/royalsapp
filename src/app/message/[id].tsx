@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoAnnouncements } from '@/data/demo';
 import { can } from '@/lib/capabilities';
+import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -72,7 +73,7 @@ export default function MessageThreadScreen() {
 function Header({ title }: { title: string }) {
   return (
     <View style={styles.topbar}>
-      <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+      <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
       <Text style={styles.topTitle}>{title}</Text>
       <View style={styles.back} />
     </View>

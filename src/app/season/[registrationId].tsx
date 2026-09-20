@@ -7,6 +7,7 @@ import { useToast } from '@/components/Toast';
 import { calendarGateway } from '@/services/calendar';
 import { demoPrograms, demoRegistrations, demoTeams } from '@/data/demo';
 import { formatEventParts } from '@/lib/datetime';
+import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -50,7 +51,7 @@ export default function SeasonHubScreen() {
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/programs')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <View style={styles.flex}><Text style={styles.eyebrow}>SEASON HUB</Text><Text style={styles.topTitle}>{program?.title ?? 'Your season'}</Text></View>
       </View>
 

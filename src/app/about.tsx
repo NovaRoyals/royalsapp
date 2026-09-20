@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/ui';
 import { useToast } from '@/components/Toast';
+import { safeBack } from '@/lib/nav';
 import { shareContent } from '@/lib/share';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 const links = [
-  { title: 'About', body: 'Nova Royals Athletic Club is a Northern Virginia 501(c)(3) building a family of sports lovers through soccer, cricket, fitness and community.' },
+  { title: 'About', body: 'Nova Royals Athletic Club is a Northern Virginia 501(c)(3) building a family of sports lovers through soccer, cricket and community.' },
   { title: 'Support Us', body: 'Donations and in-kind help keep youth training accessible. Contact the board for current campaigns.' },
   { title: 'Sponsors', body: 'Partner logos will live here. Sponsors are not a primary tab in Stage 2.' },
   { title: 'Volunteer', body: 'Match-day marshalling, setup, and Royals Run support. Open volunteer spots appear on Home this week.' },
@@ -20,7 +20,7 @@ export default function AboutScreen() {
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.title}>About ROYALS</Text>
         <View style={styles.back} />
       </View>

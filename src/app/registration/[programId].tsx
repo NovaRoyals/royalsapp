@@ -11,6 +11,7 @@ import { ConfirmationPeak, shareRegistration } from '@/components/interactions/C
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoHousehold, demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
 import { track } from '@/lib/analytics';
+import { safeBack } from '@/lib/nav';
 import { childRegistrationHints, siblingPrice } from '@/lib/intelligence';
 import {
   clearRegistrationDraft,
@@ -229,7 +230,7 @@ export default function RegistrationScreen() {
   };
 
   const goBack = () => {
-    if (step === 'overview') return router.back();
+    if (step === 'overview') return safeBack('/(tabs)/programs');
     const previous = steps[Math.max(0, activeStepIndex - 1)];
     setStep(previous.id);
   };
@@ -478,7 +479,7 @@ export default function RegistrationScreen() {
           <Text style={styles.stepTitle}>Review your registration</Text>
           <Text style={styles.stepBody}>Make sure everything looks right before continuing to payment status.</Text>
           <View style={styles.reviewCard}>
-            <ReviewSection title="Program" icon="football-outline">
+            <ReviewSection title="Program" icon={program.sport === 'cricket' ? 'baseball-outline' : 'football-outline'}>
               <SummaryRow label={program.title} value={program.dates} last />
             </ReviewSection>
             <ReviewSection title="Household" icon="home-outline">
@@ -561,7 +562,7 @@ function AdultRegistration({ programId, title }: { programId: string; title: str
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/programs')} style={styles.backButton}><Ionicons name="arrow-back" size={21} /></Pressable>
         <View style={styles.topCopy}><Text style={styles.topEyebrow}>PLAYER REGISTRATION</Text><Text style={styles.topTitle}>{title}</Text></View>
       </View>
       <View style={styles.step}>

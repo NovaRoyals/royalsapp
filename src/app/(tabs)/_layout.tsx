@@ -35,7 +35,7 @@ export default function TabsLayout() {
         },
       })}
     >
-      {(['index', 'programs', 'schedule', 'teams', 'profile'] as const).map((name) => (
+      {(['index', 'programs', 'schedule', 'profile'] as const).map((name) => (
         <Tabs.Screen
           key={name}
           name={name}
@@ -51,6 +51,7 @@ export default function TabsLayout() {
           })}
         />
       ))}
+      <Tabs.Screen name="teams" options={{ href: null, title: 'Teams' }} />
     </Tabs>
   );
 }

@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoCompetitions, demoSchedule } from '@/data/demo';
 import { formatEventParts } from '@/lib/datetime';
+import { safeBack } from '@/lib/nav';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function generateStaticParams() {
@@ -23,7 +24,7 @@ export default function CompetitionDetailScreen() {
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/schedule')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.topTitle}>Competition</Text>
         <Pressable accessibilityLabel="Share competition" style={styles.back}><Ionicons name="share-outline" size={20} /></Pressable>
       </View>

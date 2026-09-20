@@ -11,6 +11,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { IllustrationFrame } from '@/components/illustrations/IllustrationFrame';
 import { Screen, StatusPill } from '@/components/ui';
 import { haptic, type HapticKind } from '@/lib/haptics';
+import { safeBack } from '@/lib/nav';
 import { motion } from '@/theme/motion';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { AttendanceMark, AttendanceStatus, Person } from '@/types/domain';
@@ -36,7 +37,7 @@ export default function InteractionLabScreen() {
   return (
     <Screen>
       <View style={styles.top}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}>
           <Ionicons name="arrow-back" size={21} />
         </Pressable>
         <View style={styles.flex}>

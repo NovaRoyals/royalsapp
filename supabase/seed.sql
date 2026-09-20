@@ -103,15 +103,15 @@ insert into public.competitions (
   '30000000-0000-0000-0000-000000000003',
   (select id from public.sports where code = 'cricket'),
   '10000000-0000-0000-0000-000000000002',
-  'CCPL Season · Demo', 'league', 'External competition · Demo',
-  true, 'Invented fixtures and results for product demonstration.', 'Limited overs',
-  '2026-04-01', '2026-10-31', 'Northern Virginia', 'active', true, '{}'::jsonb
+  'CCPL · Manassas1', 'league', 'Capital Cricket Premier League',
+  true, 'External T20 league. Club fixtures and published scorecards only. Aug 16 vs Global Warriors has no recorded result.', 'T20 · Manassas1 · 8 matches',
+  '2026-08-02', '2026-09-26', 'Manassas, VA', 'active', true, '{}'::jsonb
 );
 
 insert into public.teams (id, sport_id, name, short_name, audience_label) values
   ('40000000-0000-0000-0000-000000000001', (select id from public.sports where code = 'soccer'), 'Nova Royals AC', 'ROYALS', 'Men''s Open 8v8'),
   ('40000000-0000-0000-0000-000000000002', (select id from public.sports where code = 'soccer'), 'Nova Royals Women · Demo', 'ROYALS W', 'Adult women'),
-  ('40000000-0000-0000-0000-000000000003', (select id from public.sports where code = 'cricket'), 'Nova Royals Cricket · Demo', 'ROYALS CC', 'Adult');
+  ('40000000-0000-0000-0000-000000000003', (select id from public.sports where code = 'cricket'), 'Nova Royals Cricket', 'ROYALS CC', 'Adult · CCPL T20'),
 
 insert into public.events (
   sport_id, program_id, competition_id, event_type, title, home_team_id,
@@ -184,9 +184,58 @@ insert into public.events (
 (
   (select id from public.sports where code = 'cricket'),
   null, '30000000-0000-0000-0000-000000000003', 'league_match',
-  'Nova Royals CC vs Potomac XI · Demo', '40000000-0000-0000-0000-000000000003',
-  'Potomac XI · Demo', '2026-09-19 09:30:00-04', 'Northern Virginia Cricket Ground · Demo', 'Northern Virginia',
-  'scheduled', null, null, 'Invented demo fixture', true
+  'NOVA Royals vs Golmaal Aces', '40000000-0000-0000-0000-000000000003',
+  'Golmaal Aces', '2026-08-02 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
+  'completed', null, null, 'Lost by 41 runs · Aces 112/6 · Royals 71/10', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'NOVA Royals vs Blitz', '40000000-0000-0000-0000-000000000003',
+  'Blitz', '2026-08-08 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
+  'completed', null, null, 'Lost by 6 wickets · Royals 69/10 · Blitz 75/4', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'NOVA Royals vs Global Warriors', '40000000-0000-0000-0000-000000000003',
+  'Global Warriors', '2026-08-16 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
+  'completed', null, null, 'No result recorded · scorecard unpublished', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'NOVA Royals vs Galaxy Legends', '40000000-0000-0000-0000-000000000003',
+  'Galaxy Legends', '2026-08-22 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
+  'completed', null, null, 'Won by 6 wickets · Legends 56/10 · Royals 57/4', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'NOVA Royals vs Statesmen', '40000000-0000-0000-0000-000000000003',
+  'Statesmen', '2026-08-30 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
+  'completed', null, null, 'Won by 25 runs · Royals 112/10 · Statesmen all out 18.3 ov', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'NOVA Royals vs Orange Army', '40000000-0000-0000-0000-000000000003',
+  'Orange Army', '2026-09-12 11:45:00-04', 'Manassas cricket fields', 'Manassas, VA',
+  'completed', null, null, 'Won by 20 runs · Royals 87/10 · Orange Army 67/8', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'LM Tigers vs NOVA Royals', '40000000-0000-0000-0000-000000000003',
+  'LM Tigers', '2026-09-20 11:45:00-04', 'Manassas Field 2', 'Manassas, VA',
+  'scheduled', null, null, 'CCPL T20 Manassas1 · away', true
+),
+(
+  (select id from public.sports where code = 'cricket'),
+  null, '30000000-0000-0000-0000-000000000003', 'league_match',
+  'NOVA Royals vs Shockers', '40000000-0000-0000-0000-000000000003',
+  'Shockers', '2026-09-26 11:45:00-04', 'Manassas Field 1', 'Manassas, VA',
+  'scheduled', null, null, 'CCPL T20 Manassas1 · home', true
 );
 
 -- Men's Open standings are omitted until verified results exist.

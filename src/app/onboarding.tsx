@@ -8,6 +8,7 @@ import { CrownMark } from '@/components/onboarding/Decor';
 import { FlowShell } from '@/components/onboarding/FlowShell';
 import { ChoiceCard, FlowField, OrRule, ProviderButton, TickRow, ToggleRow, type Tint } from '@/components/onboarding/Pieces';
 import { Button } from '@/components/ui';
+import { safeBack } from '@/lib/nav';
 import { defaultNotificationPrefs, useApp } from '@/state/AppProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 import type { NotificationPrefs, Person, UserRole } from '@/types/domain';
@@ -31,7 +32,7 @@ const ROLE_CHOICES: {
 
 const PROGRAM_CHOICES: { id: 'soccer' | 'cricket' | 'both'; icon: keyof typeof Ionicons.glyphMap; tint: Tint; title: string; detail: string; ids: string[] }[] = [
   { id: 'soccer', icon: 'football', tint: 'green', title: 'Soccer', detail: 'Youth, veterans, mens, 35+ and more', ids: ['fall-kids-2026', 'nova-royals-men', 'nova-royals-women'] },
-  { id: 'cricket', icon: 'baseball', tint: 'rose', title: 'Cricket', detail: 'Leagues, tournaments, community matches', ids: ['nova-royals-cricket'] },
+  { id: 'cricket', icon: 'baseball', tint: 'rose', title: 'Cricket', detail: 'CCPL T20 · Manassas1', ids: ['nova-royals-cricket'] },
   { id: 'both', icon: 'star', tint: 'amber', title: 'Both', detail: 'I’m interested in both', ids: ['fall-kids-2026', 'nova-royals-men', 'nova-royals-cricket'] },
 ];
 
@@ -74,7 +75,7 @@ export default function OnboardingScreen() {
     if (step === 'signin') return goTo('welcome');
     const previous = order[index - 1];
     if (previous) return goTo(previous);
-    if (introCompleted) return router.back();
+    if (introCompleted) return safeBack('/(tabs)');
     goTo('welcome');
   };
 
@@ -114,7 +115,7 @@ export default function OnboardingScreen() {
       <FlowShell
         tone="dark"
         fill
-        onSkip={introCompleted ? () => router.back() : undefined}
+        onSkip={introCompleted ? () => safeBack('/(tabs)') : undefined}
         skipLabel="Close"
         above={
           <View style={styles.lockup}>
@@ -305,6 +306,7 @@ export default function OnboardingScreen() {
             title={choice.title}
             detail={choice.detail}
             trailing="checkbox"
+            cricket={choice.id === 'cricket'}
             selected={sport === choice.id}
             onPress={() => setSport(choice.id)}
           />

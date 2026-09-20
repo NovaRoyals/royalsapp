@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Roy, ROY_STATES, type RoyHandle, type RoyState } from '@/components/mascot';
 import { Screen, StatusPill } from '@/components/ui';
 import { haptic } from '@/lib/haptics';
+import { safeBack } from '@/lib/nav';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export default function RoyLabScreen() {
@@ -22,7 +22,7 @@ export default function RoyLabScreen() {
   return (
     <Screen>
       <View style={styles.top}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}>
           <Ionicons name="arrow-back" size={21} />
         </Pressable>
         <View style={styles.flex}>

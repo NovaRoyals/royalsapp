@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { notificationsForRole } from '@/lib/membership';
+import { safeBack } from '@/lib/nav';
 import { formatEventParts } from '@/lib/datetime';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
@@ -29,7 +30,7 @@ export default function NotificationsScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <View style={styles.flex}><Text style={styles.eyebrow}>UPDATES</Text><Text style={styles.title}>Notifications</Text></View>
         <Pressable
           onPress={() => {

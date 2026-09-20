@@ -8,7 +8,7 @@ export const DEMO_CLOCK_ISO = '2026-09-13T14:30:00-04:00';
 export function travelMinutesStub(venue: string) {
   if (venue.toLowerCase().includes('nottoway') || venue.toLowerCase().includes('training')) return 18;
   if (venue.toLowerCase().includes('lawrence')) return 24;
-  if (venue.toLowerCase().includes('cricket')) return 32;
+  if (venue.toLowerCase().includes('manassas') || venue.toLowerCase().includes('cricket')) return 38;
   return 22;
 }
 

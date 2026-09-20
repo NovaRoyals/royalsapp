@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/ui';
+import { safeBack } from '@/lib/nav';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export default function AccountPersonalScreen() {
@@ -21,7 +21,7 @@ export default function AccountPersonalScreen() {
 export function Header({ title }: { title: string }) {
   return (
     <View style={styles.top}>
-      <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+      <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
       <Text style={styles.title}>{title}</Text>
     </View>
   );

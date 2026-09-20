@@ -9,6 +9,7 @@ import { demoPrograms, demoTeams } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
 import { formatEventParts } from '@/lib/datetime';
 import { can } from '@/lib/capabilities';
+import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { NoticeUrgency } from '@/types/domain';
@@ -78,7 +79,7 @@ export default function AdminScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <View style={styles.flex}><Text style={styles.eyebrow}>ROLE-PROTECTED · DEMO</Text><Text style={styles.title}>{role === 'coach' ? 'U8 staff tools' : 'Club management'}</Text></View>
         <View style={styles.adminMark}><Text style={styles.adminText}>A</Text></View>
       </View>

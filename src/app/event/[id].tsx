@@ -7,6 +7,7 @@ import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
 import { FieldChangeBanner } from '@/components/interactions/ContextCards';
 import { CalendarConfirmButton, SupporterButton } from '@/components/interactions/SupporterButton';
 import { RsvpChoices } from '@/components/interactions/RsvpChoices';
+import { CricketMark } from '@/components/icons/CricketMark';
 import { Button, Screen, StatusPill } from '@/components/ui';
 import { demoSchedule, demoTeams } from '@/data/demo';
 import { estimatedTravelStub, formatEventParts, formatEventWhen, formatLeaveBy } from '@/lib/datetime';
@@ -15,6 +16,7 @@ import { PressableScale } from '@/components/motion';
 import { can } from '@/lib/capabilities';
 import { gameDayBrief, isGameDayWindow, travelMinutesStub } from '@/lib/intelligence';
 import { canPlayerRsvp, canSeeFullRoster, COACH_TEAM_ID } from '@/lib/membership';
+import { safeBack } from '@/lib/nav';
 import { shareContent } from '@/lib/share';
 import { calendarGateway } from '@/services/calendar';
 import { mapsSearchUrl } from '@/services/maps';
@@ -41,7 +43,7 @@ export default function EventDetailScreen() {
   const canClose = can(role, 'urgent_field_closure');
   const showPlayerRsvp = canPlayerRsvp(role, event, registrations);
   const showSupporter = !showPlayerRsvp && !staffAttendance;
-  const isTraining = event.type === 'training' || event.type === 'fitness';
+  const isTraining = event.type === 'training';
   const team = demoTeams.find((item) => item.id === event.teamId);
   const roster = team?.roster ?? [];
   const authorizedNames = canSeeFullRoster(role, event.teamId);
@@ -53,7 +55,7 @@ export default function EventDetailScreen() {
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/schedule')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.topTitle}>Event details</Text>
         <PressableScale
           accessibilityLabel="Share event"
@@ -76,7 +78,13 @@ export default function EventDetailScreen() {
           <Text style={styles.day}>{parts.day}</Text>
           <Text style={styles.month}>{parts.month}</Text>
         </View>
-        <StatusPill label={event.type.replace('_', ' ')} tone="orange" />
+        <StatusPill label={event.sport === 'cricket' ? 'T20 · CCPL' : event.type.replace('_', ' ')} tone="orange" />
+        {event.sport === 'cricket' ? (
+          <View style={styles.cricketRow}>
+            <CricketMark size={18} color={colors.orange} />
+            <Text style={styles.cricketLabel}>Manassas1 division</Text>
+          </View>
+        ) : null}
         <Text style={styles.title}>{event.title}</Text>
         <Text style={styles.subtitle}>{event.subtitle}</Text>
         {event.subtitle.includes('Session') ? (
@@ -189,7 +197,7 @@ export default function EventDetailScreen() {
           setCalendarAdded(true);
         }}
       />
-      {event.coachName ? <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} /> : null}
+      {event.coachName && event.sport !== 'cricket' ? <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} /> : null}
       <View style={styles.demoNote}>
         <Ionicons name="flask-outline" size={19} color={colors.warning} />
         <Text style={styles.demoText}>Travel time is a stub until live maps are configured. Weather and calendar write are stubs. Field status is staff-controlled in demo.</Text>
@@ -217,6 +225,8 @@ const styles = StyleSheet.create({
   month: { color: colors.white, fontSize: 11, ...typography.numeric },
   title: { color: colors.white, fontSize: 28, lineHeight: 32, marginTop: spacing.md, ...typography.display },
   subtitle: { color: colors.sand, fontSize: 13, marginTop: 5, ...typography.body },
+  cricketRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.sm },
+  cricketLabel: { color: colors.sand, fontSize: 12, ...typography.label },
   path: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md },
   pathDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.28)' },
   pathDotOn: { backgroundColor: colors.orange },

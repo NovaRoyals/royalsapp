@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native';
 
+import { CricketMark } from '@/components/icons/CricketMark';
 import { PressableScale } from '@/components/motion';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -14,11 +15,21 @@ const tints: Record<Tint, { bg: string; fg: string }> = {
   rose: { bg: colors.roseSoft, fg: colors.rose },
 };
 
-function IconTile({ icon, tint, size = 40 }: { icon: keyof typeof Ionicons.glyphMap; tint: Tint; size?: number }) {
+function IconTile({
+  icon,
+  tint,
+  size = 40,
+  cricket = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  tint: Tint;
+  size?: number;
+  cricket?: boolean;
+}) {
   const scheme = tints[tint];
   return (
     <View style={[styles.tile, { width: size, height: size, borderRadius: size / 2, backgroundColor: scheme.bg }]}>
-      <Ionicons name={icon} size={size * 0.46} color={scheme.fg} />
+      {cricket ? <CricketMark size={size * 0.5} color={scheme.fg} /> : <Ionicons name={icon} size={size * 0.46} color={scheme.fg} />}
     </View>
   );
 }
@@ -30,6 +41,7 @@ export function ChoiceCard({
   detail,
   selected,
   trailing = 'chevron',
+  cricket,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -38,6 +50,7 @@ export function ChoiceCard({
   detail?: string;
   selected?: boolean;
   trailing?: 'chevron' | 'checkbox' | 'none';
+  cricket?: boolean;
   onPress?: () => void;
 }) {
   return (
@@ -48,7 +61,7 @@ export function ChoiceCard({
       onPress={onPress}
       style={[styles.card, selected && styles.cardSelected]}
     >
-      <IconTile icon={icon} tint={tint} />
+      <IconTile icon={icon} tint={tint} cricket={cricket} />
       <View style={styles.flex}>
         <Text style={styles.cardTitle}>{title}</Text>
         {detail ? <Text style={styles.cardDetail}>{detail}</Text> : null}
