@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     minHeight: 64,
   },
   star: { color: '#e9a13b', fontSize: 22 },

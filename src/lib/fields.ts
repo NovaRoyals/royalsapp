@@ -22,7 +22,8 @@ export const DEFAULT_PITCH_TIME = '6:30PM';
 export const PITCH_DISCLAIMER =
   'Public league calendars only — private teams and game bookings aren’t checked. Treat this as a starting point, not a hold on the pitch.';
 
-export const PITCH_FILTER_HINT = 'Green is clear at your time · Orange has something on · Map starts on the best pick';
+export const PITCH_FILTER_HINT =
+  'This app cannot verify private permits and private/member practice schedules.';
 
 export function minutesForTime(time: string) {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);

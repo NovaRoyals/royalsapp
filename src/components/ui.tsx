@@ -90,6 +90,7 @@ export function AppHeader({
   meta,
   metaTone = 'default',
   compactTitle = false,
+  style,
 }: {
   eyebrow?: string;
   title?: string;
@@ -97,12 +98,13 @@ export function AppHeader({
   meta?: string;
   metaTone?: 'default' | 'stale';
   compactTitle?: boolean;
+  style?: StyleProp<ViewStyle>;
 }) {
   const { hydrated, notifications, role } = useApp();
   const unread = hydrated ? notificationsForRole(role, notifications).filter((item) => !item.read).length : 0;
   const reduced = useReducedMotion();
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, style]}>
       <View style={styles.headerCopy}>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : <Brand />}
         {title ? <Text style={[styles.headerTitle, compactTitle && styles.headerTitleCompact]}>{title}</Text> : null}

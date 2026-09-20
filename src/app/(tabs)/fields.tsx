@@ -21,7 +21,6 @@ import { useFieldCoverage, usePitchDay } from '@/hooks/useFieldCalendar';
 import { clubNowPostedIso } from '@/lib/datetime';
 import {
   DEFAULT_PITCH_TIME,
-  PITCH_DISCLAIMER,
   PITCH_FILTER_HINT,
   PITCH_TIMES,
   clubDateFromPosted,
@@ -254,12 +253,13 @@ export default function FieldsScreen() {
   return (
     <Screen tabScene>
         <AppHeader
-          eyebrow="Pickup & planning"
-          title="Fields"
+          compactTitle
+          eyebrow="Open pitches"
+          title="Find your next pickup location and avoid busy fields"
           meta={updated}
           metaTone={stale ? 'stale' : 'default'}
+          style={styles.headerTight}
         />
-        <Text style={styles.lead}>Check public calendars before you drive. Pick a time, then scan pitches around Northern Virginia.</Text>
 
         {coverage.isError && !coverage.data ? (
           <View style={styles.banner}>
@@ -287,7 +287,7 @@ export default function FieldsScreen() {
           onTime={setTime}
           onTurf={() => setTurfOnly((value) => !value)}
         />
-        <Text style={styles.hint}>{PITCH_FILTER_HINT}</Text>
+        <Text numberOfLines={1} style={styles.hint}>{PITCH_FILTER_HINT}</Text>
 
         {suggestion ? (
           <BestPickBanner pitch={suggestion} time={time} onPress={() => selectPitch(suggestion.id)} />
@@ -315,18 +315,14 @@ export default function FieldsScreen() {
               ))}
         </View>
 
-        <View style={styles.note}>
-          <Ionicons name="information-circle-outline" size={22} color={colors.info} />
-          <Text style={styles.noteText}>{coverage.data?.disclaimer ?? PITCH_DISCLAIMER}</Text>
-        </View>
         <Text style={styles.footer}>Data: Fieldchecker API · source health</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  lead: { color: colors.stone, fontSize: 15, lineHeight: 22, marginTop: -spacing.sm, marginBottom: spacing.lg, ...typography.body },
-  hint: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: spacing.sm, marginBottom: spacing.md, ...typography.body },
+  headerTight: { paddingTop: 4, paddingBottom: 8 },
+  hint: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: spacing.sm, ...typography.body },
   mapCard: {
     height: 320,
     borderRadius: radius.lg,
@@ -334,9 +330,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: '#F3F5F3',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  mapSpacer: { height: 320, marginBottom: spacing.md },
+  mapSpacer: { height: 320, marginBottom: spacing.sm },
   mapFull: {
     position: 'absolute',
     top: 0,
@@ -428,7 +424,7 @@ const styles = StyleSheet.create({
   panelName: { color: colors.ink, fontSize: 22, ...typography.heading, marginTop: 4 },
   panelSub: { color: colors.orangeDark, fontSize: 11, marginBottom: spacing.sm, ...typography.label, textTransform: 'uppercase' },
   empty: { color: colors.stone, fontSize: 14, marginBottom: spacing.md, ...typography.body },
-  section: { color: colors.stone, fontSize: 10, marginBottom: spacing.md, ...typography.label },
+  section: { color: colors.stone, fontSize: 10, marginBottom: spacing.sm, ...typography.label },
   list: { gap: spacing.sm },
   listGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   half: { width: '48%', flexGrow: 1 },
@@ -445,7 +441,5 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, color: colors.charcoal, fontSize: 13, lineHeight: 19, ...typography.body },
   retry: { minHeight: 44, justifyContent: 'center' },
   retryText: { color: colors.orangeDark, fontSize: 12, ...typography.label },
-  note: { marginTop: spacing.xl, flexDirection: 'row', gap: spacing.md, backgroundColor: '#E7F0F5', borderRadius: radius.lg, padding: spacing.lg },
-  noteText: { flex: 1, color: colors.info, fontSize: 13, lineHeight: 19, ...typography.body },
   footer: { color: colors.stone, fontSize: 11, marginTop: spacing.md, marginBottom: spacing.lg, ...typography.body },
 });
