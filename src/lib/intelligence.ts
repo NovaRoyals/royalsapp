@@ -123,7 +123,7 @@ export function upcomingThisWeek(schedule: ScheduleEvent[], nowIso = clubNowIso(
 export function aroundTheClub(schedule: ScheduleEvent[], _followedIds: string[], nowIso = clubNowIso()) {
   const week = upcomingThisWeek(schedule, nowIso);
   const cricket = week.find((item) => item.sport === 'cricket');
-  const feature = cricket ?? week.find((item) => item.teamId !== 'nova-royals-kids-u8' && item.sport !== 'soccer') ?? week.find((item) => item.teamId === 'nova-royals-men');
+  const feature = cricket ?? week.find((item) => item.teamId !== 'nova-royals-kids-u8' && item.sport !== 'soccer') ?? week.find((item) => item.teamId === 'nova-royals-men' || item.teamId === 'nova-royals-35plus');
   if (!feature) return null;
   const parts = formatEventParts(feature.startsAt);
   return {
@@ -248,6 +248,7 @@ export function homeStories(
 ): HomeStory[] {
   const posted = clubNowPostedIso();
   const men = schedule.filter((item) => item.teamId === 'nova-royals-men');
+  const plus = schedule.filter((item) => item.teamId === 'nova-royals-35plus');
   const kids = schedule.filter((item) => item.teamId === 'nova-royals-kids-u8');
   const cricket = schedule.filter((item) => item.sport === 'cricket');
   const cards: HomeStory[] = [];
@@ -269,7 +270,7 @@ export function homeStories(
     push(upcomingStory(personal, role === 'adult_player' ? 'Next match' : 'Next session'));
   }
 
-  const clubSoccer = nextOf(men, nowIso);
+  const clubSoccer = nextOf([...men, ...plus], nowIso);
   if (clubSoccer && clubSoccer.id !== personal?.id) {
     push(upcomingStory(clubSoccer, 'Upcoming soccer'));
   }

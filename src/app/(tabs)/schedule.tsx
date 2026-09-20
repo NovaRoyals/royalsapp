@@ -24,7 +24,7 @@ const filters: { id: Filter; label: string }[] = [
 function matchesFilter(event: ScheduleEvent, filter: Filter, followedIds: string[]) {
   if (filter === 'soccer' || filter === 'cricket') return event.sport === filter;
   if (filter === 'community') return event.type === 'club_event';
-  if (isKids(event) || isWomen(event)) return true;
+  if (isKids(event) || isWomen(event) || is35Plus(event)) return true;
   return Boolean(
     event.attendance ||
       event.supporterGoing ||
@@ -46,6 +46,10 @@ function isKids(event: ScheduleEvent) {
 
 function isWomen(event: ScheduleEvent) {
   return event.programId === 'womens-soccer' || event.teamId === 'nova-royals-women';
+}
+
+function is35Plus(event: ScheduleEvent) {
+  return event.programId === 'veterans-soccer' || event.teamId === 'nova-royals-35plus';
 }
 
 function dayStamp(iso: string) {

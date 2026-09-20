@@ -55,7 +55,7 @@ export const defaultNotificationPrefs: NotificationPrefs = {
   locationShare: false,
 };
 
-export const defaultFollowedIds = ['fall-kids-2026', 'nova-royals-women', 'nova-royals-men', 'nova-royals-cricket'];
+export const defaultFollowedIds = ['fall-kids-2026', 'nova-royals-women', 'nova-royals-men', 'nova-royals-35plus', 'veterans-soccer', 'nova-royals-cricket'];
 
 export type Persona = 'visitor' | 'demo';
 
@@ -139,6 +139,10 @@ function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
     }),
     ...extra,
   ].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+}
+
+function mergeFollowedIds(ids?: string[]) {
+  return [...new Set([...(ids?.length ? ids : defaultFollowedIds), 'nova-royals-35plus', 'veterans-soccer'])];
 }
 
 function visitorNotifications() {
@@ -225,6 +229,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             role,
             introCompleted: parsed.introCompleted ?? true,
             schedule: mergeClubSchedule(parsed.schedule),
+            followedIds: mergeFollowedIds(parsed.followedIds),
           });
           return;
         }
@@ -240,6 +245,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           introCompleted: parsed.introCompleted ?? false,
           notifications: parsed.notifications ?? visitorNotifications(),
           schedule: mergeClubSchedule(parsed.schedule),
+          followedIds: mergeFollowedIds(parsed.followedIds),
         });
       })
       .catch(() => setState({ ...initialState, schedule: mergeClubSchedule() }))
