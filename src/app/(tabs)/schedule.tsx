@@ -7,7 +7,7 @@ import { CricketMark } from '@/components/icons/CricketMark';
 import { PressableScale } from '@/components/motion';
 import { AppHeader, Chip, Screen } from '@/components/ui';
 import { kidsProgramId } from '@/data/demo';
-import { formatEventParts } from '@/lib/datetime';
+import { formatEventParts, isEventOver } from '@/lib/datetime';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { ScheduleEvent } from '@/types/domain';
@@ -131,7 +131,10 @@ export default function ScheduleScreen() {
   const [filter, setFilter] = useState<Filter>('mine');
   const [showPast, setShowPast] = useState(false);
   const filtered = useMemo(
-    () => schedule.filter((event) => matchesFilter(event, filter, followedIds) && (showPast || event.status !== 'completed')),
+    () =>
+      schedule
+        .filter((event) => matchesFilter(event, filter, followedIds) && (showPast || !isEventOver(event)))
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
     [filter, schedule, showPast, followedIds],
   );
   const rows = useMemo(() => groupRows(filtered), [filtered]);

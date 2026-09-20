@@ -130,6 +130,26 @@ export function isEventPast(startsAt: string, nowIso = clubNowIso()) {
   return new Date(startsAt).getTime() <= new Date(nowIso).getTime();
 }
 
+export function eventEndsAt(event: { startsAt: string; endsAt?: string }) {
+  return event.endsAt ?? addMinutesToWall(event.startsAt, 90);
+}
+
+export type EventPhase = 'upcoming' | 'live' | 'past';
+
+export function eventPhase(event: { startsAt: string; endsAt?: string }, nowIso = clubNowIso()): EventPhase {
+  const start = new Date(event.startsAt).getTime();
+  const end = new Date(eventEndsAt(event)).getTime();
+  const now = new Date(nowIso).getTime();
+  if (now < start) return 'upcoming';
+  if (now < end) return 'live';
+  return 'past';
+}
+
+export function isEventOver(event: { startsAt: string; endsAt?: string; status?: string }, nowIso = clubNowIso()) {
+  if (event.status === 'completed' || event.status === 'cancelled') return true;
+  return eventPhase(event, nowIso) === 'past';
+}
+
 export function relativeDayLabel(startsAt: string, nowPostedIso = clubNowPostedIso()) {
   if (isSameWallDay(startsAt, nowPostedIso)) return 'today';
   const tomorrow = addMinutesToWall(nowPostedIso, 24 * 60);

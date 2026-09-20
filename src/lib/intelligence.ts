@@ -1,9 +1,16 @@
 import type { Person, ScheduleEvent, UserRole } from '@/types/domain';
-import { addMinutesToWall, clubNowIso, estimatedTravelStub, formatEventParts, formatLeaveBy, relativeDayLabel } from '@/lib/datetime';
+import {
+  addMinutesToWall,
+  clubNowIso,
+  clubNowPostedIso,
+  estimatedTravelStub,
+  eventPhase,
+  formatEventParts,
+  formatLeaveBy,
+  isSameWallDay,
+  relativeDayLabel,
+} from '@/lib/datetime';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
-
-/** Demo “now” so Game-Day Home can be reviewed without waiting for kickoff. */
-export const DEMO_CLOCK_ISO = '2026-09-13T14:30:00-04:00';
 
 export function travelMinutesStub(venue: string) {
   if (venue.toLowerCase().includes('nottoway') || venue.toLowerCase().includes('training')) return 18;
@@ -16,7 +23,7 @@ export function leaveByIso(startsAt: string, venue: string, bufferMin = 10) {
   return addMinutesToWall(startsAt, -(travelMinutesStub(venue) + bufferMin));
 }
 
-export function ageOnDate(dateOfBirth: string, asOfIso = '2026-09-13') {
+export function ageOnDate(dateOfBirth: string, asOfIso = clubNowPostedIso().slice(0, 10)) {
   const birth = new Date(dateOfBirth);
   const asOf = new Date(asOfIso);
   let age = asOf.getFullYear() - birth.getFullYear();
@@ -106,9 +113,10 @@ export const WEEK_WINDOW_MINUTES = 7 * 24 * 60;
 
 export function upcomingThisWeek(schedule: ScheduleEvent[], nowIso = clubNowIso()) {
   return schedule.filter((item) => {
-    if (item.status !== 'scheduled') return false;
+    if (item.status === 'cancelled' || item.status === 'completed') return false;
+    if (eventPhase(item, nowIso) !== 'upcoming') return false;
     const minutes = minutesUntil(item.startsAt, nowIso);
-    return minutes >= -12 * 60 && minutes < WEEK_WINDOW_MINUTES;
+    return minutes < WEEK_WINDOW_MINUTES;
   });
 }
 
@@ -148,4 +156,137 @@ export function childRegistrationHints(children: Person[]) {
       warning: rec.match ? null : `${child.firstName} is outside the 3–16 age range for Fall Soccer Training.`,
     };
   });
+}
+
+export type HomeStory = {
+  id: string;
+  kicker: string;
+  title: string;
+  meta: string;
+  href: string;
+  startsAt: string;
+  kind: 'upcoming' | 'live' | 'result';
+};
+
+function cricketHref(event: ScheduleEvent) {
+  if (event.id === 'ccpl-2026-09-20') return '/cricket/match/4806';
+  if (event.id === 'ccpl-2026-09-26') return '/cricket/match/shockers';
+  if (event.id === 'ccpl-2026-09-12') return '/cricket/match/4777';
+  return `/event/${event.id}`;
+}
+
+export function nextUpcomingEvent(events: ScheduleEvent[], nowIso = clubNowIso()) {
+  return nextOf(events, nowIso);
+}
+
+function nextOf(events: ScheduleEvent[], nowIso: string) {
+  return events
+    .filter((item) => eventPhase(item, nowIso) === 'upcoming')
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+}
+
+function upcomingStory(event: ScheduleEvent, kicker: string): HomeStory {
+  const parts = formatEventParts(event.startsAt);
+  const rel = relativeDayLabel(event.startsAt);
+  const hour = Number(event.startsAt.slice(11, 13));
+  const when =
+    rel === 'today' ? (hour >= 17 ? 'Tonight' : 'Today') : rel === 'tomorrow' ? 'Tomorrow' : `${parts.weekday} ${parts.month} ${parts.day}`;
+  return {
+    id: `up-${event.id}`,
+    kicker,
+    title: event.title,
+    meta: `${when} · ${parts.time}${event.venue ? ` · ${event.venue}` : ''}`,
+    href: event.sport === 'cricket' ? cricketHref(event) : `/event/${event.id}`,
+    startsAt: event.startsAt,
+    kind: 'upcoming',
+  };
+}
+
+function cricketTodayStory(event: ScheduleEvent, nowIso: string): HomeStory | null {
+  const phase = eventPhase(event, nowIso);
+  const parts = formatEventParts(event.startsAt);
+  if (phase === 'upcoming') return null;
+  if (phase === 'live') {
+    return {
+      id: `live-${event.id}`,
+      kicker: 'In play',
+      title: event.title,
+      meta: 'Official live score is on CCPL — ROYALS does not guess the score.',
+      href: cricketHref(event),
+      startsAt: event.startsAt,
+      kind: 'live',
+    };
+  }
+  if (event.result) {
+    const line = event.result.replace(/^Lost — /, 'Lost today — ').replace(/^Won by /, 'Won today by ').replace(/^Tied — /, 'Tied today — ');
+    return {
+      id: `done-${event.id}`,
+      kicker: 'Today',
+      title: `Cricket · ${line}`,
+      meta: `${parts.time} · ${event.venue}`,
+      href: cricketHref(event),
+      startsAt: event.startsAt,
+      kind: 'result',
+    };
+  }
+  return {
+    id: `done-${event.id}`,
+    kicker: 'Today',
+    title: event.title,
+    meta: 'Match window is over. Result waits on the official CCPL scorecard.',
+    href: cricketHref(event),
+    startsAt: event.startsAt,
+    kind: 'result',
+  };
+}
+
+export function homeStories(
+  schedule: ScheduleEvent[],
+  role: UserRole,
+  hasChildren: boolean,
+  nowIso = clubNowIso(),
+): HomeStory[] {
+  const posted = clubNowPostedIso();
+  const men = schedule.filter((item) => item.teamId === 'nova-royals-men');
+  const kids = schedule.filter((item) => item.teamId === 'nova-royals-kids-u8');
+  const cricket = schedule.filter((item) => item.sport === 'cricket');
+  const cards: HomeStory[] = [];
+  const seen = new Set<string>();
+
+  const push = (card: HomeStory | undefined) => {
+    if (!card || seen.has(card.id)) return;
+    seen.add(card.id);
+    cards.push(card);
+  };
+
+  const personal =
+    role === 'adult_player'
+      ? nextOf(men, nowIso)
+      : role === 'coach' || (role === 'guardian' && hasChildren)
+        ? nextOf(kids, nowIso)
+        : undefined;
+  if (personal) {
+    push(upcomingStory(personal, role === 'adult_player' ? 'Next match' : 'Next session'));
+  }
+
+  const clubSoccer = nextOf(men, nowIso);
+  if (clubSoccer && clubSoccer.id !== personal?.id) {
+    push(upcomingStory(clubSoccer, 'Upcoming soccer'));
+  }
+
+  const cricketToday = cricket.find((item) => isSameWallDay(item.startsAt, posted));
+  if (cricketToday) {
+    const story = cricketTodayStory(cricketToday, nowIso);
+    if (story) push(story);
+    else if (eventPhase(cricketToday, nowIso) === 'upcoming' && cricketToday.id !== personal?.id && cricketToday.id !== clubSoccer?.id) {
+      push(upcomingStory(cricketToday, 'Upcoming cricket'));
+    }
+  }
+
+  if (!cards.length) {
+    const anyNext = nextOf(schedule.filter((item) => item.status !== 'cancelled'), nowIso);
+    if (anyNext) push(upcomingStory(anyNext, 'Upcoming'));
+  }
+
+  return cards.slice(0, 3);
 }

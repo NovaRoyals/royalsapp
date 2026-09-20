@@ -133,7 +133,7 @@ function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
         goingCount: overlay.goingCount ?? event.goingCount,
         fieldStatus: overlay.fieldStatus ?? event.fieldStatus,
         checkIns: overlay.checkIns ?? event.checkIns,
-        result: overlay.result ?? event.result,
+        result: event.sport === 'cricket' ? event.result : overlay.result ?? event.result,
         status: overlay.status ?? event.status,
       };
     }),

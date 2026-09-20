@@ -1,24 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link, router } from 'expo-router';
+import { Href, Link, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { FieldChangeBanner, GameDayCard } from '@/components/interactions/ContextCards';
 import { SeasonDots } from '@/components/interactions/SeasonDots';
-import { Roy } from '@/components/mascot';
 import { KenBurnsImage } from '@/components/media/KenBurnsImage';
 import { PressableScale } from '@/components/motion';
 import { AppHeader, Button, Screen } from '@/components/ui';
 import { demoPrograms, kidsProgramId } from '@/data/demo';
 import { mayaAttendanceHistory } from '@/lib/attendance';
-import { formatEventParts, relativeDayLabel } from '@/lib/datetime';
+import { clubNowIso, formatEventParts, relativeDayLabel } from '@/lib/datetime';
 import {
   gameDayBrief,
+  homeStories,
   householdConflictStub,
   isGameDayWindow,
-  upcomingThisWeek,
+  nextUpcomingEvent,
+  type HomeStory,
 } from '@/lib/intelligence';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -43,33 +44,35 @@ export default function HomeScreen() {
   const kidsProgram = demoPrograms.find((item) => item.id === kidsProgramId)!;
   const unread = notificationsForRole(role, notifications).filter((item) => !item.read);
   const urgent = unread.find((item) => item.urgency === 'urgent');
-  const kidsEvent = schedule.find((event) => event.teamId === COACH_TEAM_ID && event.status === 'scheduled');
-  const menEvent = schedule.find((event) => event.teamId === PLAYER_TEAM_ID && event.status === 'scheduled');
+  const [nowIso, setNowIso] = useState(clubNowIso);
+  useEffect(() => {
+    const tick = setInterval(() => setNowIso(clubNowIso()), 60_000);
+    return () => clearInterval(tick);
+  }, []);
+  const kidsEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === COACH_TEAM_ID), nowIso);
+  const menEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === PLAYER_TEAM_ID), nowIso);
   const pendingRegs = registrations.filter((item) => item.status === 'pending' || item.paymentStatus === 'pending');
   const closedField = schedule.find((event) => event.fieldStatus === 'closed');
   const parentReg = role === 'guardian' || role === 'admin' ? registrations[0] : undefined;
-  const missingRsvps = Math.max(0, 12 - (kidsEvent?.goingCount ?? 0));
-  const mayaCheckedIn = kidsEvent?.checkIns?.some((row) => row.personId === 'child-maya' && row.present);
-  const week = upcomingThisWeek(schedule);
   const viewingChild = household.children.find((child) => child.id === childId) ?? household.children[0];
   const hasChildren = household.children.length > 0;
   const staffPending = Boolean(pendingStaffRole);
   const firstName = household.guardianName.trim().split(' ')[0];
+  const missingRsvps = Math.max(0, 12 - (kidsEvent?.goingCount ?? 0));
+  const mayaCheckedIn = kidsEvent?.checkIns?.some((row) => row.personId === 'child-maya' && row.present);
+  const stories = useMemo(
+    () => homeStories(schedule, role, hasChildren, nowIso),
+    [schedule, role, hasChildren, nowIso],
+  );
   const gameEvent =
     role === 'adult_player'
       ? menEvent
       : role === 'coach' || (role === 'guardian' && hasChildren)
         ? kidsEvent
-        : undefined;
-  const gameDay = gameEvent && isGameDayWindow(gameEvent) ? gameDayBrief(gameEvent, role === 'guardian' ? viewingChild?.firstName : undefined) : null;
+        : menEvent;
+  const gameDay = gameEvent && isGameDayWindow(gameEvent, nowIso) ? gameDayBrief(gameEvent, role === 'guardian' ? viewingChild?.firstName : undefined, nowIso) : null;
   const conflict = householdConflictStub(role, household.children.map((child) => child.firstName));
-
-  const featured =
-    (role === 'guardian' && hasChildren && kidsEvent) ||
-    (role === 'adult_player' && menEvent) ||
-    (role === 'coach' && kidsEvent)
-      ? gameEvent ?? kidsEvent ?? menEvent
-      : week[0];
+  const showRegister = role === 'guest' || (role === 'guardian' && !hasChildren);
 
   const tiles: { label: string; detail: string; icon: keyof typeof Ionicons.glyphMap; tint: Tint; href: string }[] = [
     { label: 'Programs', detail: 'Soccer & cricket', icon: 'grid', tint: 'green', href: '/(tabs)/programs' },
@@ -105,6 +108,9 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
         <Text style={styles.introCopy}>See schedule, nearby pitches, and what to bring — no account required.</Text>
+        {stories.map((story) => (
+          <StoryCard key={story.id} {...story} />
+        ))}
         <View style={styles.tileGrid}>
           {tiles.slice(0, 4).map((tile) => (
             <Tile key={tile.label} {...tile} />
@@ -176,24 +182,11 @@ export default function HomeScreen() {
       ) : null}
       {conflict ? <Brief title={conflict.title} detail={conflict.detail} href="/(tabs)/schedule" /> : null}
 
-      {featured ? (
-        <Link href={`/event/${featured.id}`} asChild>
-          <PressableScale style={styles.featured}>
-            <View style={styles.featuredDate}>
-              <Text style={styles.featuredDow}>{formatEventParts(featured.startsAt).weekday}</Text>
-              <Text style={styles.featuredDay}>{new Date(featured.startsAt).getDate()}</Text>
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.featuredKicker}>UPCOMING</Text>
-              <Text style={styles.featuredTitle}>{featured.title}</Text>
-              <Text style={styles.featuredMeta}>
-                {formatEventParts(featured.startsAt).time}
-                {featured.venue ? ` · ${featured.venue}` : ''}
-              </Text>
-            </View>
-            <Roy pose="point" still size={78} />
-          </PressableScale>
-        </Link>
+      {stories.map((story) => (
+        <StoryCard key={story.id} {...story} />
+      ))}
+      {showRegister && stories.length === 0 ? (
+        <Brief title="Fall Soccer Training is open" detail="Sundays 9–10 AM at Arrowhead 3A · $120, sibling rate $60." href={`/registration/${kidsProgramId}`} />
       ) : null}
 
       {role === 'guardian' && persona === 'demo' && hydrated ? (
@@ -238,6 +231,25 @@ function Tile({
         </View>
         <Text style={styles.tileLabel}>{label}</Text>
         <Text style={styles.tileDetail}>{detail}</Text>
+      </PressableScale>
+    </Link>
+  );
+}
+
+function StoryCard({ kicker, title, meta, href, startsAt, kind }: HomeStory) {
+  const parts = formatEventParts(startsAt);
+  return (
+    <Link href={href as Href} asChild>
+      <PressableScale style={StyleSheet.flatten([styles.featured, kind === 'result' && styles.featuredResult, kind === 'live' && styles.featuredLive])}>
+        <View style={styles.featuredDate}>
+          <Text style={styles.featuredDow}>{parts.weekday}</Text>
+          <Text style={styles.featuredDay}>{parts.day}</Text>
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.featuredKicker}>{kicker.toUpperCase()}</Text>
+          <Text style={styles.featuredTitle}>{title}</Text>
+          <Text style={styles.featuredMeta}>{meta}</Text>
+        </View>
       </PressableScale>
     </Link>
   );
@@ -308,6 +320,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     overflow: 'hidden',
   },
+  featuredLive: { borderColor: colors.orange },
+  featuredResult: { backgroundColor: colors.paper },
   featuredDate: {
     width: 52,
     height: 58,

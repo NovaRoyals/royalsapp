@@ -14,7 +14,9 @@ export const mayaAttendanceHistory: SessionHistoryRow[] = [
   { id: 'h7', label: 'Aug 23', status: 'present' },
   { id: 'h8', label: 'Aug 30', status: 'present' },
   { id: 'h9', label: 'Sep 6', status: 'present' },
-  { id: 'h10', label: 'Sep 13', status: 'upcoming' },
+  { id: 'h10', label: 'Sep 13', status: 'present' },
+  { id: 'h11', label: 'Sep 20', status: 'present' },
+  { id: 'h12', label: 'Sep 27', status: 'upcoming' },
 ];
 
 export function completedAttendance(history: SessionHistoryRow[]) {
