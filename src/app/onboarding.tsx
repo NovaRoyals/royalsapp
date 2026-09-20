@@ -32,7 +32,7 @@ const ROLE_CHOICES: {
 
 const PROGRAM_CHOICES: { id: string; icon: keyof typeof Ionicons.glyphMap; tint: Tint; title: string; detail: string; ids: string[]; cricket?: boolean }[] = [
   { id: 'open', icon: 'football', tint: 'green', title: 'Open soccer', detail: 'Men’s Open 8v8 · Sunday evenings', ids: ['nova-royals-men'] },
-  { id: 'veterans', icon: 'medal', tint: 'amber', title: '35+ soccer', detail: 'Veterans pathway', ids: ['veterans-soccer'] },
+  { id: 'veterans', icon: 'medal', tint: 'amber', title: '35+ soccer', detail: 'Thursday nights · FXA 8v8', ids: ['nova-royals-35plus', 'veterans-soccer'] },
   { id: 'women', icon: 'football', tint: 'rose', title: 'Women’s soccer', detail: 'Adult women’s team', ids: ['nova-royals-women'] },
   { id: 'kids', icon: 'happy', tint: 'blue', title: 'Kids soccer', detail: 'Ages 3–16 · Sunday training', ids: ['fall-kids-2026'] },
   { id: 'cricket', icon: 'baseball', tint: 'teal', title: 'Cricket', detail: 'CCPL T20 · Manassas1', ids: ['nova-royals-cricket'], cricket: true },

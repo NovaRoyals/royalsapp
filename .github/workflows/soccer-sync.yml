@@ -1,0 +1,42 @@
+# FXA soccer sync (LeagueLab). Schedules via FXA Sports — never invent tables.
+
+name: soccer-sync
+on:
+  schedule:
+    - cron: "0 12 * * 5"
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+    inputs:
+      league_id:
+        description: "105789 (35+) or 105797 (open). Empty = both."
+        required: false
+
+concurrency:
+  group: soccer-sync-${{ github.event.inputs.league_id || github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r soccer-sync/requirements.txt supabase
+      - run: python -m playwright install chromium --with-deps
+      - working-directory: soccer-sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "0 12 * * 5" ]; then
+            python sync.py backfill --league-id 105789
+          elif [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "0 12 * * 1" ]; then
+            python sync.py backfill --league-id 105797
+          elif [ -n "${{ github.event.inputs.league_id }}" ]; then
+            python sync.py backfill --league-id ${{ github.event.inputs.league_id }}
+          else
+            python sync.py backfill
+          fi

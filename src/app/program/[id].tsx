@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { CricketMatchesPane } from '@/components/cricket/MatchesPane';
+import { SoccerFixturesPane } from '@/components/soccer/FixturesPane';
 import { KenBurnsImage } from '@/components/media/KenBurnsImage';
 import { CricketMark } from '@/components/icons/CricketMark';
 import { Button, Chip, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms, demoTeams } from '@/data/demo';
+import { FXA } from '@/lib/soccer';
 import { track } from '@/lib/analytics';
 import { safeBack } from '@/lib/nav';
 import { cricketPrivacyName } from '@/lib/cricket';
@@ -27,8 +29,9 @@ export default function ProgramDetailScreen() {
   const { role, schedule } = useApp();
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
   const team = program.teamId ? demoTeams.find((item) => item.id === program.teamId) : undefined;
-  const [pane, setPane] = useState<'about' | 'squad' | 'matches'>('about');
+  const [pane, setPane] = useState<'about' | 'squad' | 'matches' | 'fixtures'>('about');
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
+  const fxaSide = program.id === 'veterans-soccer' ? '35plus' as const : undefined;
   const authorized = canSeeFullRoster(role, team?.id);
   const next = team ? schedule.find((event) => event.teamId === team.id && event.status === 'scheduled') : undefined;
   const nextParts = next ? formatEventParts(next.startsAt) : null;
@@ -72,6 +75,7 @@ export default function ProgramDetailScreen() {
       {team ? (
         <View style={styles.paneRow}>
           <Chip label="About" active={pane === 'about'} onPress={() => setPane('about')} />
+          {fxaSide ? <Chip label="Fixtures" active={pane === 'fixtures'} onPress={() => setPane('fixtures')} /> : null}
           <Chip label="Squad" active={pane === 'squad'} onPress={() => setPane('squad')} />
           {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPane('matches')} /> : null}
         </View>
@@ -79,6 +83,8 @@ export default function ProgramDetailScreen() {
 
       {pane === 'matches' && cricket ? (
         <CricketMatchesPane />
+      ) : pane === 'fixtures' && fxaSide ? (
+        <SoccerFixturesPane side={fxaSide} />
       ) : pane === 'squad' && team ? (
         <View style={styles.squadWrap}>
           <View style={styles.squadMeta}>
@@ -101,7 +107,12 @@ export default function ProgramDetailScreen() {
             </Link>
           ) : null}
           <View style={styles.roster}>
-            {squadGroups.map((group) => (
+            {fxaSide ? (
+              <View style={styles.privateRoster}>
+                <Ionicons name="lock-closed-outline" size={15} color={colors.stone} />
+                <Text style={styles.privateText}>Roster available to registered players on FXA</Text>
+              </View>
+            ) : squadGroups.map((group) => (
               <View key={group.title}>
                 {squadGroups.length > 1 ? <Text style={styles.groupTitle}>{group.title}</Text> : null}
                 {group.people.map((person, index) => {
@@ -127,10 +138,12 @@ export default function ProgramDetailScreen() {
                 })}
               </View>
             ))}
-            <View style={styles.privateRoster}>
+            {fxaSide ? null : (
+          <View style={styles.privateRoster}>
               <Ionicons name="lock-closed-outline" size={15} color={colors.stone} />
               <Text style={styles.privateText}>{authorized ? 'Full names · teammate / parent / staff view' : 'Public view · first name and last initial only'}</Text>
             </View>
+            )}
           </View>
         </View>
       ) : (
@@ -199,13 +212,17 @@ export default function ProgramDetailScreen() {
 
       <View style={styles.cta}>
         <View style={styles.flex}>
-          <Text style={styles.ctaLabel}>{program.registrationOpen ? 'Registration open' : 'Interest list'}</Text>
+          <Text style={styles.ctaLabel}>{fxaSide ? 'FXA Sports' : program.registrationOpen ? 'Registration open' : 'Interest list'}</Text>
           <Text style={styles.ctaPrice}>{program.priceLabel}</Text>
         </View>
         <Button
-          label={program.registrationOpen ? 'Register' : 'Join list'}
+          label={fxaSide ? 'Register on FXA Sports' : program.registrationOpen ? 'Register' : 'Join list'}
           icon="arrow-forward"
           onPress={() => {
+            if (fxaSide) {
+              Linking.openURL(FXA[fxaSide].detailsUrl);
+              return;
+            }
             router.push(`/registration/${program.id}`);
           }}
         />

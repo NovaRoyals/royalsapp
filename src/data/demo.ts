@@ -10,13 +10,14 @@ import type {
   ScheduleEvent,
   Team,
 } from '@/types/domain';
+import { fxa35PlusMatches, soccerResultText } from '@/data/fxa';
 
 export const kidsProgramId = 'fall-kids-2026';
 
 export const followCatalog = [
   { id: kidsProgramId, label: 'Kids Soccer', detail: 'Sundays 9–10 AM · Arrowhead 3A' },
   { id: 'nova-royals-men', label: 'Open Soccer', detail: 'Sunday evenings' },
-  { id: 'veterans-soccer', label: '35+ Soccer', detail: 'Veterans pathway' },
+  { id: 'veterans-soccer', label: '35+ Soccer', detail: 'Thursday nights · FXA 8v8' },
   { id: 'nova-royals-women', label: 'Women’s Soccer', detail: 'Sunday practice 8:00–8:30 AM' },
   { id: 'nova-royals-cricket', label: 'ROYALS Cricket', detail: 'CCPL T20 · Manassas1' },
 ] as const;
@@ -128,17 +129,23 @@ export const demoPrograms: Program[] = [
     title: 'Veterans 35+',
     sport: 'soccer',
     audience: 'Players 35+',
-    summary: 'Competitive play with an experienced, community-first squad.',
-    description: 'A dedicated soccer pathway for experienced players aged 35 and over.',
-    dates: 'Seasonal',
-    venue: 'Northern Virginia',
-    priceLabel: 'Varies by season',
+    summary: 'Thursday night Men’s 8v8 (35+) with FXA Sports — Fall ’26 Competitive.',
+    description:
+      'Nova Royals AC 35+ play Thursday nights in FXA’s Men’s 8v8 (35+) Competitive division. Eight regular-season games on turf around Northern Virginia. Registration for this season is closed on FXA; roster names are not public.',
+    dates: 'Sep 17 – Nov 5, 2026 · playoffs Nov 12 / Nov 19 if qualified',
+    venue: 'Arrowhead · Greenbriar · Sully Highlands · Hutchison',
+    priceLabel: 'Register on FXA Sports',
     registrationOpen: false,
-    badge: 'Interest list',
+    badge: 'FXA Fall ’26',
     heroImage: 'https://www.novaroyalsac.com/images/team-cream-jersey-outdoor.jpg',
-    facts: [{ label: 'Eligibility', value: 'Age 35+' }, { label: 'Format', value: 'Team play' }],
-    includes: ['Regular fixtures', 'Experienced squad', 'Club community'],
-    factual: false,
+    facts: [
+      { label: 'Nights', value: 'Thursdays' },
+      { label: 'Format', value: '8v8 · 35+' },
+      { label: 'League', value: 'FXA Competitive' },
+    ],
+    includes: ['Eight regular-season games', 'Turf fields and officials', 'Playoff path for top teams', 'Schedules via FXA Sports'],
+    factual: true,
+    teamId: 'nova-royals-35plus',
   },
   {
     id: 'recreational-soccer',
@@ -381,6 +388,21 @@ export const demoTeams: Team[] = [
     roster: [],
   },
   {
+    id: 'nova-royals-35plus',
+    name: 'Nova Royals AC 35+',
+    shortName: '35+',
+    sport: 'soccer',
+    audience: 'Players 35+',
+    competitionId: 'thu-35-8v8',
+    competitionName: "FXA Thursday Men’s 8v8 (35+) · Fall ’26",
+    season: 'Fall 2026',
+    record: '0-1-0',
+    accent: '#A54218',
+    memberCount: 0,
+    managed: true,
+    roster: [],
+  },
+  {
     id: 'nova-royals-cricket',
     name: 'Nova Royals Cricket',
     shortName: 'ROYALS CC',
@@ -414,6 +436,22 @@ export const demoCompetitions: Competition[] = [
       'Current Nova Royals AC men’s open 8v8 schedule. ROYALS is not the official league operator; fixtures, fields and kickoff times are shown for the club team.',
     externalDisclaimer: 'Standings and scores are not invented. Table updates after verified results.',
     teamIds: ['nova-royals-men'],
+  },
+  {
+    id: 'thu-35-8v8',
+    title: 'Thursday Men’s 8v8 (35+)',
+    type: 'league',
+    sport: 'soccer',
+    season: 'Fall 2026',
+    organizer: 'FXA Sports NoVA',
+    status: 'active',
+    dates: 'Sep 17 – Nov 5, 2026',
+    location: 'Fairfax County, VA',
+    format: '8v8 · Thursday nights · Competitive',
+    description:
+      'Nova Royals AC 35+ in FXA’s Thursday Men’s 8v8 (35+) Competitive division. Fixtures and scores follow FXA Sports.',
+    externalDisclaimer: 'Schedules via FXA Sports. ROYALS does not invent standings or scores.',
+    teamIds: ['nova-royals-35plus'],
   },
   {
     id: 'royals-autumn-cup',
@@ -623,6 +661,23 @@ const mensOpenMatches: ScheduleEvent[] = [
   },
 ];
 
+const veterans35Matches: ScheduleEvent[] = fxa35PlusMatches.map((match) => ({
+  id: match.id,
+  type: 'league_match' as const,
+  sport: 'soccer' as const,
+  title: `Nova Royals AC vs ${match.opponentName}`,
+  subtitle: `${match.homeAway === 'H' ? 'Home' : 'Visitor'} · FXA 35+ 8v8`,
+  startsAt: match.playedAt,
+  venue: [match.venue, match.field].filter(Boolean).join(' · '),
+  address: 'Fairfax County, VA',
+  teamId: 'nova-royals-35plus',
+  programId: 'veterans-soccer',
+  competitionId: 'thu-35-8v8',
+  status: match.status === 'completed' ? 'completed' as const : 'scheduled' as const,
+  result: match.status === 'completed' ? soccerResultText(match) : undefined,
+  fieldStatus: 'open' as const,
+}));
+
 const ccplMatches: ScheduleEvent[] = [
   {
     id: 'ccpl-2026-08-02',
@@ -791,6 +846,7 @@ export const demoSchedule: ScheduleEvent[] = [
   ...kidsFallSessions,
   ...womensPracticeSessions,
   ...mensOpenMatches,
+  ...veterans35Matches,
   ...ccplMatches,
 ].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()) as ScheduleEvent[];
 

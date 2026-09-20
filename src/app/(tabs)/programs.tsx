@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { CricketMark } from '@/components/icons/CricketMark';
@@ -43,6 +43,8 @@ export default function ProgramsScreen() {
 
   const kidsPromo = !hideKidsPromo && sport === 'soccer' ? programs.find((program) => program.id === kidsProgramId) : undefined;
   const list = kidsPromo ? programs.filter((program) => program.id !== kidsProgramId) : programs;
+  const { width } = useWindowDimensions();
+  const twoCol = width >= 640 && list.length > 1;
   const fade = useSharedValue(1);
 
   useEffect(() => {
@@ -104,18 +106,18 @@ export default function ProgramsScreen() {
         </ScrollView>
       </View>
 
-      <View style={styles.list}>
+      <View style={[styles.list, twoCol && styles.listGrid]}>
         {list.map((program) => (
           <Link key={program.id} href={`/program/${program.id}`} asChild>
-            <PressableScale style={styles.programCard}>
-              <Image source={{ uri: program.heroImage }} style={styles.cardImage} contentFit="cover" />
-              <View style={styles.cardBody}>
+            <PressableScale style={StyleSheet.flatten([styles.programCard, twoCol && styles.programTile])}>
+              <Image source={{ uri: program.heroImage }} style={[styles.cardImage, twoCol && styles.tileImage]} contentFit="cover" />
+              <View style={[styles.cardBody, twoCol && styles.tileBody]}>
                 <View style={styles.titleRow}>
                   <Text style={styles.cardTitle}>{program.title}</Text>
                   <Ionicons name="arrow-forward" size={18} color={colors.ink} />
                 </View>
                 <Text style={styles.audience}>{program.audience}</Text>
-                <Text numberOfLines={2} style={styles.cardSummary}>{program.summary}</Text>
+                <Text numberOfLines={twoCol ? 3 : 2} style={styles.cardSummary}>{program.summary}</Text>
                 <View style={styles.cardFooter}>
                   <Text style={styles.price}>{program.id === kidsProgramId ? `${program.priceLabel} · $10/session` : program.priceLabel}</Text>
                   {program.registrationOpen ? <View style={styles.openDot} /> : null}
@@ -203,9 +205,13 @@ const styles = StyleSheet.create({
   count: { color: colors.stone, fontSize: 10, ...typography.label, letterSpacing: 1 },
   chips: { flexDirection: 'row', gap: spacing.sm },
   list: { gap: spacing.md },
+  listGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   programCard: { flexDirection: 'row', backgroundColor: colors.paper, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  programTile: { width: '48%', flexGrow: 0, flexDirection: 'column', minHeight: 280 },
   cardImage: { width: 112, minHeight: 154, backgroundColor: colors.sand },
+  tileImage: { width: '100%', height: 148, minHeight: 148 },
   cardBody: { flex: 1, padding: spacing.md, gap: 4 },
+  tileBody: { minHeight: 132 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
   cardTitle: { flex: 1, color: colors.ink, fontSize: 16, ...typography.heading },
   audience: { color: colors.orangeDark, fontSize: 11, ...typography.label, textTransform: 'uppercase' },
