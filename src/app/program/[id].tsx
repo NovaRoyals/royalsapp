@@ -25,11 +25,12 @@ export function generateStaticParams() {
 }
 
 export default function ProgramDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, pane: paneParam } = useLocalSearchParams<{ id: string; pane?: string }>();
   const { role, schedule } = useApp();
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
   const team = program.teamId ? demoTeams.find((item) => item.id === program.teamId) : undefined;
-  const [pane, setPane] = useState<'about' | 'squad' | 'matches' | 'fixtures'>('about');
+  const requestedPane = paneParam === 'squad' || paneParam === 'matches' || paneParam === 'fixtures' ? paneParam : 'about';
+  const [pane, setPane] = useState<'about' | 'squad' | 'matches' | 'fixtures'>(requestedPane);
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
   const fxaSide = program.id === 'veterans-soccer' ? '35plus' as const : undefined;
   const authorized = canSeeFullRoster(role, team?.id);
@@ -50,6 +51,10 @@ export default function ProgramDetailScreen() {
   useEffect(() => {
     track('program_viewed', { programId: program.id });
   }, [program.id]);
+
+  useEffect(() => {
+    if (requestedPane !== 'about') setPane(requestedPane);
+  }, [requestedPane]);
 
   return (
     <Screen contentStyle={styles.page}>

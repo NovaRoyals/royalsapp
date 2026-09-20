@@ -58,6 +58,8 @@ export function Screen({
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      pinchGestureEnabled={false}
+      nestedScrollEnabled
     >
       {content}
     </ScrollView>

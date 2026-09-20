@@ -12,6 +12,26 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 export { seasonRecord, ccplScorecardUrl, isTrustedLive, isPublishedMatch } from "@/data/ccpl";
 export type { CricketMatch, CricketPlayer, CricketBall } from "@/data/ccpl";
 
+const SCHEDULE_TO_MATCH: Record<string, string> = {
+  "ccpl-2026-08-02": "aces",
+  "ccpl-2026-08-08": "blitz",
+  "ccpl-2026-08-22": "4721",
+  "ccpl-2026-08-30": "4762",
+  "ccpl-2026-09-12": "4777",
+  "ccpl-2026-09-20": "4806",
+  "ccpl-2026-09-26": "shockers",
+};
+
+export function cricketEventHref(event: { id: string; sport?: string }) {
+  if (event.sport && event.sport !== "cricket") return `/event/${event.id}`;
+  const slug = SCHEDULE_TO_MATCH[event.id];
+  return slug ? `/cricket/match/${slug}` : `/event/${event.id}`;
+}
+
+export function cricketProgramHref(pane?: "about" | "squad" | "matches") {
+  return pane && pane !== "about" ? `/program/ccpl-cricket?pane=${pane}` : "/program/ccpl-cricket";
+}
+
 type NameParts = { firstName: string; lastName: string; displayName: string; isMinor?: boolean };
 
 function partsFromFullName(fullName: string): NameParts {

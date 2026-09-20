@@ -10,6 +10,7 @@ import {
   isSameWallDay,
   relativeDayLabel,
 } from '@/lib/datetime';
+import { cricketEventHref } from '@/lib/cricket';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 
 export function travelMinutesStub(venue: string) {
@@ -169,10 +170,7 @@ export type HomeStory = {
 };
 
 function cricketHref(event: ScheduleEvent) {
-  if (event.id === 'ccpl-2026-09-20') return '/cricket/match/4806';
-  if (event.id === 'ccpl-2026-09-26') return '/cricket/match/shockers';
-  if (event.id === 'ccpl-2026-09-12') return '/cricket/match/4777';
-  return `/event/${event.id}`;
+  return cricketEventHref(event);
 }
 
 export function nextUpcomingEvent(events: ScheduleEvent[], nowIso = clubNowIso()) {

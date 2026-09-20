@@ -128,7 +128,7 @@ function toEvent(match: SoccerMatch, side: SoccerSide): ScheduleEvent {
     id: match.id,
     type: 'league_match',
     sport: 'soccer',
-    title: `Nova Royals AC vs ${match.opponentName}`,
+    title: `Nova Royals AC (${side === '35plus' ? '35+' : 'Open'}) vs ${match.opponentName}`,
     subtitle: match.homeAway === 'H' ? 'Home' : 'Visitor',
     startsAt: match.playedAt,
     venue: [match.venue, match.field].filter(Boolean).join(' · '),

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Href, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { RsvpChoices } from '@/components/interactions/RsvpChoices';
 import { CricketMark } from '@/components/icons/CricketMark';
 import { Button, Screen, StatusPill } from '@/components/ui';
 import { demoSchedule, demoTeams } from '@/data/demo';
+import { cricketEventHref, cricketProgramHref } from '@/lib/cricket';
 import { estimatedTravelStub, formatEventParts, formatEventWhen, formatLeaveBy } from '@/lib/datetime';
 import { useToast } from '@/components/Toast';
 import { PressableScale } from '@/components/motion';
@@ -117,6 +118,16 @@ export default function EventDetailScreen() {
             count={event.supporterCount ?? 0}
             onToggle={(next) => setSupporter(event.id, next)}
           />
+        </View>
+      ) : null}
+
+      {event.sport === 'cricket' ? (
+        <View style={styles.cricketBridge}>
+          <Text style={styles.sectionTitle}>CCPL cricket</Text>
+          <Text style={styles.hint}>Squad, scorecards, and fixtures live on the cricket program — open them from here.</Text>
+          <Button label="Open match center" icon="baseball-outline" onPress={() => router.push(cricketEventHref(event) as Href)} />
+          <Button label="Nova Royals squad" icon="people-outline" variant="secondary" style={styles.secondary} onPress={() => router.push(cricketProgramHref('squad') as Href)} />
+          <Button label="All CCPL matches" icon="trophy-outline" variant="secondary" style={styles.secondary} onPress={() => router.push(cricketProgramHref('matches') as Href)} />
         </View>
       ) : null}
 
@@ -255,6 +266,7 @@ const styles = StyleSheet.create({
   rsvpText: { color: colors.charcoal, fontSize: 11, ...typography.label },
   rsvpTextActive: { color: colors.white },
   support: { marginTop: spacing.md, gap: spacing.md },
+  cricketBridge: { marginTop: spacing.md, gap: spacing.sm },
   staff: { marginTop: spacing.md },
   checkRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border },
   checkName: { color: colors.ink, ...typography.heading },

@@ -117,6 +117,11 @@ export default function PitchMap({
       onRegionChangeComplete={(region) => {
         setZoom(zoomFromLongitudeDelta(region.longitudeDelta));
       }}
+      zoomEnabled
+      scrollEnabled
+      pitchEnabled={false}
+      rotateEnabled={false}
+      moveOnMarkerPress={false}
       mapType="none"
       onPress={() => onBackground?.()}
     >

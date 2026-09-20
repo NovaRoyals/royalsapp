@@ -178,7 +178,7 @@ export default function FieldsScreen() {
   }
 
   const mapCard = (
-    <View style={[styles.mapCard, fullscreen && styles.mapFull, fullscreen && webFull]}>
+    <View style={[styles.mapCard, fullscreen && styles.mapFull, fullscreen && webFull, Platform.OS === 'web' && ({ touchAction: 'none' } as ViewStyle)]}>
       {fullscreen ? (
         <View style={styles.fullBar}>
           <Pressable accessibilityRole="button" accessibilityLabel="Exit fullscreen map" onPress={exitFullscreen} style={styles.mapBtn}>

@@ -41,7 +41,8 @@ function ensureLeafletCss() {
     .nr-pin.pulse .nr-glow { animation: nr-pin-pulse 1.6s ease-in-out infinite; }
     @media (prefers-reduced-motion: reduce) { .nr-pin.pulse .nr-glow { animation: none; } }
     @keyframes nr-pin-pulse { 0%,100% { transform: scale(1); opacity: .28; } 50% { transform: scale(1.55); opacity: .12; } }
-    .leaflet-container { font-family: inherit; background: #F3F5F3; height: 100%; width: 100%; }
+    .leaflet-container { font-family: inherit; background: #F3F5F3; height: 100%; width: 100%; touch-action: none; }
+    #fields-map { touch-action: none; }
     .leaflet-top.leaflet-left { top: 48px; }
   `;
   document.head.appendChild(style);
@@ -129,7 +130,15 @@ export default function PitchMap({
       host.style.height = '100%';
       host.style.width = '100%';
       host.innerHTML = '';
-      map = L.map(host, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+      map = L.map(host, {
+        zoomControl: true,
+        attributionControl: true,
+        scrollWheelZoom: false,
+        touchZoom: true,
+        bounceAtZoomLimits: true,
+        dragging: true,
+        doubleClickZoom: true,
+      });
       L.tileLayer(LIGHT_TILES, {
         attribution: '&copy; OpenStreetMap &copy; Esri',
         maxZoom: 16,

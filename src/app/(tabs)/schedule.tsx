@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Href, Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -99,7 +99,7 @@ function groupRows(events: ScheduleEvent[]): ScheduleRow[] {
 function EventCard({ event, raised, flush }: { event: ScheduleEvent; raised?: boolean; flush?: boolean }) {
   const glyph = iconFor(event);
   return (
-    <Link href={`/event/${event.id}`} asChild>
+    <Link href={`/event/${event.id}` as Href} asChild>
       <PressableScale style={StyleSheet.flatten([styles.eventCard, !flush && styles.singleCard, event.status === 'completed' && styles.completedCard, raised && styles.raisedCard])}>
         <View style={styles.eventTop}>
           <View style={[styles.eventIcon, event.sport === 'cricket' && styles.cricketIcon]}>

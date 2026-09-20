@@ -1,11 +1,11 @@
-import { Href, Link, useLocalSearchParams } from "expo-router";
+import { Href, Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CricketMark } from "@/components/icons/CricketMark";
 import { Button, Chip, Screen, StatusPill } from "@/components/ui";
 import { cricketSquad } from "@/data/ccpl";
-import { ccplScorecardUrl, displayCricketName, getMatchDetail, isTrustedLive, subscribeLive, type CricketBall, type CricketMatch } from "@/lib/cricket";
+import { ccplScorecardUrl, cricketProgramHref, displayCricketName, getMatchDetail, isTrustedLive, subscribeLive, type CricketBall, type CricketMatch } from "@/lib/cricket";
 import { safeBack } from "@/lib/nav";
 import { useApp } from "@/state/AppProvider";
 import { colors, radius, spacing, typography } from "@/theme/tokens";
@@ -105,6 +105,11 @@ export default function CricketMatchScreen() {
         ) : (
           <Text style={styles.attr}>Scores via CCPL (CricClubs)</Text>
         )}
+      </View>
+
+      <View style={styles.tabs}>
+        <Chip label="Squad" onPress={() => router.push(cricketProgramHref("squad") as Href)} />
+        <Chip label="All matches" onPress={() => router.push(cricketProgramHref("matches") as Href)} />
       </View>
 
       <View style={styles.tabs}>
