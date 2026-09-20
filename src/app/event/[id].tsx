@@ -9,10 +9,13 @@ import { CalendarConfirmButton, SupporterButton } from '@/components/interaction
 import { RsvpChoices } from '@/components/interactions/RsvpChoices';
 import { Button, Screen, StatusPill } from '@/components/ui';
 import { demoSchedule, demoTeams } from '@/data/demo';
-import { estimatedTravelStub, formatEventParts, formatEventWhen } from '@/lib/datetime';
+import { estimatedTravelStub, formatEventParts, formatEventWhen, formatLeaveBy } from '@/lib/datetime';
+import { useToast } from '@/components/Toast';
+import { PressableScale } from '@/components/motion';
 import { can } from '@/lib/capabilities';
-import { gameDayBrief, isGameDayWindow, leaveByIso, travelMinutesStub } from '@/lib/intelligence';
-import { canPlayerRsvp, COACH_TEAM_ID } from '@/lib/membership';
+import { gameDayBrief, isGameDayWindow, travelMinutesStub } from '@/lib/intelligence';
+import { canPlayerRsvp, canSeeFullRoster, COACH_TEAM_ID } from '@/lib/membership';
+import { shareContent } from '@/lib/share';
 import { calendarGateway } from '@/services/calendar';
 import { mapsSearchUrl } from '@/services/maps';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
@@ -26,9 +29,11 @@ export function generateStaticParams() {
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { schedule, setAttendance, setSupporter, setFieldStatus, recordCheckIn, recordAllPresent, role, registrations } = useApp();
+  const { schedule, setAttendance, setSupporter, setFieldStatus, recordCheckIn, recordAllPresent, role, registrations, household } = useApp();
+  const toast = useToast();
   const event = schedule.find((item) => item.id === id) ?? schedule[0];
   const [calendarAdded, setCalendarAdded] = useState(false);
+  const [factsOpen, setFactsOpen] = useState(false);
   const parts = formatEventParts(event.startsAt);
   const weather = weatherForEvent(event);
   const staffAttendance =
@@ -39,10 +44,10 @@ export default function EventDetailScreen() {
   const isTraining = event.type === 'training' || event.type === 'fitness';
   const team = demoTeams.find((item) => item.id === event.teamId);
   const roster = team?.roster ?? [];
-  const authorizedNames = role === 'coach' || role === 'admin' || role === 'guardian';
+  const authorizedNames = canSeeFullRoster(role, event.teamId);
   const recorded = event.checkIns ?? [];
   const gameDay = isGameDayWindow(event) ? gameDayBrief(event) : null;
-  const leave = formatEventParts(leaveByIso(event.startsAt, event.venue));
+  const leaveBy = formatLeaveBy(event.startsAt, travelMinutesStub(event.venue) + 10);
   const missingRsvpIds = roster.filter((person) => !recorded.some((item) => item.personId === person.id)).map((person) => person.id);
 
   return (
@@ -50,7 +55,21 @@ export default function EventDetailScreen() {
       <View style={styles.topbar}>
         <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.topTitle}>Event details</Text>
-        <Pressable accessibilityLabel="Share event" style={styles.back}><Ionicons name="share-outline" size={20} /></Pressable>
+        <PressableScale
+          accessibilityLabel="Share event"
+          onPress={async () => {
+            const result = await shareContent({
+              title: event.title,
+              message: `${event.title} · ${formatEventWhen(event.startsAt)} · ${event.venue}`,
+              url: typeof window !== 'undefined' ? window.location.href : undefined,
+            });
+            if (result === 'copied') toast('Link copied');
+            if (result === 'shared') toast('Shared');
+          }}
+          style={styles.back}
+        >
+          <Ionicons name="share-outline" size={20} />
+        </PressableScale>
       </View>
       <View style={styles.hero}>
         <View style={styles.date}>
@@ -60,7 +79,38 @@ export default function EventDetailScreen() {
         <StatusPill label={event.type.replace('_', ' ')} tone="orange" />
         <Text style={styles.title}>{event.title}</Text>
         <Text style={styles.subtitle}>{event.subtitle}</Text>
+        {event.subtitle.includes('Session') ? (
+          <View style={styles.path}>
+            {Array.from({ length: 12 }).map((_, index) => (
+              <View key={index} style={[styles.pathDot, index === 0 && styles.pathDotOn]} />
+            ))}
+          </View>
+        ) : null}
       </View>
+
+      {event.status === 'completed' ? (
+        <View style={styles.result}><Text style={styles.resultLabel}>{event.demo ? 'FINAL · DEMO' : 'FINAL'}</Text><Text style={styles.resultValue}>{event.result}</Text></View>
+      ) : showPlayerRsvp ? (
+        <View style={styles.rsvpHero}>
+          <Text style={styles.sectionTitle}>Can you make it?</Text>
+          <RsvpChoices
+            value={event.attendance}
+            goingCount={event.goingCount ?? 0}
+            onChange={(status) => setAttendance(event.id, status)}
+          />
+        </View>
+      ) : null}
+
+      {showSupporter ? (
+        <View style={styles.support}>
+          <Text style={styles.sectionTitle}>Coming to support?</Text>
+          <SupporterButton
+            going={Boolean(event.supporterGoing)}
+            count={event.supporterCount ?? 0}
+            onToggle={(next) => setSupporter(event.id, next)}
+          />
+        </View>
+      ) : null}
 
       <FieldChangeBanner closed={event.fieldStatus === 'closed'} venue={event.venue} />
 
@@ -71,13 +121,18 @@ export default function EventDetailScreen() {
 
       <View style={styles.travel}>
         <Text style={styles.travelKicker}>GETTING THERE</Text>
-        {gameDay ? <Text style={styles.travelTime}>{gameDay.leaveBy}</Text> : <Text style={styles.travelTime}>{estimatedTravelStub(event.venue)}</Text>}
+        {gameDay?.leaveBy ? <Text style={styles.travelTime}>{gameDay.leaveBy}</Text> : <Text style={styles.travelTime}>{estimatedTravelStub(event.venue)}</Text>}
         <Text style={styles.travelMeta}>
-          {travelMinutesStub(event.venue)}-minute drive stub · Leave by {leave.time} · Field {fieldStatusLabel(event.fieldStatus)} · {event.parkingNotes ?? 'Parking notes closer to kickoff'}
+          {travelMinutesStub(event.venue)}-minute drive stub{leaveBy ? ` · ${leaveBy}` : ''} · Field {fieldStatusLabel(event.fieldStatus)} · {event.parkingNotes ?? 'Parking notes closer to kickoff'}
         </Text>
         <Button label="Open directions" icon="navigate-outline" variant="secondary" onPress={() => Linking.openURL(mapsSearchUrl(event.venue, event.address))} />
       </View>
 
+      <PressableScale onPress={() => setFactsOpen((open) => !open)} style={styles.detailsToggle}>
+        <Text style={styles.detailsToggleText}>{factsOpen ? 'Hide when, where, weather' : 'When, where, weather & kit'}</Text>
+        <Ionicons name={factsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
+      </PressableScale>
+      {factsOpen ? (
       <View style={styles.details}>
         <Detail icon="time-outline" label="When" value={formatEventWhen(event.startsAt)} />
         <Detail icon="location-outline" label="Where" value={`${event.venue}${event.address ? `\n${event.address}` : ''}`} />
@@ -86,27 +141,6 @@ export default function EventDetailScreen() {
         {event.coachName ? <Detail icon="person-outline" label="Coach" value={event.coachName} /> : null}
         {event.whatToBring ? <Detail icon="bag-outline" label="Bring" value={event.whatToBring} last /> : <Detail icon="shirt-outline" label="For" value={event.subtitle} last />}
       </View>
-
-      {event.status === 'completed' ? (
-        <View style={styles.result}><Text style={styles.resultLabel}>{event.demo ? 'FINAL · DEMO' : 'FINAL'}</Text><Text style={styles.resultValue}>{event.result}</Text></View>
-      ) : showPlayerRsvp ? (
-        <>
-          <Text style={styles.sectionTitle}>Can you make it?</Text>
-          <Text style={styles.hint}>Player availability for this roster — not spectator support.</Text>
-          <RsvpChoices value={event.attendance} goingCount={event.goingCount ?? 0} onChange={(status) => setAttendance(event.id, status)} />
-        </>
-      ) : null}
-
-      {showSupporter ? (
-        <View style={styles.support}>
-          <Text style={styles.sectionTitle}>Coming to support?</Text>
-          <Text style={styles.hint}>Spectators and club members who are not on this roster.</Text>
-          <SupporterButton
-            going={Boolean(event.supporterGoing)}
-            count={event.supporterCount ?? 0}
-            onToggle={(next) => setSupporter(event.id, next)}
-          />
-        </View>
       ) : null}
 
       {staffAttendance && roster.length ? (
@@ -179,14 +213,20 @@ const styles = StyleSheet.create({
   topTitle: { color: colors.ink, fontSize: 15, ...typography.heading },
   hero: { minHeight: 240, padding: spacing.xl, marginTop: spacing.md, borderRadius: radius.lg, backgroundColor: colors.ink, justifyContent: 'flex-end', alignItems: 'flex-start' },
   date: { position: 'absolute', top: spacing.xl, right: spacing.xl, width: 68, height: 74, borderRadius: radius.md, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
-  day: { color: colors.white, fontSize: 29, lineHeight: 31, ...typography.heading },
-  month: { color: colors.white, fontSize: 10, ...typography.label, letterSpacing: 1 },
-  title: { color: colors.white, fontSize: 27, lineHeight: 31, marginTop: spacing.md, ...typography.heading },
+  day: { color: colors.white, fontSize: 29, lineHeight: 31, ...typography.display },
+  month: { color: colors.white, fontSize: 11, ...typography.numeric },
+  title: { color: colors.white, fontSize: 28, lineHeight: 32, marginTop: spacing.md, ...typography.display },
   subtitle: { color: colors.sand, fontSize: 13, marginTop: 5, ...typography.body },
+  path: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md },
+  pathDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.28)' },
+  pathDotOn: { backgroundColor: colors.orange },
+  rsvpHero: { marginTop: spacing.lg },
+  detailsToggle: { marginTop: spacing.lg, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailsToggleText: { color: colors.charcoal, ...typography.heading },
   statusRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   travel: { marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper, gap: spacing.sm, borderWidth: 1, borderColor: colors.border },
   travelKicker: { color: colors.orangeDark, fontSize: 10, ...typography.label },
-  travelTime: { color: colors.ink, fontSize: 18, ...typography.heading },
+  travelTime: { color: colors.ink, fontSize: 22, ...typography.display },
   travelMeta: { color: colors.stone, fontSize: 12, lineHeight: 18, ...typography.body },
   details: { marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper },
   detailRow: { paddingVertical: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -210,7 +250,7 @@ const styles = StyleSheet.create({
   checkName: { color: colors.ink, ...typography.heading },
   result: { marginTop: spacing.xl, padding: spacing.xl, borderRadius: radius.md, backgroundColor: colors.orangeSoft, alignItems: 'center' },
   resultLabel: { color: colors.orangeDark, fontSize: 10, ...typography.label, letterSpacing: 1 },
-  resultValue: { color: colors.ink, fontSize: 21, marginTop: spacing.sm, ...typography.heading },
+  resultValue: { color: colors.ink, fontSize: 28, marginTop: spacing.sm, ...typography.display },
   secondary: { marginTop: spacing.sm },
   demoNote: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.warningSoft, flexDirection: 'row', gap: spacing.sm },
   demoText: { flex: 1, color: colors.warning, fontSize: 11, lineHeight: 17, ...typography.body },

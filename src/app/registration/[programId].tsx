@@ -2,17 +2,29 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Ionicons } from '@expo/vector-icons';
 import { Controller, useForm } from 'react-hook-form';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { z } from 'zod';
 
+import { ConfirmationPeak, shareRegistration } from '@/components/interactions/ConfirmationPeak';
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
-import { demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
+import { demoHousehold, demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
 import { track } from '@/lib/analytics';
-import { formatEventParts } from '@/lib/datetime';
 import { childRegistrationHints, siblingPrice } from '@/lib/intelligence';
+import {
+  clearRegistrationDraft,
+  loadRegistrationDraft,
+  registrationIdentityKey,
+  saveRegistrationDraft,
+  type RegistrationDraftStep,
+} from '@/lib/registrationDraft';
+import { useReducedMotion } from '@/lib/reducedMotion';
+import { calendarGateway } from '@/services/calendar';
 import { useApp } from '@/state/AppProvider';
+import { motion } from '@/theme/motion';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
+import type { Person } from '@/types/domain';
 
 export function generateStaticParams() {
   return demoPrograms.map((item) => ({ programId: item.id }));
@@ -33,45 +45,143 @@ type Step = 'overview' | 'household' | 'children' | 'consent' | 'review' | 'paym
 
 const steps: { id: Step; label: string }[] = [
   { id: 'overview', label: 'Program' },
+  { id: 'children', label: 'Player' },
   { id: 'household', label: 'Household' },
-  { id: 'children', label: 'Children' },
-  { id: 'consent', label: 'Consent' },
+  { id: 'consent', label: 'Waiver' },
   { id: 'review', label: 'Review' },
-  { id: 'payment', label: 'Status' },
+  { id: 'payment', label: 'Done' },
 ];
 
 export default function RegistrationScreen() {
   const { programId } = useLocalSearchParams<{ programId: string }>();
   const program = demoPrograms.find((item) => item.id === programId) ?? demoPrograms[0];
-  const { household, addChild, submitRegistration, registrations } = useApp();
+  const { household, addChild, submitRegistration, registrations, role, persona, hydrated } = useApp();
   const isYouth = program.id === kidsProgramId || program.id === 'travel-soccer';
+  const reduced = useReducedMotion();
+  const [lens, setLens] = useState<'chooser' | 'guest' | 'demo' | 'account'>(role === 'guest' ? 'chooser' : 'account');
+  const [localChildren, setLocalChildren] = useState<Person[]>([]);
   const [step, setStep] = useState<Step>('overview');
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(() => (role === 'guest' ? [] : household.children.slice(0, 1).map((child) => child.id)));
   const [showAddChild, setShowAddChild] = useState(false);
   const [newChild, setNewChild] = useState({ firstName: '', lastName: '', dateOfBirth: '' });
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [editHousehold, setEditHousehold] = useState(role === 'guest');
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const restoring = useRef(true);
 
   const form = useForm<YouthForm>({
     resolver: zodResolver(youthSchema),
     defaultValues: {
-      guardianName: household.guardianName,
-      email: household.email,
-      phone: household.phone,
-      address: household.address,
+      guardianName: role === 'guest' ? '' : household.guardianName,
+      email: role === 'guest' ? '' : household.email,
+      phone: role === 'guest' ? '' : household.phone,
+      address: role === 'guest' ? '' : household.address,
       parentConsent: false,
       emergencyConsent: false,
       signature: '',
     },
   });
 
+  const childrenPool = lens === 'guest' ? localChildren : lens === 'demo' ? demoHousehold.children : household.children;
+  const identityKey = registrationIdentityKey({
+    persona,
+    role,
+    householdId: household.id,
+    email: household.email,
+  });
   const selectedChildren = useMemo(
-    () => household.children.filter((child) => selected.includes(child.id)),
-    [household.children, selected],
+    () => childrenPool.filter((child) => selected.includes(child.id)),
+    [childrenPool, selected],
   );
   const subtotal = selectedChildren.length > 0 ? 120 + Math.max(0, selectedChildren.length - 1) * 60 : 0;
   const standardPrice = selectedChildren.length * 120;
   const discount = standardPrice - subtotal;
   const activeStepIndex = steps.findIndex((item) => item.id === step);
+  const percent = Math.max(20, Math.round(((activeStepIndex + 1) / steps.length) * 100));
+  const formValues = form.watch();
+
+  useEffect(() => {
+    if (!hydrated || !isYouth) return;
+    let cancelled = false;
+    restoring.current = true;
+    loadRegistrationDraft(program.id, identityKey)
+      .then((draft) => {
+        if (cancelled || !draft) return;
+        setLens(draft.lens);
+        setStep(draft.step);
+        setSelected(draft.selected);
+        setLocalChildren(draft.localChildren);
+        setEditHousehold(draft.editHousehold);
+        setShowAddChild(draft.showAddChild);
+        setNewChild(draft.newChild);
+        form.reset(draft.form);
+        setDraftSavedAt(draft.savedAt);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          restoring.current = false;
+          setDraftReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, identityKey, isYouth, program.id]);
+
+  useEffect(() => {
+    if (!draftReady || restoring.current || !isYouth || step === 'confirmation') return;
+    const timer = setTimeout(() => {
+      saveRegistrationDraft({
+        identityKey,
+        programId: program.id,
+        step: step as RegistrationDraftStep,
+        lens,
+        selected,
+        localChildren,
+        form: {
+          guardianName: formValues.guardianName,
+          email: formValues.email,
+          phone: formValues.phone,
+          address: formValues.address,
+          parentConsent: formValues.parentConsent,
+          emergencyConsent: formValues.emergencyConsent,
+          signature: formValues.signature,
+        },
+        editHousehold,
+        showAddChild,
+        newChild,
+      })
+        .then((payload) => setDraftSavedAt(payload.savedAt))
+        .catch(() => undefined);
+    }, 550);
+    return () => clearTimeout(timer);
+  }, [
+    draftReady,
+    isYouth,
+    identityKey,
+    program.id,
+    step,
+    lens,
+    selected,
+    localChildren,
+    formValues.guardianName,
+    formValues.email,
+    formValues.phone,
+    formValues.address,
+    formValues.parentConsent,
+    formValues.emergencyConsent,
+    formValues.signature,
+    editHousehold,
+    showAddChild,
+    newChild,
+  ]);
+
+  const bar = useSharedValue(percent);
+  useEffect(() => {
+    bar.value = reduced ? percent : withTiming(percent, { duration: motion.duration.base, easing: Easing.out(Easing.cubic) });
+  }, [percent, bar, reduced]);
+  const barStyle = useAnimatedStyle(() => ({ width: `${bar.value}%` as `${number}%` }));
 
   if (!isYouth) {
     return <AdultRegistration programId={program.id} title={program.title} />;
@@ -80,18 +190,28 @@ export default function RegistrationScreen() {
   const goNext = async () => {
     if (step === 'overview') {
       track(registrations.some((item) => item.programId === program.id) ? 're_registration' : 'registration_started', { programId: program.id });
-      setStep('household');
+      setStep('children');
+      return;
+    }
+    if (step === 'children') {
+      if (lens === 'chooser') return;
+      if (selected.length > 0) setStep('household');
+      return;
     }
     if (step === 'household') {
       const valid = await form.trigger(['guardianName', 'email', 'phone', 'address']);
-      if (valid) setStep('children');
+      if (valid) setStep('consent');
+      return;
     }
-    if (step === 'children' && selected.length > 0) setStep('consent');
     if (step === 'consent') {
       const valid = await form.trigger(['parentConsent', 'emergencyConsent', 'signature']);
       if (valid) setStep('review');
+      return;
     }
-    if (step === 'review') setStep('payment');
+    if (step === 'review') {
+      setStep('payment');
+      return;
+    }
     if (step === 'payment') {
       const registration = submitRegistration({
         programId: program.id,
@@ -104,6 +224,7 @@ export default function RegistrationScreen() {
       });
       setSubmittedId(registration.id);
       setStep('confirmation');
+      clearRegistrationDraft().catch(() => undefined);
     }
   };
 
@@ -119,38 +240,43 @@ export default function RegistrationScreen() {
 
   const saveChild = () => {
     if (!newChild.firstName.trim() || !newChild.lastName.trim() || !newChild.dateOfBirth.trim()) return;
-    const created = addChild(newChild);
-    setSelected((current) => [...current, created.id]);
+    if (lens === 'guest') {
+      const created: Person = {
+        id: `guest-child-${Date.now()}`,
+        firstName: newChild.firstName.trim(),
+        lastName: newChild.lastName.trim(),
+        displayName: `${newChild.firstName.trim()} ${newChild.lastName.trim().slice(0, 1)}.`,
+        dateOfBirth: newChild.dateOfBirth.trim(),
+        isMinor: true,
+      };
+      setLocalChildren((current) => [...current, created]);
+      setSelected((current) => [...current, created.id]);
+    } else {
+      const created = addChild(newChild);
+      setSelected((current) => [...current, created.id]);
+    }
     setNewChild({ firstName: '', lastName: '', dateOfBirth: '' });
     setShowAddChild(false);
   };
 
   if (step === 'confirmation') {
     const first = demoSchedule.find((item) => item.id === 'kids-session-1');
-    const firstParts = first ? formatEventParts(first.startsAt) : null;
-    const lead = selectedChildren.length === 1 ? `${selectedChildren[0].firstName} is joining ROYALS.` : `${selectedChildren.map((child) => child.firstName).join(' and ')} are joining ROYALS.`;
+    const name = selectedChildren[0]?.firstName ?? 'Your player';
     return (
       <Screen contentStyle={styles.confirmationPage}>
-        <View style={styles.confirmIcon}><Ionicons name="checkmark" size={44} color={colors.white} /></View>
-        <StatusPill label="Submitted · Demo checkout" tone="success" />
-        <Text style={styles.confirmTitle}>{lead}</Text>
-        <Text style={styles.confirmCopy}>
-          We received the registration for {program.title}. Next: {firstParts ? `Session 1 · ${firstParts.weekday} ${firstParts.time} · ${first?.venue}` : 'Check the season hub for session 1'}.
-        </Text>
-        <View style={styles.confirmCard}>
-          <SummaryRow label="Registration" value={submittedId?.slice(-8).toUpperCase() ?? 'DEMO'} />
-          <SummaryRow label="Participants" value={selectedChildren.map((child) => child.firstName).join(', ')} />
-          <SummaryRow label="Recommended group" value={childRegistrationHints(selectedChildren).map((item) => `${item.name} ${item.group}`).join(' · ')} />
-          <SummaryRow label="Amount due" value={`$${subtotal}`} />
-          <SummaryRow label="Status" value="Pending review" last />
-        </View>
-        <View style={styles.notice}>
-          <Ionicons name="information-circle-outline" size={21} color={colors.info} />
-          <Text style={styles.noticeText}>No real payment was processed. Your demo registration is saved on this device.</Text>
-        </View>
-          <Button label="Open season hub" onPress={() => router.replace(`/season/${submittedId}` as never)} style={styles.fullButton} />
-          {first ? <Button label="Open first session" variant="secondary" onPress={() => router.replace(`/event/${first.id}` as never)} style={styles.fullButton} /> : null}
-          <Button label="View schedule" variant="ghost" onPress={() => router.replace('/(tabs)/schedule')} style={styles.fullButton} />
+        <ConfirmationPeak
+          name={name}
+          program={program.title}
+          sessionLine={first ? 'Sunday · 4:00 PM · First session' : 'First session posts with the season calendar'}
+          onCalendar={() => {
+            if (first) calendarGateway.add(first);
+          }}
+          onCoach={() => router.replace('/message/coach-priya' as never)}
+          onSeason={() => router.replace(`/season/${submittedId}` as never)}
+          onShare={() => {
+            shareRegistration(name);
+          }}
+        />
       </Screen>
     );
   }
@@ -165,15 +291,27 @@ export default function RegistrationScreen() {
           <Text style={styles.topEyebrow}>REGISTRATION</Text>
           <Text numberOfLines={1} style={styles.topTitle}>{program.title}</Text>
         </View>
-        <Text style={styles.stepCount}>{activeStepIndex + 1}/{steps.length}</Text>
+        <Text style={styles.stepCount}>{percent}%</Text>
       </View>
+      {draftSavedAt ? <Text style={styles.draftSaved}>Draft saved · kept on this device for 7 days</Text> : null}
 
       <View style={styles.progress}>
-        {steps.map((item, index) => (
-          <View key={item.id} style={[styles.progressSegment, index <= activeStepIndex && styles.progressActive]} />
-        ))}
+        <Animated.View style={[styles.progressFill, barStyle]} />
       </View>
-      <Text style={styles.currentLabel}>{steps[activeStepIndex]?.label}</Text>
+      <Text style={styles.currentLabel}>
+        {step === 'overview'
+          ? 'You’re on your way · Program selected ✓'
+          : step === 'children'
+            ? 'Program ✓ · Who’s playing'
+            : step === 'household'
+              ? 'Program ✓ Player ✓ · Household'
+              : step === 'consent'
+                ? 'Program ✓ Player ✓ Household ✓ · Waiver'
+                : step === 'review'
+                  ? 'Almost there · Review'
+                  : 'Last step · Submit'}
+      </Text>
+      <Text style={styles.stepBody}>Program ✓ → Player → Household → Waiver → Review → Done</Text>
 
       {step === 'overview' && (
         <View style={styles.step}>
@@ -196,8 +334,23 @@ export default function RegistrationScreen() {
 
       {step === 'household' && (
         <View style={styles.step}>
-          <Text style={styles.stepTitle}>Parent & household</Text>
-          <Text style={styles.stepBody}>We prefilled your saved account information. Update anything that has changed.</Text>
+          <Text style={styles.stepTitle}>{lens === 'guest' ? 'Household' : 'Looks right?'}</Text>
+          <Text style={styles.stepBody}>
+            {lens === 'guest'
+              ? 'Tell us who is registering. Progress is saved on this device.'
+              : 'We’ll use the household already on this device. Change only what’s wrong.'}
+          </Text>
+          {lens !== 'guest' ? (
+          <View style={styles.programCard}>
+            <SummaryRow label="Parent" value={form.getValues('guardianName')} />
+            <SummaryRow label="Email" value={form.getValues('email')} />
+            <SummaryRow label="Phone" value={form.getValues('phone')} />
+            <SummaryRow label="Address" value={form.getValues('address')} last />
+          </View>
+          ) : null}
+          {lens !== 'guest' ? <Button label={editHousehold ? 'Hide edits' : 'Edit details'} variant="ghost" onPress={() => setEditHousehold((value) => !value)} /> : null}
+          {editHousehold || lens === 'guest' ? (
+            <>
           <Controller control={form.control} name="guardianName" render={({ field, fieldState }) => (
             <Field label="Parent / guardian name" value={field.value} onChangeText={field.onChange} error={fieldState.error?.message} autoCapitalize="words" />
           )} />
@@ -210,19 +363,56 @@ export default function RegistrationScreen() {
           <Controller control={form.control} name="address" render={({ field, fieldState }) => (
             <Field label="Home address" value={field.value} onChangeText={field.onChange} error={fieldState.error?.message} autoCapitalize="words" hint="Used only for registration administration." />
           )} />
+            </>
+          ) : null}
         </View>
       )}
 
       {step === 'children' && (
         <View style={styles.step}>
-          <Text style={styles.stepTitle}>Who’s playing?</Text>
-          <Text style={styles.stepBody}>Select saved children or add a new profile. The sibling rate updates automatically.</Text>
+          <Text style={styles.stepTitle}>Who are you registering?</Text>
+          {lens === 'chooser' ? (
+            <>
+              <Text style={styles.stepBody}>This device does not know your household yet. Choose how you want to continue.</Text>
+              <Button label="Continue as guest" onPress={() => { setLens('guest'); setShowAddChild(true); setSelected([]); setEditHousehold(true); }} />
+              <Button label="Sign in to reuse a household" variant="secondary" onPress={() => router.push('/onboarding?mode=signin')} />
+              <Button
+                label="Preview demo household"
+                variant="ghost"
+                onPress={() => {
+                  setLens('demo');
+                  setSelected(demoHousehold.children.slice(0, 1).map((child) => child.id));
+                  form.reset({
+                    guardianName: demoHousehold.guardianName,
+                    email: demoHousehold.email,
+                    phone: demoHousehold.phone,
+                    address: demoHousehold.address,
+                    parentConsent: false,
+                    emergencyConsent: false,
+                    signature: '',
+                  });
+                }}
+              />
+            </>
+          ) : (
+            <>
+          <Text style={styles.stepBody}>
+            {lens === 'demo' || (lens === 'account' && persona === 'demo')
+              ? 'Maya and Noah are on the demo household. Select who is joining this season.'
+              : 'Enter or select a child for this season.'}
+          </Text>
           <View style={styles.childList}>
-          {household.children.map((child, index) => {
+          {childrenPool.map((child, index) => {
               const checked = selected.includes(child.id);
               const hint = childRegistrationHints([child])[0];
               return (
-                <Pressable key={child.id} onPress={() => toggleChild(child.id)} style={[styles.childChoice, checked && styles.childSelected]}>
+                <Pressable
+                  key={child.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: checked }}
+                  onPress={() => toggleChild(child.id)}
+                  style={[styles.childChoice, checked && styles.childSelected]}
+                >
                   <View style={[styles.checkbox, checked && styles.checkboxActive]}>
                     {checked ? <Ionicons name="checkmark" size={17} color={colors.white} /> : null}
                   </View>
@@ -256,6 +446,8 @@ export default function RegistrationScreen() {
           {selected.length === 0 ? <Text style={styles.selectionError}>Select at least one child to continue.</Text> : null}
           <Text style={styles.stepBody}>{siblingPrice(selected.length).note}</Text>
           <PriceCard count={selected.length} total={subtotal} discount={discount} />
+            </>
+          )}
         </View>
       )}
 
@@ -311,6 +503,7 @@ export default function RegistrationScreen() {
             <Text style={styles.totalLabel}>TOTAL DUE</Text>
             <Text style={styles.totalValue}>${subtotal}</Text>
             {discount > 0 ? <Text style={styles.saved}>You saved ${discount} with sibling pricing</Text> : null}
+            <Text style={styles.saved}>$10/session across 12 Sundays</Text>
           </View>
           <View style={styles.demoCheckout}>
             <Ionicons name="flask-outline" size={24} color={colors.warning} />
@@ -337,10 +530,10 @@ export default function RegistrationScreen() {
           )}
         </View>
         <Button
-          label={step === 'payment' ? 'Submit registration' : 'Continue'}
+          label={step === 'payment' ? 'Submit registration' : step === 'household' ? 'Looks right' : 'Continue'}
           icon="arrow-forward"
           onPress={goNext}
-          disabled={step === 'children' && selected.length === 0}
+          disabled={(step === 'children' && (lens === 'chooser' || selected.length === 0))}
           style={styles.continue}
         />
       </View>
@@ -447,12 +640,12 @@ const styles = StyleSheet.create({
   topEyebrow: { color: colors.orangeDark, fontSize: 9, ...typography.label, letterSpacing: 1.1 },
   topTitle: { color: colors.ink, fontSize: 15, marginTop: 2, ...typography.heading },
   stepCount: { color: colors.stone, fontSize: 12, ...typography.label },
-  progress: { flexDirection: 'row', gap: 5, marginTop: spacing.md },
-  progressSegment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.sand },
-  progressActive: { backgroundColor: colors.orange },
+  draftSaved: { color: colors.stone, fontSize: 10, marginTop: spacing.sm, ...typography.body },
+  progress: { height: 4, borderRadius: 2, backgroundColor: colors.sand, marginTop: spacing.md, overflow: 'hidden' },
+  progressFill: { height: 4, backgroundColor: colors.orange, borderRadius: 2 },
   currentLabel: { color: colors.stone, fontSize: 10, textTransform: 'uppercase', marginTop: spacing.sm, ...typography.label, letterSpacing: 1 },
   step: { marginTop: spacing.xxl },
-  stepTitle: { color: colors.ink, fontSize: 31, lineHeight: 36, marginTop: spacing.md, ...typography.heading },
+  stepTitle: { color: colors.ink, fontSize: 32, lineHeight: 36, marginTop: spacing.md, ...typography.display },
   stepBody: { color: colors.stone, fontSize: 15, lineHeight: 22, marginTop: spacing.sm, marginBottom: spacing.xl, ...typography.body },
   programCard: { borderRadius: radius.md, backgroundColor: colors.paper, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
   summaryRow: { minHeight: 49, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },

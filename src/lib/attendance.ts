@@ -29,6 +29,10 @@ export function privacyName(
   person: { firstName: string; lastName: string; displayName: string; isMinor?: boolean },
   authorized: boolean,
 ) {
-  if (!person.isMinor || authorized) return person.displayName;
-  return `${person.firstName.slice(0, 1)}. ${person.lastName.slice(0, 1)}.`;
+  if (person.isMinor) {
+    return authorized ? person.displayName : `${person.firstName.slice(0, 1)}. ${person.lastName.slice(0, 1)}.`;
+  }
+  if (authorized) return person.displayName;
+  const last = person.lastName?.slice(0, 1) ?? '';
+  return last ? `${person.firstName} ${last}.` : person.firstName;
 }

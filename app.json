@@ -15,7 +15,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#151310",
+        "backgroundColor": "#0F3D2E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -30,9 +30,22 @@
     "plugins": [
       "expo-router",
       [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/BarlowCondensed_700Bold.ttf",
+            "./assets/fonts/Manrope_400Regular.ttf",
+            "./assets/fonts/Manrope_500Medium.ttf",
+            "./assets/fonts/Manrope_600SemiBold.ttf",
+            "./assets/fonts/Manrope_700Bold.ttf",
+            "./assets/fonts/Manrope_800ExtraBold.ttf"
+          ]
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "backgroundColor": "#151310",
+          "backgroundColor": "#0F3D2E",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
@@ -41,7 +54,7 @@
       [
         "expo-notifications",
         {
-          "color": "#F36A21"
+          "color": "#0F3D2E"
         }
       ]
     ],

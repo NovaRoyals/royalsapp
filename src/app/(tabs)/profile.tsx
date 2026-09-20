@@ -3,9 +3,10 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader, Button, DemoBadge, Screen, SectionHeading, StatusPill } from '@/components/ui';
+import { SeasonDots } from '@/components/interactions/SeasonDots';
 import { demoPrograms, followCatalog } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
-import { completedAttendance, mayaAttendanceHistory } from '@/lib/attendance';
+import { mayaAttendanceHistory } from '@/lib/attendance';
 import { can, isStaff } from '@/lib/capabilities';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
@@ -23,10 +24,10 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 const menu = [
-  { icon: 'person-outline' as const, label: 'Personal information', detail: 'Name, phone, address' },
-  { icon: 'card-outline' as const, label: 'Payments', detail: 'Receipts and status' },
-  { icon: 'document-text-outline' as const, label: 'Waivers & consents', detail: 'Signed documents' },
-  { icon: 'notifications-outline' as const, label: 'Notification settings', detail: 'Reminders and alerts' },
+  { icon: 'person-outline' as const, label: 'Personal information', detail: 'Name, phone, address', href: '/account/personal' },
+  { icon: 'card-outline' as const, label: 'Payments', detail: 'Receipts and status', href: '/account/payments' },
+  { icon: 'document-text-outline' as const, label: 'Waivers & consents', detail: 'Signed documents', href: '/account/waivers' },
+  { icon: 'notifications-outline' as const, label: 'Notification settings', detail: 'Reminders and alerts', href: '/account/notifications' },
 ];
 
 export default function ProfileScreen() {
@@ -41,12 +42,13 @@ export default function ProfileScreen() {
     setNotificationPrefs,
     followedIds,
     setFollowedIds,
+    persona,
     schedule,
+    pendingStaffRole,
   } = useApp();
   const staff = isStaff(role);
   const parentView = role === 'guardian';
   const [funnel, setFunnel] = useState<ReturnType<typeof funnelCounts> | null>(null);
-  const attendance = completedAttendance(mayaAttendanceHistory);
   const kidsEvent = schedule.find((event) => event.id === 'kids-session-1');
   const recorded = kidsEvent?.checkIns ?? [];
   const presentNow = recorded.filter((item) => item.present).length;
@@ -65,13 +67,28 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.identityCopy}>
           <Text style={styles.name}>{role === 'guest' ? 'Guest visitor' : household.guardianName}</Text>
-          <Text style={styles.role}>{roleLabels[role]}</Text>
+          <Text style={styles.role}>
+            {pendingStaffRole === 'coach'
+              ? 'Coach · pending review'
+              : pendingStaffRole === 'competition_manager'
+                ? 'Manager · pending review'
+                : roleLabels[role]}
+          </Text>
           <DemoBadge />
         </View>
-        <Pressable accessibilityLabel="Edit profile" style={styles.editButton}>
+        <Pressable accessibilityLabel="Edit profile" onPress={() => router.push('/account/personal' as never)} style={styles.editButton}>
           <Ionicons name="pencil-outline" size={17} color={colors.ink} />
         </Pressable>
       </View>
+
+      {pendingStaffRole ? (
+        <View style={styles.signInCard}>
+          <Text style={styles.signInTitle}>Staff access requested</Text>
+          <Text style={styles.signInCopy}>
+            {pendingStaffRole === 'coach' ? 'Coach' : 'Manager'} tools are not unlocked from onboarding. An admin still needs to approve this account.
+          </Text>
+        </View>
+      ) : null}
 
       {role === 'guest' ? (
         <View style={styles.signInCard}>
@@ -130,23 +147,11 @@ export default function ProfileScreen() {
             </>
           ) : null}
 
-          {parentView ? (
+          {parentView && persona === 'demo' ? (
             <>
               <SectionHeading title="Maya’s attendance" />
               <View style={styles.registration}>
-                <Text style={styles.registrationTitle}>{attendance.attended} of {attendance.total} sessions</Text>
-                <Text style={styles.registrationPeople}>{attendance.percent}% · Fall Soccer Training</Text>
-                <View style={styles.history}>
-                  {mayaAttendanceHistory.map((row) => (
-                    <View key={row.id} style={styles.historyRow}>
-                      <Text style={styles.menuLabel}>{row.label}</Text>
-                      <StatusPill
-                        label={row.status}
-                        tone={row.status === 'present' ? 'success' : row.status === 'absent' ? 'warning' : 'neutral'}
-                      />
-                    </View>
-                  ))}
-                </View>
+                <SeasonDots history={mayaAttendanceHistory} childName="Maya" />
               </View>
             </>
           ) : null}
@@ -210,15 +215,17 @@ export default function ProfileScreen() {
 
       {staff && (
         <>
-          <SectionHeading title="Club tools" />
+          <SectionHeading title={role === 'admin' ? 'Club tools' : 'Staff tools'} />
           <Pressable onPress={() => router.push('/admin')} style={styles.adminCard}>
             <View style={styles.adminIcon}><Ionicons name="settings-outline" size={22} color={colors.white} /></View>
             <View style={styles.flex}>
-              <Text style={styles.adminTitle}>Open management</Text>
+              <Text style={styles.adminTitle}>{role === 'coach' ? 'Open team tools' : 'Open management'}</Text>
               <Text style={styles.adminCopy}>
-                {funnel
-                  ? `Funnel · views ${funnel.programViewed} · starts ${funnel.registrationStarted} · completions ${funnel.registrationCompleted}`
-                  : 'Registrations, fields, attendance, announcements'}
+                {role === 'coach'
+                  ? 'Attendance, team messages, and assigned-session tools. Club registrations stay with administrators.'
+                  : funnel
+                    ? `Funnel · views ${funnel.programViewed} · starts ${funnel.registrationStarted} · completions ${funnel.registrationCompleted}`
+                    : 'Registrations, fields, attendance, announcements'}
               </Text>
             </View>
             <Ionicons name="arrow-forward" size={20} color={colors.orange} />
@@ -231,7 +238,7 @@ export default function ProfileScreen() {
         {menu.map((item, index) => (
           <Pressable
             key={item.label}
-            onPress={item.label === 'Waivers & consents' || item.label === 'Payments' ? () => undefined : undefined}
+            onPress={() => router.push(item.href as never)}
             style={[styles.menuRow, index < menu.length - 1 && styles.menuBorder]}
           >
             <Ionicons name={item.icon} size={21} color={colors.orangeDark} />
@@ -259,6 +266,13 @@ export default function ProfileScreen() {
           <Text style={styles.adminCopy}>Compare RSVP, supporter, attendance and calendar variants. Not in tab navigation.</Text>
         </View>
         <Ionicons name="flask-outline" size={20} color={colors.orange} />
+      </Pressable>
+      <Pressable onPress={() => router.push('/roy' as never)} style={[styles.adminCard, { marginBottom: 16 }]}>
+        <View style={styles.flex}>
+          <Text style={styles.adminTitle}>Open Roy Lab</Text>
+          <Text style={styles.adminCopy}>Preview idle, enter, wave, point, celebrate, bounce, and exit. Not in tab navigation.</Text>
+        </View>
+        <Ionicons name="sparkles-outline" size={20} color={colors.orange} />
       </Pressable>
       <View style={styles.roleGrid}>
         {(['guest', 'guardian', 'adult_player', 'coach', 'volunteer', 'admin'] as UserRole[]).map((item) => (

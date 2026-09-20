@@ -1,5 +1,5 @@
 import type { Person, ScheduleEvent, UserRole } from '@/types/domain';
-import { estimatedTravelStub, formatEventParts } from '@/lib/datetime';
+import { addMinutesToWall, clubNowIso, estimatedTravelStub, formatEventParts, formatLeaveBy, relativeDayLabel } from '@/lib/datetime';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 
 /** Demo “now” so Game-Day Home can be reviewed without waiting for kickoff. */
@@ -13,9 +13,7 @@ export function travelMinutesStub(venue: string) {
 }
 
 export function leaveByIso(startsAt: string, venue: string, bufferMin = 10) {
-  const start = new Date(startsAt).getTime();
-  const leave = start - (travelMinutesStub(venue) + bufferMin) * 60_000;
-  return new Date(leave).toISOString();
+  return addMinutesToWall(startsAt, -(travelMinutesStub(venue) + bufferMin));
 }
 
 export function ageOnDate(dateOfBirth: string, asOfIso = '2026-09-13') {
@@ -48,8 +46,9 @@ export function eventsOverlap(a: ScheduleEvent, b: ScheduleEvent, minutes = 30) 
   return overlap >= minutes * 60_000;
 }
 
-export function householdConflictStub(role: UserRole) {
+export function householdConflictStub(role: UserRole, childNames: string[] = []) {
   if (role !== 'guardian') return null;
+  if (!childNames.includes('Maya') || !childNames.includes('Noah')) return null;
   return {
     title: 'Schedule conflict',
     detail: 'Maya’s training and Noah’s U6 group overlap by 30 minutes. Household calendar stub — not a published club fixture.',
@@ -72,46 +71,63 @@ export function householdConflicts(events: ScheduleEvent[]) {
   return null;
 }
 
-export function minutesUntil(startsAt: string, nowIso = DEMO_CLOCK_ISO) {
+export function minutesUntil(startsAt: string, nowIso = clubNowIso()) {
   return Math.round((new Date(startsAt).getTime() - new Date(nowIso).getTime()) / 60000);
 }
 
-export function isGameDayWindow(event: ScheduleEvent | undefined, nowIso = DEMO_CLOCK_ISO) {
+export function isGameDayWindow(event: ScheduleEvent | undefined, nowIso = clubNowIso()) {
   if (!event || event.status !== 'scheduled') return false;
   const mins = minutesUntil(event.startsAt, nowIso);
   return mins > 0 && mins <= 120;
 }
 
-export function gameDayBrief(event: ScheduleEvent, childName?: string, nowIso = DEMO_CLOCK_ISO) {
+export function gameDayBrief(event: ScheduleEvent, childName?: string, nowIso = clubNowIso()) {
   const parts = formatEventParts(event.startsAt);
-  const leave = formatEventParts(leaveByIso(event.startsAt, event.venue));
+  const leaveBy = formatLeaveBy(event.startsAt, travelMinutesStub(event.venue) + 10, nowIso);
   const weather = weatherForEvent(event);
   const mins = travelMinutesStub(event.venue);
   return {
     headline: childName ? `${childName}’s practice begins at ${parts.time}` : `${event.title} · ${parts.time}`,
     drive: `${mins}-minute drive · ${estimatedTravelStub(event.venue)}`,
-    leaveBy: `Leave by ${leave.time}`,
+    leaveBy,
     field: `Field ${fieldStatusLabel(event.fieldStatus)}`,
     weather: weather.summary.includes('°') ? weather.summary : `${weather.summary} · 74°F stub`,
-    bring: event.whatToBring ?? 'Check your session card',
+    bring: event.whatToBring
+      ? `${event.whatToBring}${weather.summary.toLowerCase().includes('mild') ? ' · light jacket' : ''}`
+      : weather.summary.toLowerCase().includes('mild')
+        ? 'Light jacket'
+        : 'Check your session card',
     minutesOut: minutesUntil(event.startsAt, nowIso),
+    dayLabel: relativeDayLabel(event.startsAt),
   };
 }
 
-export function crossClubSuggestion(_role: UserRole, followedIds: string[], schedule: ScheduleEvent[], nowIso = DEMO_CLOCK_ISO) {
-  const upcoming = schedule.filter((item) => item.status === 'scheduled' && minutesUntil(item.startsAt, nowIso) > 0);
-  const cricketThisWeekend = upcoming.find((item) => item.sport === 'cricket' && minutesUntil(item.startsAt, nowIso) < 36 * 60);
-  const weekendOther = upcoming.find(
-    (item) => item.sport !== 'cricket' && item.teamId !== 'nova-royals-kids-u8' && minutesUntil(item.startsAt, nowIso) < 36 * 60,
-  );
-  if (followedIds.includes('nova-royals-cricket') && !cricketThisWeekend && weekendOther) {
-    return {
-      title: 'No cricket fixture this weekend.',
-      detail: `${weekendOther.title} · ${formatEventParts(weekendOther.startsAt).weekday} ${formatEventParts(weekendOther.startsAt).time}. ${weekendOther.supporterCount ?? 0} Royals are supporting.`,
-      href: `/event/${weekendOther.id}`,
-    };
-  }
-  return null;
+export const WEEK_WINDOW_MINUTES = 7 * 24 * 60;
+
+export function upcomingThisWeek(schedule: ScheduleEvent[], nowIso = clubNowIso()) {
+  return schedule.filter((item) => {
+    if (item.status !== 'scheduled') return false;
+    const minutes = minutesUntil(item.startsAt, nowIso);
+    return minutes >= -12 * 60 && minutes < WEEK_WINDOW_MINUTES;
+  });
+}
+
+export function aroundTheClub(schedule: ScheduleEvent[], _followedIds: string[], nowIso = clubNowIso()) {
+  const week = upcomingThisWeek(schedule, nowIso);
+  const cricket = week.find((item) => item.sport === 'cricket');
+  const feature = cricket ?? week.find((item) => item.teamId !== 'nova-royals-kids-u8' && item.sport !== 'soccer') ?? week.find((item) => item.teamId === 'nova-royals-men');
+  if (!feature) return null;
+  const parts = formatEventParts(feature.startsAt);
+  return {
+    title: feature.title,
+    detail: `${parts.weekday} ${parts.time} · ${feature.supporterCount ?? 0} Royals are going`,
+    href: `/event/${feature.id}`,
+    eventId: feature.id,
+  };
+}
+
+export function crossClubSuggestion(role: UserRole, followedIds: string[], schedule: ScheduleEvent[], nowIso = clubNowIso()) {
+  return aroundTheClub(schedule, followedIds, nowIso);
 }
 
 export function siblingPrice(count: number) {

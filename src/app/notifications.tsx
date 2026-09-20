@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { notificationsForRole } from '@/lib/membership';
 import { formatEventParts } from '@/lib/datetime';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -21,6 +22,7 @@ const icons = {
 
 export default function NotificationsScreen() {
   const { notifications, markNotificationRead, markAllNotificationsRead, role } = useApp();
+  const toast = useToast();
   const visible = notificationsForRole(role, notifications);
   const reduced = useReducedMotion();
 
@@ -29,7 +31,15 @@ export default function NotificationsScreen() {
       <View style={styles.header}>
         <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <View style={styles.flex}><Text style={styles.eyebrow}>UPDATES</Text><Text style={styles.title}>Notifications</Text></View>
-        <Pressable onPress={markAllNotificationsRead} style={styles.markAll}><Text style={styles.markAllText}>Read all</Text></Pressable>
+        <Pressable
+          onPress={() => {
+            markAllNotificationsRead();
+            toast('Caught up');
+          }}
+          style={styles.markAll}
+        >
+          <Text style={styles.markAllText}>Read all</Text>
+        </Pressable>
       </View>
       <View style={styles.preferences}>
         <Ionicons name="notifications-outline" size={21} color={colors.orangeDark} />

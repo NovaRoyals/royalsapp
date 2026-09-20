@@ -6,6 +6,7 @@ import { Button, Screen, SectionHeading, StatusPill } from '@/components/ui';
 import { demoTeams } from '@/data/demo';
 import { privacyName } from '@/lib/attendance';
 import { formatEventParts } from '@/lib/datetime';
+import { canSeeFullRoster } from '@/lib/membership';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -21,7 +22,7 @@ export default function TeamDetailScreen() {
   const recent = schedule.find((event) => event.teamId === team.id && event.status === 'completed');
   const nextParts = next ? formatEventParts(next.startsAt) : null;
   const teamNote = announcements.find((item) => item.teamId === team.id);
-  const authorized = role === 'coach' || role === 'admin' || role === 'guardian';
+  const authorized = canSeeFullRoster(role, team.id);
 
   return (
     <Screen>
@@ -92,7 +93,7 @@ export default function TeamDetailScreen() {
             {team.managed ? <Ionicons name="checkmark-circle" size={19} color={colors.success} /> : null}
           </View>
         ))}
-        <View style={styles.privateRoster}><Ionicons name="lock-closed-outline" size={15} color={colors.stone} /><Text style={styles.privateText}>Youth names use initials outside authorized guardian and staff views</Text></View>
+        <View style={styles.privateRoster}><Ionicons name="lock-closed-outline" size={15} color={colors.stone} /><Text style={styles.privateText}>{authorized ? 'Full names · teammate / parent / staff view' : 'Public view · first name and last initial only'}</Text></View>
       </View>
 
       {teamNote ? (

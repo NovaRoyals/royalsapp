@@ -77,7 +77,7 @@ export default function TeamsScreen() {
         <Ionicons name="lock-closed-outline" size={20} color={colors.info} />
         <View style={styles.teamCopy}>
           <Text style={styles.privacyTitle}>Roster privacy built in</Text>
-          <Text style={styles.privacyText}>Contact details and minor information are shown only to authorized guardians and team staff.</Text>
+          <Text style={styles.privacyText}>Public viewers see first name and last initial. Full names are for teammates, parents, and staff. Youth stay behind initials unless you are an authorized guardian or coach.</Text>
         </View>
       </View>
     </Screen>

@@ -1,21 +1,22 @@
 export const motion = {
   duration: {
     fast: 120,
+    tab: 170,
     base: 200,
-    enter: 240,
-    celebrate: 420,
+    enter: 180,
+    content: 160,
+    celebrate: 380,
   },
   easing: {
-    standard: [0.2, 0.8, 0.2, 1] as const,
+    standard: [0.16, 1, 0.3, 1] as const,
     emphasized: [0.2, 0, 0, 1] as const,
   },
   spring: {
     press: { damping: 18, stiffness: 420 },
-    success: { damping: 14, stiffness: 280 },
+    success: { damping: 18, stiffness: 260 },
   },
   offset: {
-    tabExit: 5,
-    tabEnter: 7,
+    tabEnter: 6,
   },
   press: {
     scale: 0.97,

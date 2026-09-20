@@ -28,7 +28,7 @@ export function GameDayCard({
 }: {
   headline: string;
   drive: string;
-  leaveBy: string;
+  leaveBy?: string | null;
   field: string;
   weather: string;
   bring: string;
@@ -39,7 +39,7 @@ export function GameDayCard({
     <View style={styles.game}>
       <Text style={styles.kicker}>GAME-DAY · {minutesOut} MIN</Text>
       <Text style={styles.headline}>{headline}</Text>
-      <Text style={styles.line}>{leaveBy}</Text>
+      {leaveBy ? <Text style={styles.line}>{leaveBy}</Text> : null}
       <Text style={styles.meta}>{drive}</Text>
       <Text style={styles.meta}>{field} · {weather}</Text>
       <Text style={styles.bring}>Bring {bring}</Text>

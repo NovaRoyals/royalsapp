@@ -1,15 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { KenBurnsImage } from '@/components/media/KenBurnsImage';
 import { Button, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms } from '@/data/demo';
 import { track } from '@/lib/analytics';
-import { can } from '@/lib/capabilities';
-import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function generateStaticParams() {
@@ -18,7 +16,6 @@ export function generateStaticParams() {
 
 export default function ProgramDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { role } = useApp();
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
 
@@ -28,14 +25,14 @@ export default function ProgramDetailScreen() {
 
   return (
     <Screen contentStyle={styles.page}>
-      <View style={styles.hero}>
-        <Image source={{ uri: program.heroImage }} contentFit="cover" style={StyleSheet.absoluteFill} />
+        <View style={styles.hero}>
+        <KenBurnsImage uri={program.heroImage} style={StyleSheet.absoluteFill} />
         <LinearGradient colors={['rgba(21,19,16,0.08)', 'rgba(21,19,16,0.9)']} style={StyleSheet.absoluteFill} />
         <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}>
           <Ionicons name="arrow-back" size={21} color={colors.ink} />
         </Pressable>
         <View style={styles.heroCopy}>
-          <StatusPill label={program.badge ?? 'Program'} tone={program.registrationOpen ? 'orange' : 'neutral'} />
+          <StatusPill label={program.badge ?? 'Program'} tone="neutral" />
           <Text style={styles.title}>{program.title}</Text>
           <Text style={styles.audience}>{program.audience} · {program.sport.toUpperCase()}</Text>
         </View>
@@ -58,8 +55,16 @@ export default function ProgramDetailScreen() {
       <View style={styles.infoCard}>
         <InfoRow icon="calendar-outline" label="Dates" value={program.dates} />
         <InfoRow icon="location-outline" label="Venue" value={program.venue} />
-        <InfoRow icon="wallet-outline" label="Price" value={program.priceLabel} last />
+        <InfoRow icon="person-outline" label="Coach" value={program.id === 'fall-kids-2026' ? 'Coach Priya Sharma' : 'Club staff'} />
+        <InfoRow icon="wallet-outline" label="Price" value={program.id === 'fall-kids-2026' ? `${program.priceLabel} · $10/session across 12 Sundays` : program.priceLabel} last />
       </View>
+
+      {program.id === 'fall-kids-2026' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What to bring</Text>
+          <Text style={styles.body}>Shin guards, water, and a labeled jacket. First session Sunday · 4:00 PM at Royals Training Field.</Text>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>What’s included</Text>
@@ -102,9 +107,7 @@ export default function ProgramDetailScreen() {
           label={program.registrationOpen ? 'Register' : 'Join list'}
           icon="arrow-forward"
           onPress={() => {
-            if (isYouth && !can(role, 'register_child')) router.push('/onboarding');
-            else if (!isYouth && !can(role, 'register_self')) router.push('/onboarding');
-            else router.push(`/registration/${program.id}`);
+            router.push(`/registration/${program.id}`);
           }}
         />
       </View>

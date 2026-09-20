@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { CountTick } from '@/components/interactions/CountTick';
+import { DrawCheck } from '@/components/interactions/DrawCheck';
+import { FaceStack } from '@/components/interactions/FaceStack';
 import { PressableScale } from '@/components/motion';
 import { haptic, type HapticKind } from '@/lib/haptics';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -16,7 +18,6 @@ export function SupporterButton({
   going,
   count,
   onToggle,
-  variant = 'a',
   hapticKind = 'medium',
 }: {
   going: boolean;
@@ -27,38 +28,46 @@ export function SupporterButton({
 }) {
   const reduced = useReducedMotion();
   const fill = useSharedValue(going ? 1 : 0);
-  const [note, setNote] = useState(going ? 'Saved · you’re supporting this event.' : '');
+  const bump = useSharedValue(1);
 
   useEffect(() => {
-    fill.value = reduced ? (going ? 1 : 0) : withTiming(going ? 1 : 0, { duration: motion.duration.enter });
-  }, [going, fill, reduced]);
+    fill.value = reduced ? (going ? 1 : 0) : withTiming(going ? 1 : 0, { duration: 320, easing: Easing.out(Easing.cubic) });
+    if (going && !reduced) {
+      bump.value = 1.06;
+      bump.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+    }
+  }, [going, fill, reduced, bump]);
 
-  const fillStyle = useAnimatedStyle(() =>
-    variant === 'b'
-      ? { width: `${Math.max(fill.value * 100, 0)}%` as `${number}%` }
-      : { opacity: fill.value },
-  );
+  const fillStyle = useAnimatedStyle(() => ({
+    opacity: fill.value,
+  }));
+  const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.value }] }));
 
   return (
     <View style={styles.wrap}>
       <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ selected: going }}
         onPress={() => {
           const next = !going;
-          onToggle(next);
-          setNote(next ? 'Saved · you’re supporting this event.' : 'Support removed.');
           haptic(next ? hapticKind : 'light');
+          onToggle(next);
         }}
-        style={styles.button}
+        style={[styles.button, going && styles.buttonOn]}
       >
-        <Animated.View style={[styles.fill, variant === 'a' ? styles.fillA : null, fillStyle]} />
+        <Animated.View style={[styles.fill, fillStyle]} />
         <View style={styles.inner}>
-          <Ionicons name={going ? 'heart' : 'heart-outline'} size={18} color={going ? colors.white : colors.ink} />
-          <Text style={[styles.label, going && styles.labelOn]}>{going ? 'You’re supporting' : 'I’m coming to support'}</Text>
+          {going ? <DrawCheck active color={colors.white} size={18} /> : <Ionicons name="heart-outline" size={18} color={colors.ink} />}
+          <Text style={[styles.label, going && styles.labelOn]}>
+            {going ? 'You’re supporting' : 'I’m coming to support'}
+          </Text>
         </View>
       </PressableScale>
       <View style={styles.meta}>
-        <CountTick value={count} suffix="Royals supporting" style={styles.count} />
-        {note ? <Text style={styles.note}>{note}</Text> : null}
+        <FaceStack count={count} joined={going} />
+        <Animated.View style={bumpStyle}>
+          <CountTick value={count} suffix="Royals going" style={styles.count} />
+        </Animated.View>
       </View>
     </View>
   );
@@ -77,14 +86,16 @@ export function CalendarConfirmButton({
   const pop = useSharedValue(added ? 1 : 0);
 
   useEffect(() => {
-    pop.value = reduced ? (added ? 1 : 0) : withSpring(added ? 1 : 0, motion.spring.success);
+    pop.value = reduced ? (added ? 1 : 0) : withTiming(added ? 1 : 0, { duration: motion.duration.base, easing: Easing.out(Easing.cubic) });
   }, [added, pop, reduced]);
 
-  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.85 + pop.value * 0.2 }] }));
+  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.9 + pop.value * 0.1 }] }));
 
   return (
     <View>
       <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ selected: added }}
         onPress={() => {
           if (added) return;
           onAdd();
@@ -95,7 +106,7 @@ export function CalendarConfirmButton({
         <Animated.View style={iconStyle}>
           <Ionicons name={added ? 'checkmark' : 'calendar-outline'} size={18} color={added ? colors.white : colors.ink} />
         </Animated.View>
-        <Text style={[styles.calLabel, added && styles.labelOn]}>{added ? 'Added' : labelIdle}</Text>
+        <Text style={[styles.calLabel, added && styles.labelOn]}>{added ? 'Added to calendar' : labelIdle}</Text>
       </PressableScale>
       {added ? <Text style={styles.note}>Saved on this device · calendar write is a stub.</Text> : null}
     </View>
@@ -113,14 +124,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
   },
-  fill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.ink },
-  fillA: { borderRadius: radius.md },
+  buttonOn: { backgroundColor: colors.orange, borderColor: colors.orange },
+  fill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.orange },
   inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, zIndex: 1 },
-  label: { color: colors.ink, fontSize: 14, ...typography.heading },
+  label: { color: colors.ink, fontSize: 14, ...typography.label },
   labelOn: { color: colors.white },
-  meta: { gap: 2 },
+  meta: { gap: spacing.sm, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   count: { color: colors.charcoal, fontSize: 13, ...typography.body },
-  note: { color: colors.success, fontSize: 13, marginTop: spacing.sm, ...typography.heading },
+  note: { color: colors.success, fontSize: 13, marginTop: spacing.sm, ...typography.bodyMedium },
   cal: {
     minHeight: 52,
     borderRadius: radius.md,
@@ -133,5 +144,5 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   calOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  calLabel: { color: colors.ink, fontSize: 14, ...typography.heading },
+  calLabel: { color: colors.ink, fontSize: 14, ...typography.label },
 });

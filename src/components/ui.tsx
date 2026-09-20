@@ -127,7 +127,7 @@ export function Button({
 }: {
   label: string;
   onPress?: () => void;
-  variant?: 'primary' | 'secondary' | 'dark' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'dark' | 'ghost' | 'accent' | 'light';
   icon?: keyof typeof Ionicons.glyphMap;
   disabled?: boolean;
   loading?: boolean;
@@ -149,7 +149,7 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' || variant === 'dark' ? colors.white : colors.ink} />
+        <ActivityIndicator color={variant === 'primary' || variant === 'dark' || variant === 'accent' ? colors.white : colors.ink} />
       ) : (
         <>
           <Text style={[styles.buttonLabel, styles[`buttonLabel_${variant}`]]}>{label}</Text>
@@ -157,7 +157,7 @@ export function Button({
             <Ionicons
               name={icon}
               size={18}
-              color={variant === 'primary' || variant === 'dark' ? colors.white : colors.ink}
+              color={variant === 'primary' || variant === 'dark' || variant === 'accent' ? colors.white : colors.ink}
             />
           ) : null}
         </>
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   eyebrow: { color: colors.orangeDark, textTransform: 'uppercase', fontSize: 11, ...typography.label, letterSpacing: 1.4 },
-  headerTitle: { color: colors.ink, fontSize: 30, marginTop: 3, ...typography.heading },
+  headerTitle: { color: colors.ink, fontSize: 32, marginTop: 3, ...typography.display },
   iconButton: {
     width: 44,
     height: 44,
@@ -329,23 +329,27 @@ const styles = StyleSheet.create({
     borderColor: colors.paper,
   },
   button: {
-    minHeight: 50,
+    minHeight: 54,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  button_primary: { backgroundColor: colors.orange },
+  button_primary: { backgroundColor: colors.ink },
   button_secondary: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
   button_dark: { backgroundColor: colors.ink },
   button_ghost: { backgroundColor: 'transparent' },
+  button_accent: { backgroundColor: colors.orange },
+  button_light: { backgroundColor: colors.white },
   buttonLabel: { fontSize: 15, ...typography.label },
   buttonLabel_primary: { color: colors.white },
   buttonLabel_secondary: { color: colors.ink },
   buttonLabel_dark: { color: colors.white },
   buttonLabel_ghost: { color: colors.ink },
+  buttonLabel_accent: { color: colors.white },
+  buttonLabel_light: { color: colors.ink },
   pressed: { opacity: motion.press.opacity, transform: [{ scale: motion.press.scale }] },
   disabled: { opacity: 0.45 },
   sectionHeading: {
@@ -419,7 +423,7 @@ const styles = StyleSheet.create({
 
 export const textStyles = StyleSheet.create({
   display: { color: colors.ink, fontSize: 40, lineHeight: 43, ...typography.display } as TextStyle,
-  h1: { color: colors.ink, fontSize: 32, lineHeight: 37, ...typography.heading } as TextStyle,
+  h1: { color: colors.ink, fontSize: 32, lineHeight: 36, ...typography.display } as TextStyle,
   h2: { color: colors.ink, fontSize: 23, lineHeight: 29, ...typography.heading } as TextStyle,
   h3: { color: colors.ink, fontSize: 17, lineHeight: 22, ...typography.heading } as TextStyle,
   body: { color: colors.charcoal, fontSize: 15, lineHeight: 22, ...typography.body } as TextStyle,

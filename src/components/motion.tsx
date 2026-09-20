@@ -9,9 +9,7 @@ import { useReducedMotion } from '@/lib/reducedMotion';
 import { colors } from '@/theme/tokens';
 import { motion } from '@/theme/motion';
 
-const ease = Easing.bezier(motion.easing.standard[0], motion.easing.standard[1], motion.easing.standard[2], motion.easing.standard[3]);
-
-let didInitialTabPaint = false;
+const easeOut = Easing.bezier(0.16, 1, 0.3, 1);
 
 export function PressableScale({ style, children, ...props }: PressableProps) {
   const reduced = useReducedMotion();
@@ -39,28 +37,19 @@ export function TabBarIcon({
   focused: boolean;
   size: number;
 }) {
-  const reduced = useReducedMotion();
-  const progress = useSharedValue(focused ? 1 : 0);
-
-  useEffect(() => {
-    progress.value = reduced
-      ? focused
-        ? 1
-        : 0
-      : withTiming(focused ? 1 : 0, { duration: motion.duration.base, easing: ease });
-  }, [focused, progress, reduced]);
-
-  const outlineStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }));
-  const filledStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
-
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessible={false}>
-      <Animated.View style={[{ position: 'absolute' }, outlineStyle]} pointerEvents="none">
-        <Ionicons name={outline} size={size} color={colors.stone} />
-      </Animated.View>
-      <Animated.View style={filledStyle} pointerEvents="none">
-        <Ionicons name={filled} size={size} color={colors.orange} />
-      </Animated.View>
+    <View
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Ionicons
+        accessible={false}
+        name={focused ? filled : outline}
+        size={size}
+        color={focused ? colors.ink : colors.stone}
+      />
     </View>
   );
 }
@@ -68,27 +57,35 @@ export function TabBarIcon({
 export function TabScene({ children }: { children: ReactNode }) {
   const focused = useIsFocused();
   const reduced = useReducedMotion();
-  const progress = useSharedValue(1);
+  const progress = useSharedValue(focused ? 1 : 0);
+
   useEffect(() => {
-    if (!focused) return;
-    if (!didInitialTabPaint) {
-      didInitialTabPaint = true;
-      return;
-    }
     if (reduced) {
-      progress.value = 1;
+      progress.value = focused ? 1 : 0;
       return;
     }
-    progress.value = 0;
-    progress.value = withTiming(1, { duration: motion.duration.enter, easing: ease });
+    progress.value = withTiming(focused ? 1 : 0, { duration: motion.duration.tab, easing: easeOut });
   }, [focused, progress, reduced]);
 
   const animatedStyle = useAnimatedStyle(() => ({
+    flex: 1,
     opacity: progress.value,
     transform: [{ translateY: interpolate(progress.value, [0, 1], [motion.offset.tabEnter, 0]) }],
   }));
 
-  return <Animated.View style={[{ flex: 1 }, animatedStyle]}>{children}</Animated.View>;
+  return (
+    <Animated.View pointerEvents={focused ? 'auto' : 'none'} style={animatedStyle}>
+      <View
+        accessibilityElementsHidden={!focused}
+        importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
+        // RN-web: Reanimated views do not always forward aria-hidden.
+        {...({ 'aria-hidden': !focused } as object)}
+        style={{ flex: 1 }}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
 }
 
 export function onTabPressHaptic(alreadyFocused: boolean) {

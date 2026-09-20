@@ -15,7 +15,9 @@ export type Capability =
   | 'view_own_child_dob'
   | 'view_authorized_child_dob'
   | 'club_admin'
-  | 'reply_coach';
+  | 'reply_coach'
+  | 'review_registrations'
+  | 'send_club_announcement';
 
 const matrix: Record<Capability, UserRole[]> = {
   browse_programs: ['guest', 'adult_player', 'guardian', 'coach', 'volunteer', 'competition_manager', 'admin'],
@@ -24,9 +26,11 @@ const matrix: Record<Capability, UserRole[]> = {
   rsvp_own: ['adult_player', 'guardian', 'coach', 'admin'],
   supporter_rsvp: ['guest', 'adult_player', 'guardian', 'coach', 'volunteer', 'admin'],
   record_attendance: ['coach', 'admin'],
-  send_announcement: ['coach', 'admin'],
-  urgent_field_closure: ['coach', 'admin'],
-  edit_schedules: ['coach', 'admin'],
+  send_announcement: ['coach', 'competition_manager', 'admin'],
+  send_club_announcement: ['admin'],
+  review_registrations: ['competition_manager', 'admin'],
+  urgent_field_closure: ['admin'],
+  edit_schedules: ['competition_manager', 'admin'],
   assign_child_team: ['admin'],
   view_own_child_dob: ['guardian', 'admin'],
   view_authorized_child_dob: ['coach', 'admin'],

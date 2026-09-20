@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Screen, StatusPill } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { calendarGateway } from '@/services/calendar';
 import { demoPrograms, demoRegistrations, demoTeams } from '@/data/demo';
 import { formatEventParts } from '@/lib/datetime';
@@ -16,6 +17,7 @@ export function generateStaticParams() {
 export default function SeasonHubScreen() {
   const { registrationId } = useLocalSearchParams<{ registrationId: string }>();
   const { registrations, schedule, household, role } = useApp();
+  const toast = useToast();
   const allowed = role === 'guardian' || role === 'admin';
   const registration = allowed ? registrations.find((item) => item.id === registrationId) ?? registrations[0] : undefined;
   const program = demoPrograms.find((item) => item.id === registration?.programId);
@@ -27,10 +29,11 @@ export default function SeasonHubScreen() {
   if (!allowed) {
     return (
       <Screen contentStyle={styles.empty}>
-        <Text style={styles.title}>Season hub is for the registered parent</Text>
-        <Text style={styles.gateCopy}>This screen is Maya Williams’s confirmed registration. Switch to Parent / guardian in Profile to review it, or register from Programs.</Text>
-        <Button label="Browse programs" onPress={() => router.replace('/(tabs)/programs')} />
-        <Button label="Open profile" variant="secondary" onPress={() => router.replace('/(tabs)/profile')} />
+        <Text style={styles.kicker}>FIRST SESSION</Text>
+        <Text style={styles.title}>Maya’s first session: Sun 4:00 PM</Text>
+        <Text style={styles.gateCopy}>Create an account to unlock your briefing — coach, kit, and the winding path through 12 Sundays.</Text>
+        <Button label="Create an account" onPress={() => router.replace('/onboarding')} />
+        <Button label="Browse programs" variant="secondary" onPress={() => router.replace('/(tabs)/programs')} />
       </Screen>
     );
   }
@@ -74,7 +77,10 @@ export default function SeasonHubScreen() {
           label="Add season to calendar"
           icon="calendar-outline"
           onPress={() => {
-            if (first) calendarGateway.add(first);
+            if (first) {
+              calendarGateway.add(first);
+              toast('Season session added · stub calendar');
+            }
           }}
         />
         <Button
@@ -121,4 +127,5 @@ const styles = StyleSheet.create({
   actions: { gap: spacing.sm, marginTop: spacing.xl },
   privacy: { color: colors.stone, fontSize: 11, marginTop: spacing.lg, ...typography.body },
   gateCopy: { color: colors.stone, fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 360, ...typography.body },
+  kicker: { color: colors.orangeDark, fontSize: 11, ...typography.label, letterSpacing: 1.2 },
 });

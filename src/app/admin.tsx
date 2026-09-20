@@ -28,7 +28,7 @@ export default function AdminScreen() {
     setFieldStatus,
     upsertEvent,
   } = useApp();
-  const [tab, setTab] = useState<AdminTab>('registrations');
+  const [tab, setTab] = useState<AdminTab>(can(role, 'review_registrations') ? 'registrations' : 'announcements');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [result, setResult] = useState('');
@@ -36,7 +36,12 @@ export default function AdminScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newVenue, setNewVenue] = useState('');
   const [funnel, setFunnel] = useState<string>('');
+  const [audience, setAudience] = useState<'team' | 'club'>(can(role, 'send_club_announcement') ? 'team' : 'team');
   const allowed = role === 'admin' || role === 'coach' || role === 'competition_manager';
+  const canReview = can(role, 'review_registrations');
+  const canClubAnnounce = can(role, 'send_club_announcement');
+  const canEditSchedule = can(role, 'edit_schedules');
+  const assignedEvents = schedule.filter((event) => (role === 'coach' ? event.teamId === 'nova-royals-kids-u8' : Boolean(event.teamId)));
 
   useEffect(() => {
     getEvents().then((events) => {
@@ -58,7 +63,14 @@ export default function AdminScreen() {
 
   const publish = () => {
     if (!title.trim() || !body.trim()) return;
-    createAnnouncement({ title, body, audience: urgency === 'urgent' ? 'club' : 'team', scopeLabel: 'Nova Royals', urgency });
+    createAnnouncement({
+      title,
+      body,
+      audience: canClubAnnounce && audience === 'club' ? 'club' : 'team',
+      scopeLabel: canClubAnnounce && audience === 'club' ? 'Nova Royals' : 'U8 training',
+      teamId: canClubAnnounce && audience === 'club' ? undefined : 'nova-royals-kids-u8',
+      urgency,
+    });
     setTitle('');
     setBody('');
   };
@@ -67,30 +79,32 @@ export default function AdminScreen() {
     <Screen>
       <View style={styles.header}>
         <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
-        <View style={styles.flex}><Text style={styles.eyebrow}>ROLE-PROTECTED · DEMO</Text><Text style={styles.title}>Club management</Text></View>
+        <View style={styles.flex}><Text style={styles.eyebrow}>ROLE-PROTECTED · DEMO</Text><Text style={styles.title}>{role === 'coach' ? 'U8 staff tools' : 'Club management'}</Text></View>
         <View style={styles.adminMark}><Text style={styles.adminText}>A</Text></View>
       </View>
 
       <View style={styles.metrics}>
-        <Metric value={String(registrations.length)} label="REGISTRATIONS" />
-        <Metric value={String(demoTeams.length)} label="TEAMS" />
-        <Metric value={funnel ? 'FUNNEL' : '—'} label={funnel || 'ANALYTICS'} />
+        {canReview ? <Metric value={String(registrations.length)} label="REGISTRATIONS" /> : <Metric value="U8" label="ASSIGNED TEAM" />}
+        <Metric value={String(role === 'coach' ? 1 : demoTeams.length)} label="TEAMS" />
+        <Metric value={canReview && funnel ? 'FUNNEL' : 'STAFF'} label={canReview ? funnel || 'ANALYTICS' : 'SCOPED ACCESS'} />
       </View>
 
       <View style={styles.tabs}>
-        {([
-          ['registrations', 'Registrations'],
-          ['announcements', 'Announcements'],
-          ['teams', 'Teams'],
-          ['games', 'Games'],
-        ] as [AdminTab, string][]).map(([id, label]) => (
+        {(
+          [
+            canReview ? (['registrations', 'Registrations'] as const) : null,
+            can(role, 'send_announcement') ? (['announcements', 'Announcements'] as const) : null,
+            canReview || role === 'admin' ? (['teams', 'Teams'] as const) : null,
+            ['games', 'Games'] as const,
+          ].filter(Boolean) as [AdminTab, string][]
+        ).map(([id, label]) => (
           <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, tab === id && styles.tabActive]}>
             <Text style={[styles.tabText, tab === id && styles.tabTextActive]}>{label}</Text>
           </Pressable>
         ))}
       </View>
 
-      {tab === 'registrations' && (
+      {tab === 'registrations' && canReview && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Registration review</Text>
           <Text style={styles.sectionCopy}>Status changes persist locally in demo mode.</Text>
@@ -118,11 +132,32 @@ export default function AdminScreen() {
       {tab === 'announcements' && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Publish announcement</Text>
-          <Text style={styles.sectionCopy}>Club-wide by default. Team and program audiences share the same model.</Text>
+          <Text style={styles.sectionCopy}>
+            {canClubAnnounce
+              ? 'Choose an audience first. Club-wide messages are never the default.'
+              : 'Messages send to your assigned team only. Club-wide publishing is not available to this role.'}
+          </Text>
           <View style={styles.form}>
+            {canClubAnnounce ? (
+              <View style={styles.inline}>
+                <Button label="Assigned team" variant={audience === 'team' ? 'primary' : 'secondary'} onPress={() => setAudience('team')} style={styles.flex} />
+                <Button label="Club-wide" variant={audience === 'club' ? 'primary' : 'secondary'} onPress={() => setAudience('club')} style={styles.flex} />
+              </View>
+            ) : null}
             <Field label="Headline" value={title} onChangeText={setTitle} placeholder="What should members know?" />
             <Field label="Message" value={body} onChangeText={setBody} multiline numberOfLines={4} placeholder="Keep it clear and actionable." />
-            <Field label="Urgency (urgent / high / normal / low)" value={urgency} onChangeText={(value) => setUrgency((value as NoticeUrgency) || 'normal')} />
+            <Text style={styles.subheading}>URGENCY</Text>
+            <View style={styles.inline}>
+              {(['urgent', 'high', 'normal', 'low'] as NoticeUrgency[]).map((level) => (
+                <Button
+                  key={level}
+                  label={level}
+                  variant={urgency === level ? 'primary' : 'secondary'}
+                  onPress={() => setUrgency(level)}
+                  style={styles.flex}
+                />
+              ))}
+            </View>
             <Button label="Publish demo announcement" icon="megaphone-outline" disabled={!title || !body} onPress={publish} />
           </View>
           <Text style={styles.subheading}>Published</Text>
@@ -153,7 +188,7 @@ export default function AdminScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Game & result editor</Text>
           <Text style={styles.sectionCopy}>The first scheduled team match is available for demo editing.</Text>
-          {schedule.filter((event) => event.teamId).slice(0, 2).map((event) => (
+          {assignedEvents.slice(0, 2).map((event) => (
             <View key={event.id} style={styles.card}>
               <Text style={styles.cardTitle}>{event.title}</Text>
               <Text style={styles.cardMeta}>{event.venue} · {event.status}</Text>
@@ -164,7 +199,7 @@ export default function AdminScreen() {
               ) : null}
             </View>
           ))}
-          {can(role, 'edit_schedules') ? (
+          {canEditSchedule ? (
             <View style={styles.form}>
               <Text style={styles.subheading}>ADD SESSION</Text>
               <Field label="Title" value={newTitle} onChangeText={setNewTitle} placeholder="Saturday training" />

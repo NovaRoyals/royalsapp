@@ -18,13 +18,14 @@ export default function TabsLayout() {
       screenOptions={({ route }) => ({
         headerShown: false,
         sceneStyle: { backgroundColor: colors.cream },
-        tabBarActiveTintColor: colors.orange,
+        animation: 'none',
+        tabBarActiveTintColor: colors.ink,
         tabBarInactiveTintColor: colors.stone,
-        tabBarLabelStyle: { fontSize: 10, ...typography.label, letterSpacing: 0.1 },
+        tabBarLabelStyle: { fontSize: 10, fontFamily: typography.label.fontFamily, letterSpacing: 0.1 },
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 86 : 70,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 22 : 8,
+          height: Platform.OS === 'ios' ? 82 : 64,
+          paddingTop: 6,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           backgroundColor: colors.paper,
           borderTopColor: colors.border,
         },
@@ -38,7 +39,10 @@ export default function TabsLayout() {
         <Tabs.Screen
           key={name}
           name={name}
-          options={{ title: name === 'index' ? 'Home' : name[0].toUpperCase() + name.slice(1) }}
+          options={{
+            title: name === 'index' ? 'Home' : name[0].toUpperCase() + name.slice(1),
+            tabBarAccessibilityLabel: name === 'index' ? 'Home' : name[0].toUpperCase() + name.slice(1),
+          }}
           listeners={({ navigation, route }) => ({
             tabPress: () => {
               const state = navigation.getState();

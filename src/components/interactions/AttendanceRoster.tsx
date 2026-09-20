@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { DrawCheck } from '@/components/interactions/DrawCheck';
 import { PressableScale } from '@/components/motion';
 import { StatusPill } from '@/components/ui';
 import { privacyName } from '@/lib/attendance';
@@ -76,14 +77,17 @@ export function AttendanceRoster({
         return (
           <Pressable
             key={person.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected: Boolean(mark) }}
             onPress={() => {
               const next = cycle[(cycle.indexOf(mark?.status ?? 'late') + 1) % cycle.length];
+              haptic('light');
               onMark(person, next);
             }}
-            style={styles.row}
+            style={[styles.row, mark?.status === 'present' && styles.rowOn]}
           >
             <View style={[styles.dot, mark?.status === 'present' && styles.dotOn]}>
-              {mark?.status === 'present' ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
+              {mark?.status === 'present' ? <DrawCheck active color={colors.white} size={14} /> : null}
             </View>
             <View style={styles.flex}>
               <Text style={styles.name}>{privacyName(person, authorizedNames)}</Text>
@@ -114,7 +118,8 @@ const styles = StyleSheet.create({
   },
   markAllText: { color: colors.white, fontSize: 13, ...typography.heading },
   done: { color: colors.success, fontSize: 13, marginBottom: spacing.md, ...typography.heading },
-  row: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  row: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: spacing.xs, borderRadius: radius.sm },
+  rowOn: { backgroundColor: colors.successSoft },
   dot: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   dotOn: { backgroundColor: colors.success, borderColor: colors.success },
   flex: { flex: 1 },

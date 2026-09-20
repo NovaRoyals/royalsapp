@@ -3,6 +3,8 @@ import { router } from 'expo-router';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import { shareContent } from '@/lib/share';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 const links = [
@@ -14,6 +16,7 @@ const links = [
 ];
 
 export default function AboutScreen() {
+  const toast = useToast();
   return (
     <Screen>
       <View style={styles.topbar}>
@@ -27,7 +30,18 @@ export default function AboutScreen() {
           <Text style={styles.body}>{item.body}</Text>
         </View>
       ))}
-      <Pressable onPress={() => Linking.openURL('mailto:infonovaroyals@gmail.com')} style={styles.mail}>
+      <Pressable
+        onPress={async () => {
+          try {
+            await Linking.openURL('mailto:infonovaroyals@gmail.com');
+            toast('Opening mail…');
+          } catch {
+            const result = await shareContent({ title: 'Email ROYALS', message: 'infonovaroyals@gmail.com' });
+            toast(result === 'copied' ? 'Email copied' : 'Mail app unavailable');
+          }
+        }}
+        style={styles.mail}
+      >
         <Ionicons name="mail-outline" size={18} color={colors.orangeDark} />
         <Text style={styles.mailText}>Email the club</Text>
       </Pressable>

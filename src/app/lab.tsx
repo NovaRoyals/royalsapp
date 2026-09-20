@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
 import { CalendarConfirmButton, SupporterButton } from '@/components/interactions/SupporterButton';
 import { RsvpChoices, type RsvpVariant } from '@/components/interactions/RsvpChoices';
+import { ConfirmationPeak } from '@/components/interactions/ConfirmationPeak';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { IllustrationFrame } from '@/components/illustrations/IllustrationFrame';
 import { Screen, StatusPill } from '@/components/ui';
 import { haptic, type HapticKind } from '@/lib/haptics';
@@ -46,14 +48,20 @@ export default function InteractionLabScreen() {
       <Text style={styles.lead}>
         Compare variants before accepting a signature interaction. Production currently ships RSVP A, supporter A, and calendar confirmation.
       </Text>
+      <Pressable onPress={() => router.push('/roy' as never)} style={styles.royLink}>
+        <Text style={styles.copy}>Open Roy Lab to preview mascot animation states.</Text>
+        <Ionicons name="sparkles-outline" size={18} color={colors.orange} />
+      </Pressable>
 
-      <Section title="RSVP">
-        <ChipRow values={['a', 'b', 'c']} value={rsvpVariant} onChange={setRsvpVariant} />
+      <Section title="Timing (same spring language)">
         <ChipRow
           values={[`${motion.duration.fast}ms`, `${motion.duration.enter}ms`, `${motion.duration.celebrate}ms`]}
           value={`${duration}ms`}
           onChange={(label) => setDuration(Number(label.replace('ms', '')))}
         />
+        <SpringSample duration={duration} />
+      </Section>
+      <Section title="RSVP">
         <ChipRow values={['light', 'medium', 'success']} value={hapticKind} onChange={(value) => setHapticKind(value as HapticKind)} />
         <RsvpChoices
           value={rsvp}
@@ -108,8 +116,16 @@ export default function InteractionLabScreen() {
         <CalendarConfirmButton added={calendarAdded} labelIdle="Add to calendar" onAdd={() => setCalendarAdded(true)} />
       </Section>
 
-      <Section title="Registration completion (copy only)">
-        <Text style={styles.copy}>Maya is joining ROYALS. First session Sunday 4:00 PM · Coach Priya.</Text>
+      <Section title="Confirmation entrance">
+        <ConfirmationPeak
+          name="Maya"
+          program="Fall Soccer Training 2026"
+          sessionLine="Sunday · 4:00 PM · First session"
+          onCalendar={() => undefined}
+          onCoach={() => undefined}
+          onSeason={() => undefined}
+          onShare={() => undefined}
+        />
       </Section>
 
       <Section title="Temporary illustration architecture">
@@ -130,6 +146,24 @@ export default function InteractionLabScreen() {
   );
 }
 
+function SpringSample({ duration }: { duration: number }) {
+  const progress = useSharedValue(0);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: progress.value * 120 }],
+  }));
+  return (
+    <Pressable
+      onPress={() => {
+        progress.value = 0;
+        progress.value = withTiming(1, { duration, easing: Easing.bezier(0.2, 0.8, 0.2, 1) });
+      }}
+      style={styles.springTrack}
+    >
+      <Animated.View style={[styles.springDot, style]} />
+      <Text style={styles.note}>Tap to preview {duration}ms</Text>
+    </Pressable>
+  );
+}
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
@@ -165,7 +199,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   kicker: { color: colors.orangeDark, fontSize: 10, ...typography.label, letterSpacing: 1.1 },
   title: { color: colors.ink, fontSize: 24, ...typography.heading },
-  lead: { color: colors.stone, fontSize: 13, lineHeight: 19, marginTop: spacing.sm, marginBottom: spacing.lg, ...typography.body },
+  lead: { color: colors.stone, fontSize: 13, lineHeight: 19, marginTop: spacing.sm, marginBottom: spacing.md, ...typography.body },
+  royLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
   section: { marginBottom: spacing.xxl, gap: spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 18, ...typography.heading },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -175,4 +210,6 @@ const styles = StyleSheet.create({
   chipOnText: { color: colors.white },
   copy: { color: colors.charcoal, fontSize: 14, lineHeight: 20, ...typography.body },
   note: { color: colors.stone, fontSize: 12, ...typography.body },
+  springTrack: { height: 56, justifyContent: 'center' },
+  springDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.orange },
 });

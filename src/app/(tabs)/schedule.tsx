@@ -69,6 +69,9 @@ export default function ScheduleScreen() {
         </PressableScale>
       </View>
 
+      {filtered.length === 0 ? (
+        <Text style={styles.subtitle}>{showPast ? 'No completed results in this filter.' : 'Nothing in this filter yet.'}</Text>
+      ) : null}
       <View style={styles.timeline}>
         {filtered.map((event, index) => {
           const parts = formatEventParts(event.startsAt);

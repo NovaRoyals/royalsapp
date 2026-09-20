@@ -179,6 +179,15 @@ export const demoPrograms: Program[] = [
   },
 ];
 
+export const emptyHousehold: Household = {
+  id: 'household-local',
+  guardianName: '',
+  email: '',
+  phone: '',
+  address: '',
+  children: [],
+};
+
 export const demoHousehold: Household = {
   id: 'household-demo',
   guardianName: 'Jordan Williams',

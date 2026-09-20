@@ -21,6 +21,15 @@ export function canOpenSeasonHub(role: UserRole, hasRegistration: boolean) {
   return hasRegistration && (role === 'guardian' || role === 'admin');
 }
 
+export function canSeeFullRoster(role: UserRole, teamId?: string) {
+  if (!teamId || role === 'guest' || role === 'volunteer') return false;
+  if (role === 'admin') return true;
+  if (role === 'coach') return teamId === COACH_TEAM_ID;
+  if (role === 'adult_player') return teamId === PLAYER_TEAM_ID;
+  if (role === 'guardian') return teamId === COACH_TEAM_ID;
+  return false;
+}
+
 export function canPlayerRsvp(role: UserRole, event: ScheduleEvent, registrations: Registration[]) {
   if (role === 'coach' || role === 'admin' || role === 'volunteer' || role === 'guest') return false;
   return isTeamParticipant(role, event, registrations);

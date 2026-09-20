@@ -10,8 +10,13 @@ import {
   demoNotifications,
   demoRegistrations,
   demoSchedule,
+  emptyHousehold,
 } from '@/data/demo';
 import { resetAnalytics, track } from '@/lib/analytics';
+import { can } from '@/lib/capabilities';
+import { COACH_TEAM_ID } from '@/lib/membership';
+import { clearRegistrationDraft } from '@/lib/registrationDraft';
+import { SplashOverlay, SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import type {
   Announcement,
   AnnouncementReply,
@@ -31,8 +36,15 @@ import type {
   UserRole,
 } from '@/types/domain';
 
-const STORAGE_KEY = '@royals/demo-state/v5';
-const LEGACY_STORAGE_KEYS = ['@royals/demo-state/v1', '@royals/demo-state/v2', '@royals/demo-state/v3', '@royals/demo-state/v4'];
+const STORAGE_KEY = '@royals/demo-state/v7';
+const LEGACY_STORAGE_KEYS = [
+  '@royals/demo-state/v1',
+  '@royals/demo-state/v2',
+  '@royals/demo-state/v3',
+  '@royals/demo-state/v4',
+  '@royals/demo-state/v5',
+  '@royals/demo-state/v6',
+];
 
 export const defaultNotificationPrefs: NotificationPrefs = {
   urgent: true,
@@ -43,7 +55,10 @@ export const defaultNotificationPrefs: NotificationPrefs = {
 
 export const defaultFollowedIds = ['fall-kids-2026', 'nova-royals-men', 'nova-royals-cricket'];
 
+export type Persona = 'visitor' | 'demo';
+
 type PersistedState = {
+  persona: Persona;
   role: UserRole;
   household: Household;
   registrations: Registration[];
@@ -55,6 +70,8 @@ type PersistedState = {
   followedIds: string[];
   notificationPrefs: NotificationPrefs;
   onboardingCompleted: boolean;
+  introCompleted: boolean;
+  pendingStaffRole?: 'coach' | 'competition_manager' | null;
 };
 
 type NewRegistration = Omit<Registration, 'id' | 'submittedAt' | 'demo'>;
@@ -62,12 +79,15 @@ type NewRegistration = Omit<Registration, 'id' | 'submittedAt' | 'demo'>;
 interface AppState extends PersistedState {
   hydrated: boolean;
   setRole: (role: UserRole) => void;
+  loadDemoPersona: (role: UserRole) => void;
   completeOnboarding: (input: {
     role: UserRole;
     children?: Person[];
     followedIds: string[];
     notificationPrefs: NotificationPrefs;
     guardianName?: string;
+    email?: string;
+    pendingStaffRole?: 'coach' | 'competition_manager' | null;
   }) => void;
   setFollowedIds: (ids: string[]) => void;
   setNotificationPrefs: (prefs: NotificationPrefs) => void;
@@ -93,6 +113,7 @@ interface AppState extends PersistedState {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   resetDemo: () => Promise<void>;
+  completeIntro: () => void;
 }
 
 function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
@@ -114,19 +135,49 @@ function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
   ].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
-const initialState: PersistedState = {
-  role: 'guest',
-  household: demoHousehold,
-  registrations: demoRegistrations,
-  schedule: demoSchedule,
-  notifications: demoNotifications,
-  announcements: demoAnnouncements,
-  messages: demoDirectMessages,
-  documents: demoDocuments,
-  followedIds: defaultFollowedIds,
-  notificationPrefs: defaultNotificationPrefs,
-  onboardingCompleted: false,
-};
+function visitorNotifications() {
+  return demoNotifications.filter((item) => item.type === 'announcement' || item.type === 'weather');
+}
+
+function visitorSeed(role: UserRole = 'guest'): PersistedState {
+  return {
+    persona: 'visitor',
+    role,
+    household: emptyHousehold,
+    registrations: [],
+    schedule: demoSchedule,
+    notifications: visitorNotifications(),
+    announcements: demoAnnouncements,
+    messages: [],
+    documents: [],
+    followedIds: [],
+    notificationPrefs: defaultNotificationPrefs,
+    onboardingCompleted: false,
+    introCompleted: false,
+    pendingStaffRole: null,
+  };
+}
+
+function demoSeed(role: UserRole): PersistedState {
+  return {
+    persona: 'demo',
+    role,
+    household: demoHousehold,
+    registrations: demoRegistrations,
+    schedule: demoSchedule,
+    notifications: demoNotifications,
+    announcements: demoAnnouncements,
+    messages: demoDirectMessages,
+    documents: demoDocuments,
+    followedIds: defaultFollowedIds,
+    notificationPrefs: defaultNotificationPrefs,
+    onboardingCompleted: role !== 'guest',
+    introCompleted: true,
+    pendingStaffRole: null,
+  };
+}
+
+const initialState: PersistedState = visitorSeed('guest');
 
 const AppContext = createContext<AppState | null>(null);
 
@@ -156,14 +207,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const parsed = JSON.parse(saved) as Partial<PersistedState>;
+        const role = parsed.role ?? 'guest';
+        const demoHouseholdLoaded = parsed.household?.id === 'household-demo';
+        const persona: Persona =
+          parsed.persona ?? (role !== 'guest' && demoHouseholdLoaded ? 'demo' : 'visitor');
+        if (persona === 'demo' && role !== 'guest') {
+          setState({
+            ...demoSeed(role),
+            ...parsed,
+            persona: 'demo',
+            role,
+            introCompleted: parsed.introCompleted ?? true,
+            schedule: mergeClubSchedule(parsed.schedule),
+          });
+          return;
+        }
         setState({
-          ...initialState,
+          ...visitorSeed(role),
           ...parsed,
-          household: parsed.household ?? initialState.household,
-          notificationPrefs: { ...defaultNotificationPrefs, ...parsed.notificationPrefs },
-          followedIds: parsed.followedIds ?? initialState.followedIds,
-          messages: parsed.messages ?? initialState.messages,
-          documents: parsed.documents ?? initialState.documents,
+          persona: 'visitor',
+          role,
+          household: demoHouseholdLoaded || !parsed.household ? emptyHousehold : parsed.household,
+          registrations: (parsed.registrations ?? []).filter((item) => !item.demo),
+          documents: parsed.documents ?? [],
+          messages: parsed.messages ?? [],
+          introCompleted: parsed.introCompleted ?? false,
+          notifications: parsed.notifications ?? visitorNotifications(),
           schedule: mergeClubSchedule(parsed.schedule),
         });
       })
@@ -181,7 +250,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setRole = useCallback((role: UserRole) => {
     hapticLight();
-    setState((current) => ({ ...current, role }));
+    setState((current) => {
+      const schedule = mergeClubSchedule(current.schedule);
+      if (role === 'guest') return { ...visitorSeed('guest'), introCompleted: true, schedule };
+      return { ...demoSeed(role), schedule };
+    });
+  }, []);
+
+  const completeIntro = useCallback(() => {
+    hapticLight();
+    setState((current) => ({
+      ...visitorSeed('guest'),
+      introCompleted: true,
+      schedule: mergeClubSchedule(current.schedule),
+    }));
+  }, []);
+
+  const loadDemoPersona = useCallback((role: UserRole) => {
+    hapticLight();
+    setState((current) => ({ ...demoSeed(role), schedule: mergeClubSchedule(current.schedule) }));
   }, []);
 
   const completeOnboarding = useCallback(
@@ -191,18 +278,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       followedIds: string[];
       notificationPrefs: NotificationPrefs;
       guardianName?: string;
+      email?: string;
+      pendingStaffRole?: 'coach' | 'competition_manager' | null;
     }) => {
       setState((current) => ({
         ...current,
+        persona: 'visitor',
         role: input.role,
         onboardingCompleted: true,
+        introCompleted: true,
+        pendingStaffRole: input.pendingStaffRole ?? null,
         followedIds: input.followedIds,
         notificationPrefs: input.notificationPrefs,
         household: {
-          ...current.household,
-          guardianName: input.guardianName || current.household.guardianName,
-          children: input.children?.length ? input.children : current.household.children,
+          id: 'household-local',
+          guardianName: input.guardianName?.trim() || current.household.guardianName || 'Your household',
+          email: input.email?.trim() || current.household.email,
+          phone: current.household.phone,
+          address: current.household.address,
+          children: input.children ?? [],
         },
+        registrations: current.registrations.filter((item) => !item.demo),
+        documents: current.documents.filter((item) => item.id !== 'doc-reg-demo-1'),
+        messages: [],
       }));
       hapticLight();
     },
@@ -430,27 +528,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         eventId?: string;
       },
     ) => {
-      const created: Announcement = {
-        ...announcement,
-        id: `announcement-${Date.now()}`,
-        publishedAt: new Date().toISOString(),
-        urgency: announcement.urgency ?? 'normal',
-        replies: [],
-      };
-      const urgency = created.urgency ?? 'normal';
-      const alert = notice({
-        type: 'announcement',
-        title: created.title,
-        body: created.body,
-        route: `/message/${created.id}`,
-        urgency,
-        wouldPush: urgency !== 'low',
+      setState((current) => {
+        if (!can(current.role, 'send_announcement')) return current;
+        const scoped =
+          announcement.audience === 'club' && !can(current.role, 'send_club_announcement')
+            ? {
+                ...announcement,
+                audience: 'team' as const,
+                teamId: announcement.teamId ?? COACH_TEAM_ID,
+                scopeLabel: 'U8 training',
+              }
+            : announcement;
+        const created: Announcement = {
+          ...scoped,
+          id: `announcement-${Date.now()}`,
+          publishedAt: new Date().toISOString(),
+          urgency: scoped.urgency ?? 'normal',
+          replies: [],
+        };
+        const urgency = created.urgency ?? 'normal';
+        const alert = notice({
+          type: 'announcement',
+          title: created.title,
+          body: created.body,
+          route: `/message/${created.id}`,
+          urgency,
+          wouldPush: urgency !== 'low',
+        });
+        return {
+          ...current,
+          announcements: [created, ...current.announcements],
+          notifications: [alert, ...current.notifications],
+        };
       });
-      setState((current) => ({
-        ...current,
-        announcements: [created, ...current.announcements],
-        notifications: [alert, ...current.notifications],
-      }));
       hapticLight();
     },
     [],
@@ -511,7 +621,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const resetDemo = useCallback(async () => {
     await Promise.all([STORAGE_KEY, ...LEGACY_STORAGE_KEYS].map((key) => AsyncStorage.removeItem(key)));
     await resetAnalytics();
-    setState({ ...initialState, schedule: mergeClubSchedule() });
+    await clearRegistrationDraft();
+    try {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(SPLASH_SESSION_KEY);
+    } catch {
+      undefined;
+    }
+    setState({ ...visitorSeed('guest'), schedule: mergeClubSchedule() });
     hapticLight();
   }, []);
 
@@ -523,6 +639,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       schedule,
       hydrated,
       setRole,
+      loadDemoPersona,
+      completeIntro,
       completeOnboarding,
       setFollowedIds,
       setNotificationPrefs,
@@ -549,6 +667,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       schedule,
       hydrated,
       setRole,
+      loadDemoPersona,
+      completeIntro,
       completeOnboarding,
       setFollowedIds,
       setNotificationPrefs,
