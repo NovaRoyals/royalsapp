@@ -12,6 +12,7 @@ import {
   conflictHeadline,
   formatTimeChip,
   formatUpdatedAgo,
+  minutesForTime,
   statusCopy,
 } from '@/lib/fields';
 import { safeBack } from '@/lib/nav';
@@ -33,7 +34,7 @@ export default function PitchDetailScreen() {
   const { id, date: dateParam, time: timeParam } = useLocalSearchParams<{ id: string; date?: string; time?: string }>();
   const date = dateParam || clubDateFromPosted(clubNowPostedIso());
   const time = timeParam || DEFAULT_PITCH_TIME;
-  const day = usePitchDay(date, time, false);
+  const day = usePitchDay(date, minutesForTime(time), false);
   const located = locatePitches(day.data?.pitches ?? []);
   const pitch = located.find((item) => item.id === id);
   const suggested = day.data?.suggestionId === id;

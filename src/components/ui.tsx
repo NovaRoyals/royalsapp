@@ -87,31 +87,40 @@ export function AppHeader({
   eyebrow,
   title,
   action,
+  meta,
+  metaTone = 'default',
+  compactTitle = false,
 }: {
   eyebrow?: string;
   title?: string;
   action?: React.ReactNode;
+  meta?: string;
+  metaTone?: 'default' | 'stale';
+  compactTitle?: boolean;
 }) {
   const { hydrated, notifications, role } = useApp();
   const unread = hydrated ? notificationsForRole(role, notifications).filter((item) => !item.read).length : 0;
   const reduced = useReducedMotion();
   return (
     <View style={styles.header}>
-      <View>
+      <View style={styles.headerCopy}>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : <Brand />}
-        {title ? <Text style={styles.headerTitle}>{title}</Text> : null}
+        {title ? <Text style={[styles.headerTitle, compactTitle && styles.headerTitleCompact]}>{title}</Text> : null}
       </View>
-      {action ?? (
-        <Link href={'/notifications' as Href} asChild>
-          <Pressable
-            accessibilityLabel="Open notifications"
-            style={({ pressed }) => [styles.iconButton, pressed && !reduced && styles.pressed]}
-          >
-            <Ionicons name="notifications-outline" size={22} color={colors.ink} />
-            {unread > 0 ? <View style={styles.notificationDot} /> : null}
-          </Pressable>
-        </Link>
-      )}
+      <View style={styles.headerRight}>
+        {meta ? <Text style={[styles.headerMeta, metaTone === 'stale' && styles.headerMetaStale]}>{meta}</Text> : null}
+        {action ?? (
+          <Link href={'/notifications' as Href} asChild>
+            <Pressable
+              accessibilityLabel="Open notifications"
+              style={({ pressed }) => [styles.iconButton, pressed && !reduced && styles.pressed]}
+            >
+              <Ionicons name="notifications-outline" size={22} color={colors.ink} />
+              {unread > 0 ? <View style={styles.notificationDot} /> : null}
+            </Pressable>
+          </Link>
+        )}
+      </View>
     </View>
   );
 }
@@ -300,13 +309,19 @@ const styles = StyleSheet.create({
   brandText: { color: colors.ink, fontSize: 21, ...typography.display, letterSpacing: 2.5 },
   header: {
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: spacing.sm,
   },
+  headerCopy: { flex: 1, paddingRight: spacing.sm },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: 2 },
+  headerMeta: { color: colors.stone, fontSize: 11, maxWidth: 108, textAlign: 'right', ...typography.label },
+  headerMetaStale: { color: colors.orangeDark },
   eyebrow: { color: colors.orangeDark, textTransform: 'uppercase', fontSize: 11, ...typography.label, letterSpacing: 1.4 },
   headerTitle: { color: colors.ink, fontSize: 32, marginTop: 3, ...typography.display },
+  headerTitleCompact: { fontSize: 22, lineHeight: 26, letterSpacing: -0.3 },
   iconButton: {
     width: 44,
     height: 44,

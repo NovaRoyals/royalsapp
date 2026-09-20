@@ -1,10 +1,11 @@
 import type { CalendarStatus, PitchDay, PitchDayResult } from '@/services/fields';
 
-export const PITCH_TIMES = ['9:00AM', '12:00PM', '4:00PM', '6:30PM', '8:00PM'] as const;
+export const PITCH_TIMES = ['8:00AM', '9:30AM', '12:00PM', '4:00PM', '6:30PM', '8:00PM'] as const;
 export const DEFAULT_PITCH_TIME = '6:30PM';
 
 export const PITCH_TIME_MINUTES: Record<(typeof PITCH_TIMES)[number], number> = {
-  '9:00AM': 540,
+  '8:00AM': 480,
+  '9:30AM': 570,
   '12:00PM': 720,
   '4:00PM': 960,
   '6:30PM': 1110,
@@ -14,7 +15,7 @@ export const PITCH_TIME_MINUTES: Record<(typeof PITCH_TIMES)[number], number> = 
 export const PITCH_DISCLAIMER =
   'Public league calendars only — private teams and game bookings aren’t checked. Treat this as a starting point, not a hold on the pitch.';
 
-export const PITCH_MAP_HINT = 'Tap a glowing pin to preview the pitch — green is clear at your time, orange has something on.';
+export const PITCH_FILTER_HINT = 'Green is clear at your time · Orange has something on · Map starts on the best pick';
 
 export function minutesForTime(time: string) {
   return PITCH_TIME_MINUTES[time as (typeof PITCH_TIMES)[number]] ?? 1110;
@@ -24,8 +25,11 @@ export function clubDateFromPosted(postedIso: string) {
   return postedIso.slice(0, 10);
 }
 
-export function formatDateChip(ymd: string, todayYmd: string) {
+export function formatDateMenu(ymd: string, todayYmd: string) {
   if (ymd === todayYmd) return 'Today';
+  const [ty, tm, td] = todayYmd.split('-').map(Number);
+  const tmrw = new Date(Date.UTC(ty, tm - 1, td + 1)).toISOString().slice(0, 10);
+  if (ymd === tmrw) return 'Tmrw';
   const [year, month, day] = ymd.split('-').map(Number);
   const weekday = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay();
   const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -43,13 +47,14 @@ export function formatUpdatedAgo(iso?: string, fromCache = false, now = Date.now
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
   const age =
     minutes < 1
-      ? 'Updated just now'
+      ? 'Just now'
       : minutes < 60
-        ? `Updated ${minutes} min ago`
+        ? `${minutes} min ago`
         : minutes < 60 * 24
-          ? `Updated ${Math.round(minutes / 60)}h ago`
-          : `Updated ${Math.round(minutes / 60 / 24)}d ago`;
-  return fromCache ? `${age} · saved copy` : age;
+          ? `${Math.round(minutes / 60)}h ago`
+          : `${Math.round(minutes / 60 / 24)}d ago`;
+  if (fromCache) return `${age} · saved`;
+  return minutes < 1 ? 'Updated just now' : `Updated ${age}`;
 }
 
 export function isUpdatedStale(iso?: string, now = Date.now()) {
@@ -60,6 +65,23 @@ export function isUpdatedStale(iso?: string, now = Date.now()) {
 export function statusCopy(status: CalendarStatus) {
   if (status === 'conflict') return 'On the public calendar';
   return 'No conflicts found';
+}
+
+export function collapsedStatus(pitch: PitchDay, time: string) {
+  const label = formatTimeChip(time);
+  if (pitch.status === 'conflict') {
+    const count = Math.max(1, pitch.overlappingEvents.length);
+    return `${count} conflicting events · ${label}`;
+  }
+  return `No conflicts found · ${label}`;
+}
+
+export function atTimeStatus(pitch: PitchDay) {
+  if (pitch.status === 'conflict') {
+    const count = Math.max(1, pitch.overlappingEvents.length);
+    return count === 1 ? '1 event' : `${count} events`;
+  }
+  return 'No conflicts';
 }
 
 export function conflictHeadline(pitch: PitchDay, time: string) {
@@ -74,18 +96,14 @@ export function pitchLabel(pitch: { name: string; pitch: string }) {
   return `${pitch.name} · ${pitch.pitch}`;
 }
 
-export type PitchSort = 'suggestion' | 'clear' | 'name';
-
-export function sortPitches(pitches: PitchDay[], suggestionId: string | undefined, sort: PitchSort) {
+export function sortPitches(pitches: PitchDay[], suggestionId: string | undefined) {
   const copy = [...pitches];
   copy.sort((a, b) => {
-    if (sort === 'suggestion' && suggestionId) {
+    if (suggestionId) {
       if (a.id === suggestionId) return -1;
       if (b.id === suggestionId) return 1;
     }
-    if (sort === 'clear' || sort === 'suggestion') {
-      if (a.status !== b.status) return a.status === 'no_conflict' ? -1 : 1;
-    }
+    if (a.status !== b.status) return a.status === 'no_conflict' ? -1 : 1;
     const park = a.name.localeCompare(b.name);
     if (park) return park;
     return a.pitch.localeCompare(b.pitch);

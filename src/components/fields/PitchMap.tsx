@@ -68,7 +68,9 @@ export default function PitchMap({
   reducedMotion,
   frameKey,
   flyNonce,
+  sizeKey,
   onSelect,
+  onBackground,
 }: PitchMapProps) {
   const mapRef = useRef<ComponentRef<typeof MapView>>(null);
   const skipFly = useRef(true);
@@ -116,6 +118,7 @@ export default function PitchMap({
         setZoom(zoomFromLongitudeDelta(region.longitudeDelta));
       }}
       mapType="none"
+      onPress={() => onBackground?.()}
     >
       <UrlTile urlTemplate={LIGHT_TILES_A} maximumZ={16} zIndex={0} />
       {pitches.map((pitch) => {

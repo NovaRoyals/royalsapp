@@ -1,7 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { useDebounced } from '@/lib/debounce';
-import { minutesForTime } from '@/lib/fields';
 import { fetchCoverage, fetchPitchDay } from '@/services/fields';
 
 export function useFieldCoverage() {
@@ -14,15 +13,14 @@ export function useFieldCoverage() {
   });
 }
 
-export function usePitchDay(date: string, time: string, turfOnly: boolean, enabled = true) {
+export function usePitchDay(date: string, pickupMinutes: number, turfOnly: boolean, enabled = true) {
   const delayedDate = useDebounced(date);
-  const delayedTime = useDebounced(time);
+  const delayedMinutes = useDebounced(pickupMinutes);
   const delayedTurf = useDebounced(turfOnly);
-  const minutes = minutesForTime(delayedTime);
   return useQuery({
-    queryKey: ['pitch-day', delayedDate, minutes, delayedTurf],
-    queryFn: () => fetchPitchDay(delayedDate, minutes, delayedTurf),
-    enabled: enabled && Boolean(delayedDate && delayedTime),
+    queryKey: ['pitch-day', delayedDate, delayedMinutes, delayedTurf],
+    queryFn: () => fetchPitchDay(delayedDate, delayedMinutes, delayedTurf),
+    enabled: enabled && Boolean(delayedDate && delayedMinutes >= 0),
     staleTime: 5 * 60_000,
     gcTime: 24 * 60 * 60_000,
     retry: 1,

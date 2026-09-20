@@ -42,6 +42,7 @@ function ensureLeafletCss() {
     @media (prefers-reduced-motion: reduce) { .nr-pin.pulse .nr-glow { animation: none; } }
     @keyframes nr-pin-pulse { 0%,100% { transform: scale(1); opacity: .28; } 50% { transform: scale(1.55); opacity: .12; } }
     .leaflet-container { font-family: inherit; background: #F3F5F3; height: 100%; width: 100%; }
+    .leaflet-top.leaflet-left { top: 48px; }
   `;
   document.head.appendChild(style);
 }
@@ -80,7 +81,10 @@ function drawPins(
       icon: L.divIcon({ className: 'nr-marker-wrap', html, iconSize: [0, 0], iconAnchor: [0, 0] }),
       zIndexOffset: selected ? 1200 : top ? 800 : 0,
     })
-      .on('click', () => onSelect(pitch.id))
+      .on('click', (event) => {
+        L.DomEvent.stopPropagation(event);
+        onSelect(pitch.id);
+      })
       .addTo(layer);
   }
 }
@@ -92,10 +96,12 @@ export default function PitchMap({
   reducedMotion,
   frameKey,
   flyNonce,
+  sizeKey,
   onSelect,
+  onBackground,
 }: PitchMapProps) {
-  const stateRef = useRef({ pitches, selectedId, topPickId, reducedMotion, onSelect, frameKey });
-  stateRef.current = { pitches, selectedId, topPickId, reducedMotion, onSelect, frameKey };
+  const stateRef = useRef({ pitches, selectedId, topPickId, reducedMotion, onSelect, onBackground, frameKey });
+  stateRef.current = { pitches, selectedId, topPickId, reducedMotion, onSelect, onBackground, frameKey };
   const mapRef = useRef<LType.Map | null>(null);
   const layerRef = useRef<LType.LayerGroup | null>(null);
   const leafletRef = useRef<typeof LType | null>(null);
@@ -134,6 +140,7 @@ export default function PitchMap({
       layerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
       map.on('zoomend', redraw);
+      map.on('click', () => stateRef.current.onBackground?.());
       map.invalidateSize();
       redraw();
     }, 40);
@@ -160,6 +167,13 @@ export default function PitchMap({
     map.invalidateSize();
     redraw();
   }, [frameKey, pitches, topPickId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const timer = setTimeout(() => map.invalidateSize(), 420);
+    return () => clearTimeout(timer);
+  }, [sizeKey]);
 
   useEffect(() => {
     if (skipFly.current) {
