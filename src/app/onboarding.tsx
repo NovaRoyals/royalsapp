@@ -30,10 +30,12 @@ const ROLE_CHOICES: {
   { id: 'supporter', icon: 'heart', tint: 'rose', title: 'Fan / supporter', detail: 'Follow teams and get updates' },
 ];
 
-const PROGRAM_CHOICES: { id: 'soccer' | 'cricket' | 'both'; icon: keyof typeof Ionicons.glyphMap; tint: Tint; title: string; detail: string; ids: string[] }[] = [
-  { id: 'soccer', icon: 'football', tint: 'green', title: 'Soccer', detail: 'Youth, veterans, mens, 35+ and more', ids: ['fall-kids-2026', 'nova-royals-men', 'nova-royals-women'] },
-  { id: 'cricket', icon: 'baseball', tint: 'rose', title: 'Cricket', detail: 'CCPL T20 · Manassas1', ids: ['nova-royals-cricket'] },
-  { id: 'both', icon: 'star', tint: 'amber', title: 'Both', detail: 'I’m interested in both', ids: ['fall-kids-2026', 'nova-royals-men', 'nova-royals-cricket'] },
+const PROGRAM_CHOICES: { id: string; icon: keyof typeof Ionicons.glyphMap; tint: Tint; title: string; detail: string; ids: string[]; cricket?: boolean }[] = [
+  { id: 'open', icon: 'football', tint: 'green', title: 'Open soccer', detail: 'Men’s Open 8v8 · Sunday evenings', ids: ['nova-royals-men'] },
+  { id: 'veterans', icon: 'medal', tint: 'amber', title: '35+ soccer', detail: 'Veterans pathway', ids: ['veterans-soccer'] },
+  { id: 'women', icon: 'football', tint: 'rose', title: 'Women’s soccer', detail: 'Adult women’s team', ids: ['nova-royals-women'] },
+  { id: 'kids', icon: 'happy', tint: 'blue', title: 'Kids soccer', detail: 'Ages 3–16 · Sunday training', ids: ['fall-kids-2026'] },
+  { id: 'cricket', icon: 'baseball', tint: 'teal', title: 'Cricket', detail: 'CCPL T20 · Manassas1', ids: ['nova-royals-cricket'], cricket: true },
 ];
 
 const ROLE_TO_USER: Record<RoleChoice, UserRole> = {
@@ -56,7 +58,7 @@ export default function OnboardingScreen() {
   const [roleChoice, setRoleChoice] = useState<RoleChoice | null>(null);
   const [players, setPlayers] = useState<Person[]>([]);
   const [playerName, setPlayerName] = useState('');
-  const [sport, setSport] = useState<'soccer' | 'cricket' | 'both' | null>(null);
+  const [sports, setSports] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultNotificationPrefs);
 
   const order: Step[] =
@@ -89,7 +91,7 @@ export default function OnboardingScreen() {
     completeOnboarding({
       role: ROLE_TO_USER[choice],
       children: choice === 'parent' ? players : [],
-      followedIds: PROGRAM_CHOICES.find((item) => item.id === sport)?.ids ?? [],
+      followedIds: [...new Set(PROGRAM_CHOICES.filter((item) => sports.includes(item.id)).flatMap((item) => item.ids))],
       notificationPrefs: prefs,
       guardianName: `${firstName.trim()} ${lastName.trim()}`.trim(),
       email,
@@ -289,14 +291,17 @@ export default function OnboardingScreen() {
   }
 
   if (step === 'programs') {
+    const toggleSport = (id: string) => {
+      setSports((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    };
     return (
       <FlowShell
         onBack={back}
         step={progress?.step}
         total={progress?.total}
         title="Which program(s) interest you?"
-        subtitle="You can select more than one later from Home."
-        footer={<Button label="Continue" disabled={!sport} onPress={advance} />}
+        subtitle="Pick one or two — 35+ players often also play Open."
+        footer={<Button label="Continue" disabled={!sports.length} onPress={advance} />}
       >
         {PROGRAM_CHOICES.map((choice) => (
           <ChoiceCard
@@ -306,9 +311,9 @@ export default function OnboardingScreen() {
             title={choice.title}
             detail={choice.detail}
             trailing="checkbox"
-            cricket={choice.id === 'cricket'}
-            selected={sport === choice.id}
-            onPress={() => setSport(choice.id)}
+            cricket={choice.cricket}
+            selected={sports.includes(choice.id)}
+            onPress={() => toggleSport(choice.id)}
           />
         ))}
       </FlowShell>

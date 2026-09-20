@@ -8,6 +8,7 @@ const iconMap = {
   index: ['home-outline', 'home'],
   programs: ['grid-outline', 'grid'],
   schedule: ['calendar-outline', 'calendar'],
+  fields: ['location-outline', 'location'],
   teams: ['shield-outline', 'shield'],
   profile: ['person-outline', 'person'],
 } as const;
@@ -35,7 +36,7 @@ export default function TabsLayout() {
         },
       })}
     >
-      {(['index', 'programs', 'schedule', 'profile'] as const).map((name) => (
+      {(['index', 'programs', 'schedule', 'fields', 'profile'] as const).map((name) => (
         <Tabs.Screen
           key={name}
           name={name}

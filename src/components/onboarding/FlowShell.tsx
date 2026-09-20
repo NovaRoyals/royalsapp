@@ -102,20 +102,22 @@ export function FlowShell({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[styles.inner, fill && styles.flex]}>
-            {above}
-            {roy ? (
-              <View style={[styles.royStage, { height: roy.size ?? 220 }]}>
-                <Roy pose={roy.pose} still size={roy.size ?? 220} scene={dark ? 'dark' : 'light'} />
+          <View style={[styles.stage, fill && styles.flex]}>
+            <View style={[styles.inner, fill && styles.flex]}>
+              {above}
+              {roy ? (
+                <View style={[styles.royStage, { height: roy.size ?? 220 }]}>
+                  <Roy pose={roy.pose} still size={roy.size ?? 220} scene={dark ? 'dark' : 'light'} />
+                </View>
+              ) : null}
+              {fill ? <View style={styles.flex} /> : null}
+              <View style={fill ? styles.copyBlock : undefined}>
+                {eyebrow ? <Text style={[styles.eyebrow, dark && styles.eyebrowDark]}>{eyebrow}</Text> : null}
+                {title ? <Text style={[styles.title, dark && styles.titleDark]}>{title}</Text> : null}
+                {subtitle ? <Text style={[styles.subtitle, dark && styles.subtitleDark]}>{subtitle}</Text> : null}
               </View>
-            ) : null}
-            {fill ? <View style={styles.flex} /> : null}
-            <View style={fill ? styles.copyBlock : undefined}>
-              {eyebrow ? <Text style={[styles.eyebrow, dark && styles.eyebrowDark]}>{eyebrow}</Text> : null}
-              {title ? <Text style={[styles.title, dark && styles.titleDark]}>{title}</Text> : null}
-              {subtitle ? <Text style={[styles.subtitle, dark && styles.subtitleDark]}>{subtitle}</Text> : null}
+              {children ? <View style={styles.body}>{children}</View> : null}
             </View>
-            {children ? <View style={styles.body}>{children}</View> : null}
           </View>
         </ScrollView>
 
@@ -165,6 +167,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.65 },
   scroll: { flexGrow: 1, paddingTop: 8, paddingBottom: 16 },
   scrollFill: { flexGrow: 1 },
+  stage: { flexGrow: 1, justifyContent: 'center' },
   body: { marginTop: 18, gap: 0 },
   inner: { width: '100%', maxWidth: layout.flowWidth, alignSelf: 'center', paddingHorizontal: 22 },
   royStage: { alignItems: 'center', justifyContent: 'flex-end', marginTop: 4, marginBottom: -8 },

@@ -15,7 +15,8 @@ export const kidsProgramId = 'fall-kids-2026';
 
 export const followCatalog = [
   { id: kidsProgramId, label: 'Kids Soccer', detail: 'Fall training' },
-  { id: 'nova-royals-men', label: 'Men’s Open 8v8', detail: 'Sunday evenings' },
+  { id: 'nova-royals-men', label: 'Open Soccer', detail: 'Sunday evenings' },
+  { id: 'veterans-soccer', label: '35+ Soccer', detail: 'Veterans pathway' },
   { id: 'nova-royals-women', label: 'Women’s Soccer', detail: 'Adult team' },
   { id: 'nova-royals-cricket', label: 'ROYALS Cricket', detail: 'CCPL T20 · Manassas1' },
 ] as const;

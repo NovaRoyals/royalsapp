@@ -74,7 +74,7 @@ export default function HomeScreen() {
   const tiles: { label: string; detail: string; icon: keyof typeof Ionicons.glyphMap; tint: Tint; href: string }[] = [
     { label: 'Programs', detail: 'Soccer & cricket', icon: 'grid', tint: 'green', href: '/(tabs)/programs' },
     { label: 'Schedule', detail: 'View upcoming', icon: 'calendar', tint: 'blue', href: '/(tabs)/schedule' },
-    { label: 'Club', detail: 'About Royals', icon: 'heart', tint: 'teal', href: '/about' },
+    { label: 'Fields', detail: 'Tonight’s pickup', icon: 'location', tint: 'teal', href: '/(tabs)/fields' },
     {
       label: role === 'guardian' && !hasChildren ? 'Register' : 'Updates',
       detail: role === 'guardian' && !hasChildren ? 'Add a player' : 'News & alerts',
@@ -104,7 +104,7 @@ export default function HomeScreen() {
             <Button label="Register" variant="light" onPress={() => router.push(`/registration/${kidsProgramId}`)} />
           </Animated.View>
         </View>
-        <Text style={styles.introCopy}>See schedule, coaches, and what to bring — no account required.</Text>
+        <Text style={styles.introCopy}>See schedule, nearby pitches, and what to bring — no account required.</Text>
         <View style={styles.tileGrid}>
           {tiles.slice(0, 4).map((tile) => (
             <Tile key={tile.label} {...tile} />

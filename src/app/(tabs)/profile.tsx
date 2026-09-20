@@ -28,6 +28,7 @@ const menu = [
   { icon: 'card-outline' as const, label: 'Payments', detail: 'Receipts and status', href: '/account/payments' },
   { icon: 'document-text-outline' as const, label: 'Waivers & consents', detail: 'Signed documents', href: '/account/waivers' },
   { icon: 'notifications-outline' as const, label: 'Notification settings', detail: 'Reminders and alerts', href: '/account/notifications' },
+  { icon: 'heart-outline' as const, label: 'About the club', detail: 'Story, contact, support', href: '/about' },
 ];
 
 export default function ProfileScreen() {
