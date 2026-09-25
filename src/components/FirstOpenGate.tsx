@@ -2,6 +2,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { PrototypeMark } from '@/components/PrototypeMark';
 import { SplashOverlay, SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import { useApp } from '@/state/AppProvider';
 import { colors } from '@/theme/tokens';
@@ -63,6 +64,7 @@ export function FirstOpenGate({ children }: { children: ReactNode }) {
   return (
     <View style={styles.fill}>
       {waitingForOnboarding ? <InkHold /> : children}
+      <PrototypeMark />
       <SplashOverlay play={splashPlay && !splashDone} onFinished={onFinished} />
     </View>
   );

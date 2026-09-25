@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { CricketMark } from '@/components/icons/CricketMark';
 import { PressableScale } from '@/components/motion';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { colors, radius, typography } from '@/theme/tokens';
 
 export type Tint = 'green' | 'blue' | 'teal' | 'amber' | 'rose';
 
@@ -61,12 +61,14 @@ export function ChoiceCard({
       onPress={onPress}
       style={[styles.card, selected && styles.cardSelected]}
     >
-      <IconTile icon={icon} tint={tint} cricket={cricket} />
+      <IconTile icon={icon} tint={selected ? 'green' : tint} cricket={cricket} />
       <View style={styles.flex}>
         <Text style={styles.cardTitle}>{title}</Text>
         {detail ? <Text style={styles.cardDetail}>{detail}</Text> : null}
       </View>
-      {trailing === 'chevron' ? <Ionicons name="chevron-forward" size={16} color={colors.stone} /> : null}
+      {trailing === 'chevron' ? (
+        <Ionicons name={selected ? 'checkmark-circle' : 'chevron-forward'} size={18} color={selected ? colors.ink : colors.stone} />
+      ) : null}
       {trailing === 'checkbox' ? (
         <View style={[styles.box, selected && styles.boxOn]}>
           {selected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
@@ -81,17 +83,36 @@ export function ProviderButton({
   label,
   color,
   onPress,
+  onCancel,
+  status = 'idle',
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   color: string;
   onPress?: () => void;
+  onCancel?: () => void;
+  status?: 'idle' | 'loading' | 'error';
 }) {
+  const loading = status === 'loading';
   return (
-    <PressableScale accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.provider}>
-      <Ionicons name={icon} size={20} color={color} />
-      <Text style={styles.providerLabel}>{label}</Text>
-    </PressableScale>
+    <View style={styles.providerWrap}>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ busy: loading, disabled: loading }}
+        disabled={loading}
+        onPress={onPress}
+        style={[styles.provider, status === 'error' && styles.providerError]}
+      >
+        {loading ? <ActivityIndicator color={colors.ink} /> : <Ionicons name={icon} size={20} color={color} />}
+        <Text style={styles.providerLabel}>{loading ? 'Connecting…' : label}</Text>
+      </PressableScale>
+      {loading && onCancel ? (
+        <PressableScale accessibilityRole="button" accessibilityLabel="Cancel sign-in" onPress={onCancel} style={styles.cancel}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </PressableScale>
+      ) : null}
+    </View>
   );
 }
 
@@ -109,16 +130,17 @@ export function FlowField({
   label,
   valid,
   hint,
+  error,
   ...props
-}: TextInputProps & { label: string; valid?: boolean; hint?: string }) {
+}: TextInputProps & { label: string; valid?: boolean; hint?: string; error?: string }) {
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={[styles.fieldBox, valid && styles.fieldBoxOn]}>
+      <View style={[styles.fieldBox, valid && !error && styles.fieldBoxOn, Boolean(error) && styles.fieldBoxError]}>
         <TextInput placeholderTextColor={colors.stone} style={styles.field} {...props} />
-        {valid ? <Ionicons name="checkmark-circle" size={20} color={colors.greenBright} /> : null}
+        {valid && !error ? <Ionicons name="checkmark-circle" size={20} color={colors.greenBright} /> : null}
       </View>
-      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      {error ? <Text style={styles.fieldError}>{error}</Text> : hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -156,17 +178,6 @@ export function ToggleRow({
   );
 }
 
-export function TickRow({ label }: { label: string }) {
-  return (
-    <View style={styles.tickRow}>
-      <View style={styles.tick}>
-        <Ionicons name="checkmark" size={12} color={colors.ink} />
-      </View>
-      <Text style={styles.tickLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   tile: { alignItems: 'center', justifyContent: 'center' },
@@ -174,7 +185,8 @@ const styles = StyleSheet.create({
     minHeight: 64,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 18,
+    borderRadius: radius.card,
+    borderCurve: 'continuous',
     backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.border,
@@ -183,7 +195,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 8,
   },
-  cardSelected: { borderColor: colors.ink, backgroundColor: colors.paper },
+  cardSelected: { borderColor: colors.ink, backgroundColor: colors.mint },
   cardTitle: { color: colors.ink, fontSize: 15, ...typography.heading },
   cardDetail: { color: colors.stone, fontSize: 12, lineHeight: 16, marginTop: 2, ...typography.body },
   box: {
@@ -196,9 +208,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   boxOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  providerWrap: { marginBottom: 8 },
   provider: {
     minHeight: 52,
     borderRadius: radius.pill,
+    borderCurve: 'continuous',
     backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.border,
@@ -207,9 +221,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 18,
-    marginBottom: 8,
   },
+  providerError: { borderColor: colors.danger },
   providerLabel: { color: colors.ink, fontSize: 15, ...typography.heading },
+  cancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  cancelText: { color: colors.stone, fontSize: 13, ...typography.label },
   rule: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 10 },
   ruleLine: { flex: 1, height: 1, backgroundColor: colors.border },
   ruleText: { color: colors.stone, fontSize: 12, ...typography.body },
@@ -217,7 +233,8 @@ const styles = StyleSheet.create({
   fieldLabel: { color: colors.stone, fontSize: 12, marginBottom: 6, ...typography.label },
   fieldBox: {
     minHeight: 52,
-    borderRadius: 16,
+    borderRadius: radius.input,
+    borderCurve: 'continuous',
     backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.border,
@@ -227,9 +244,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fieldBoxOn: { borderColor: colors.ink },
+  fieldBoxError: { borderColor: colors.danger },
   field: { flex: 1, color: colors.ink, fontSize: 16, paddingVertical: 12, ...typography.body },
   fieldHint: { color: colors.stone, fontSize: 12, marginTop: 6, ...typography.body },
-  tickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  tick: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.mintDeep, alignItems: 'center', justifyContent: 'center' },
-  tickLabel: { color: colors.white, fontSize: 14, ...typography.bodyMedium },
+  fieldError: { color: colors.danger, fontSize: 12, marginTop: 6, ...typography.body },
 });

@@ -21,7 +21,7 @@ import { TabScene } from '@/components/motion';
 import { haptic } from '@/lib/haptics';
 import { notificationsForRole } from '@/lib/membership';
 import { useReducedMotion } from '@/lib/reducedMotion';
-import { backendModeLabel } from '@/lib/supabase';
+import { backendModeLabel, isDemoMode } from '@/lib/supabase';
 import { useApp } from '@/state/AppProvider';
 import { motion } from '@/theme/motion';
 import { colors, layout, radius, shadow, spacing, typography } from '@/theme/tokens';
@@ -271,7 +271,7 @@ export function DemoBadge() {
   return (
     <View style={styles.demoBadge}>
       <View style={styles.demoDot} />
-      <Text style={styles.demoText}>{backendModeLabel}</Text>
+      <Text style={styles.demoText}>{isDemoMode ? 'Prototype' : backendModeLabel}</Text>
     </View>
   );
 }
@@ -351,6 +351,7 @@ const styles = StyleSheet.create({
     minHeight: 54,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

@@ -51,8 +51,12 @@ export const spacing = {
 
 export const radius = {
   sm: 8,
+  input: 12,
+  control: 12,
   md: 14,
+  card: 18,
   lg: 20,
+  panel: 24,
   xl: 26,
   pill: 999,
 } as const;
@@ -65,6 +69,10 @@ export const typography = {
   heading: {
     fontFamily: fonts.extraBold,
     letterSpacing: -0.25,
+  },
+  pageTitle: {
+    fontFamily: fonts.extraBold,
+    letterSpacing: -0.3,
   },
   body: {
     fontFamily: fonts.regular,

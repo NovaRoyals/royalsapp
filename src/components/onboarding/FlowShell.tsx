@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Confetti, FlowBackdrop } from '@/components/onboarding/Decor';
+import { FlowBackdrop } from '@/components/onboarding/Decor';
 import { Roy } from '@/components/mascot';
 import type { RoyPose } from '@/components/mascot/poses';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -16,7 +16,7 @@ function Progress({ step, total }: { step: number; total: number }) {
 
   useEffect(() => {
     const next = Math.min(1, Math.max(0, step / total));
-    value.value = reduced ? next : withTiming(next, { duration: 380, easing: Easing.out(Easing.cubic) });
+    value.value = reduced ? next : withTiming(next, { duration: 220, easing: Easing.out(Easing.cubic) });
   }, [reduced, step, total, value]);
 
   const fill = useAnimatedStyle(() => ({ width: `${value.value * 100}%` }));
@@ -34,10 +34,9 @@ export function FlowShell({
   total,
   onBack,
   onSkip,
-  skipLabel = 'Skip',
+  skipLabel = 'Explore as guest',
   above,
   roy,
-  confetti,
   eyebrow,
   title,
   subtitle,
@@ -53,8 +52,7 @@ export function FlowShell({
   onSkip?: () => void;
   skipLabel?: string;
   above?: ReactNode;
-  roy?: { pose: RoyPose; size?: number };
-  confetti?: boolean;
+  roy?: { pose: RoyPose; size?: number; decorative?: boolean };
   eyebrow?: string;
   title?: string;
   subtitle?: string;
@@ -69,7 +67,6 @@ export function FlowShell({
   return (
     <View style={[styles.root, dark && styles.rootDark]}>
       <FlowBackdrop tone={tone} />
-      {confetti ? <Confetti /> : null}
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
         {showHeader ? (
           <View style={styles.headerInner}>
@@ -77,17 +74,23 @@ export function FlowShell({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
+                hitSlop={8}
                 onPress={onBack}
                 style={({ pressed }) => [styles.iconButton, dark && styles.iconButtonDark, pressed && styles.pressed]}
               >
-                <Ionicons name="chevron-back" size={20} color={dark ? colors.white : colors.ink} />
+                <Ionicons name="chevron-back" size={22} color={dark ? colors.white : colors.ink} />
               </Pressable>
             ) : (
               <View style={styles.iconButtonSpacer} />
             )}
             {step && total ? <Progress step={step} total={total} /> : <View style={styles.flex} />}
             {onSkip ? (
-              <Pressable accessibilityRole="button" onPress={onSkip} style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={skipLabel}
+                onPress={onSkip}
+                style={({ pressed }) => [styles.skip, pressed && styles.pressed]}
+              >
                 <Text style={[styles.skipText, dark && styles.skipTextDark]}>{skipLabel}</Text>
               </Pressable>
             ) : (
@@ -96,30 +99,41 @@ export function FlowShell({
           </View>
         ) : null}
 
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={[styles.scroll, fill && styles.scrollFill]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={[styles.stage, fill && styles.flex]}>
-            <View style={[styles.inner, fill && styles.flex]}>
-              {above}
-              {roy ? (
-                <View style={[styles.royStage, { height: roy.size ?? 220 }]}>
-                  <Roy pose={roy.pose} still size={roy.size ?? 220} scene={dark ? 'dark' : 'light'} />
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={[styles.scroll, fill && styles.scrollFill]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <View style={[styles.stage, fill && styles.flex]}>
+              <View style={[styles.inner, fill && styles.flex]}>
+                {above}
+                {roy ? (
+                  <View style={[styles.royStage, { height: roy.size ?? 220 }]}>
+                    <Roy pose={roy.pose} still size={roy.size ?? 220} scene={dark ? 'dark' : 'light'} decorative={roy.decorative !== false} />
+                  </View>
+                ) : null}
+                {fill ? <View style={styles.flex} /> : null}
+                <View style={fill ? styles.copyBlock : undefined}>
+                  {eyebrow ? <Text style={[styles.eyebrow, dark && styles.eyebrowDark]}>{eyebrow}</Text> : null}
+                  {title ? (
+                    <Text maxFontSizeMultiplier={1.35} style={[styles.title, dark && styles.titleDark]}>
+                      {title}
+                    </Text>
+                  ) : null}
+                  {subtitle ? (
+                    <Text maxFontSizeMultiplier={1.4} style={[styles.subtitle, dark && styles.subtitleDark]}>
+                      {subtitle}
+                    </Text>
+                  ) : null}
                 </View>
-              ) : null}
-              {fill ? <View style={styles.flex} /> : null}
-              <View style={fill ? styles.copyBlock : undefined}>
-                {eyebrow ? <Text style={[styles.eyebrow, dark && styles.eyebrowDark]}>{eyebrow}</Text> : null}
-                {title ? <Text style={[styles.title, dark && styles.titleDark]}>{title}</Text> : null}
-                {subtitle ? <Text style={[styles.subtitle, dark && styles.subtitleDark]}>{subtitle}</Text> : null}
+                {children ? <View style={styles.body}>{children}</View> : null}
               </View>
-              {children ? <View style={styles.body}>{children}</View> : null}
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
         {footer ? (
           <View style={styles.footer}>
@@ -151,20 +165,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButtonDark: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  iconButtonSpacer: { width: 36, height: 36 },
+  iconButtonSpacer: { width: 44, height: 44 },
   track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.mintDeep, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 2, backgroundColor: colors.ink },
-  skip: { minWidth: 36, height: 36, alignItems: 'flex-end', justifyContent: 'center' },
-  skipText: { color: colors.stone, fontSize: 13, ...typography.label },
-  skipTextDark: { color: 'rgba(255,255,255,0.7)' },
-  pressed: { opacity: 0.65 },
+  skip: { minHeight: 44, maxWidth: 148, alignItems: 'flex-end', justifyContent: 'center', paddingLeft: 8 },
+  skipText: { color: colors.stone, fontSize: 13, textAlign: 'right', ...typography.label },
+  skipTextDark: { color: 'rgba(255,255,255,0.78)' },
+  pressed: { opacity: 0.7 },
   scroll: { flexGrow: 1, paddingTop: 8, paddingBottom: 16 },
   scrollFill: { flexGrow: 1 },
   stage: { flexGrow: 1, justifyContent: 'center' },
@@ -174,9 +188,9 @@ const styles = StyleSheet.create({
   copyBlock: { paddingBottom: 8 },
   eyebrow: { color: colors.greenBright, fontSize: 11, marginBottom: 6, ...typography.label, letterSpacing: 1.6 },
   eyebrowDark: { color: colors.mintDeep },
-  title: { color: colors.ink, fontSize: 30, lineHeight: 34, ...typography.display },
-  titleDark: { color: colors.white, fontSize: 40, lineHeight: 42 },
-  subtitle: { color: colors.stone, fontSize: 14, lineHeight: 20, marginTop: 8, maxWidth: 340, ...typography.body },
+  title: { color: colors.ink, fontSize: 28, lineHeight: 34, ...typography.pageTitle },
+  titleDark: { color: colors.white, fontSize: 36, lineHeight: 40, ...typography.numeric },
+  subtitle: { color: colors.stone, fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 360, ...typography.body },
   subtitleDark: { color: 'rgba(255,255,255,0.78)' },
   footer: {
     paddingTop: 8,

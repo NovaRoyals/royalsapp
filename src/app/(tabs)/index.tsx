@@ -21,6 +21,7 @@ import {
   nextUpcomingEvent,
   type HomeStory,
 } from '@/lib/intelligence';
+import { homeGreeting } from '@/lib/greeting';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
@@ -57,7 +58,7 @@ export default function HomeScreen() {
   const viewingChild = household.children.find((child) => child.id === childId) ?? household.children[0];
   const hasChildren = household.children.length > 0;
   const staffPending = Boolean(pendingStaffRole);
-  const firstName = household.guardianName.trim().split(' ')[0];
+  const hello = homeGreeting(role, household.guardianName);
   const missingRsvps = Math.max(0, 12 - (kidsEvent?.goingCount ?? 0));
   const mayaCheckedIn = kidsEvent?.checkIns?.some((row) => row.personId === 'child-maya' && row.present);
   const stories = useMemo(
@@ -104,9 +105,10 @@ export default function HomeScreen() {
             {kidsProgram.audience} · Sundays · {kidsProgram.priceLabel}
           </Animated.Text>
           <Animated.View entering={enter(280)}>
-            <Button label="Register" variant="light" onPress={() => router.push(`/registration/${kidsProgramId}`)} />
+            <Button label="Register a child" variant="light" onPress={() => router.push(`/registration/${kidsProgramId}`)} />
           </Animated.View>
         </View>
+        <Text style={styles.hello}>{hello}</Text>
         <Text style={styles.introCopy}>See schedule, nearby pitches, and what to bring — no account required.</Text>
         {stories.map((story) => (
           <StoryCard key={story.id} {...story} />
@@ -126,7 +128,7 @@ export default function HomeScreen() {
       <View style={styles.top}>
         <View>
           <Text style={styles.mark}>NOVA ROYALS</Text>
-          <Text style={styles.hello}>{firstName ? `Good to see you, ${firstName}.` : 'Good to see you.'}</Text>
+          <Text style={styles.hello}>{hello}</Text>
         </View>
         <Link href={'/notifications' as never} asChild>
           <Pressable accessibilityLabel="Open notifications" style={styles.bell}>
@@ -160,13 +162,29 @@ export default function HomeScreen() {
 
       {staffPending ? (
         <Brief
-          title={`${pendingStaffRole === 'coach' ? 'Coach' : 'Manager'} request submitted`}
-          detail="Staff tools stay locked until an admin approves this."
+          title={`${pendingStaffRole === 'coach' ? 'Coach' : 'Manager'} access is pending`}
+          detail="Request received. Staff tools stay locked until an admin assigns this account."
           href="/(tabs)/profile"
         />
       ) : null}
       {role === 'guardian' && !hasChildren ? (
-        <Brief title="Register a child" detail="Add your Royal to a program when you’re ready." href={`/registration/${kidsProgramId}`} />
+        <>
+          <Brief title="Register a child" detail="Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A." href={`/registration/${kidsProgramId}`} />
+          <Brief title="Explore Kids Soccer" detail="See the program, price, and what to bring." href={`/program/${kidsProgramId}`} />
+        </>
+      ) : null}
+      {role === 'adult_player' ? (
+        <>
+          <Brief title="Find my team" detail="Open 8v8, 35+, and CCPL cricket all live under Programs." href="/(tabs)/programs" />
+          <Brief title="Explore adult programs" detail="Men’s Open Sundays · FXA 35+ Thursdays." href="/program/mens-soccer" />
+        </>
+      ) : null}
+      {role === 'volunteer' && !staffPending ? (
+        <Brief
+          title="Next public club event"
+          detail={menEvent ? `${menEvent.title} · ${menEvent.venue}` : 'Open the schedule to follow a side.'}
+          href={menEvent ? `/event/${menEvent.id}` : '/(tabs)/schedule'}
+        />
       ) : null}
       {role === 'coach' && kidsEvent ? (
         <Brief title="Take attendance" detail={`${missingRsvps} families still need RSVP`} href={`/event/${kidsEvent.id}`} />
@@ -273,7 +291,7 @@ const styles = StyleSheet.create({
   home: { maxWidth: layout.flowWidth, paddingBottom: 28 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 8, marginBottom: 18 },
   mark: { color: colors.ink, fontSize: 11, ...typography.label, letterSpacing: 1.8 },
-  hello: { color: colors.ink, fontSize: 26, lineHeight: 30, marginTop: 4, ...typography.display },
+  hello: { color: colors.ink, fontSize: 22, lineHeight: 28, marginTop: 4, marginBottom: 8, ...typography.pageTitle },
   bell: {
     width: 40,
     height: 40,

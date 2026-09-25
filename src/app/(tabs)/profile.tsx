@@ -259,8 +259,10 @@ export default function ProfileScreen() {
         <Ionicons name="arrow-forward" size={20} color={colors.orange} />
       </Pressable>
 
+      {persona === 'demo' ? (
+        <>
       <SectionHeading title="Preview roles" />
-      <Text style={styles.previewNote}>Demo-only controls for reviewing role-aware experiences.</Text>
+      <Text style={styles.previewNote}>Board review only. These chips load a seeded household and are not part of a real account.</Text>
       <Pressable onPress={() => router.push('/lab')} style={[styles.adminCard, { marginBottom: 16 }]}>
         <View style={styles.flex}>
           <Text style={styles.adminTitle}>Open Interaction Lab</Text>
@@ -282,6 +284,8 @@ export default function ProfileScreen() {
           </Pressable>
         ))}
       </View>
+        </>
+      ) : null}
       <Button label="Reset demo data" variant="ghost" onPress={resetDemo} style={styles.reset} />
     </Screen>
   );

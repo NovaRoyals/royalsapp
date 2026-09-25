@@ -23,17 +23,11 @@ export function FlowBackdrop({ tone }: { tone: 'dark' | 'light' }) {
   if (tone === 'dark') {
     return (
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <View style={styles.darkGlow} />
         <Hills />
       </View>
     );
   }
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={styles.lightOrbRight} />
-      <View style={styles.lightOrbLeft} />
-    </View>
-  );
+  return null;
 }
 
 export function CrownMark({ size = 26, color = colors.white }: { size?: number; color?: string }) {
@@ -81,35 +75,4 @@ export function Confetti() {
 
 const styles = StyleSheet.create({
   hills: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 240 },
-  darkGlow: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    top: 40,
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -140,
-  },
-  lightOrbRight: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: colors.mint,
-    opacity: 0.55,
-    top: -140,
-    right: -120,
-  },
-  lightOrbLeft: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: colors.mint,
-    opacity: 0.4,
-    bottom: -80,
-    left: -90,
-  },
 });

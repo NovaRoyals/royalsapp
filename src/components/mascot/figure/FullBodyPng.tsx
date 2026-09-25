@@ -15,7 +15,6 @@ export function FullBodyPng({
   values,
   pose = 'idle',
   still = false,
-  scene = 'light',
 }: {
   size: number;
   values: RoyMotionValues;
@@ -40,7 +39,6 @@ export function FullBodyPng({
     };
   });
 
-  const blend = { mixBlendMode: scene === 'dark' ? 'darken' : 'multiply' } as const;
   const image = (
     <Image
       source={royPoseSource[pose]}
@@ -51,12 +49,12 @@ export function FullBodyPng({
   );
 
   if (still) {
-    return <Animated.View style={[{ width: size, height: size }, styles.body, blend]}>{image}</Animated.View>;
+    return <Animated.View style={[{ width: size, height: size }, styles.body]}>{image}</Animated.View>;
   }
 
   return (
     <Animated.View style={[{ width: size, height: size }, rootStyle]}>
-      <Animated.View style={[styles.body, blend, bodyStyle]}>{image}</Animated.View>
+      <Animated.View style={[styles.body, bodyStyle]}>{image}</Animated.View>
     </Animated.View>
   );
 }

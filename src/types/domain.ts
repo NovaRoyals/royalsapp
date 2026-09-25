@@ -1,5 +1,7 @@
 export type SportCode = 'soccer' | 'cricket';
 export type UserRole = 'guest' | 'adult_player' | 'guardian' | 'coach' | 'volunteer' | 'competition_manager' | 'admin';
+export type ClubRelationship = 'parent' | 'player' | 'supporter' | 'coach' | 'manager';
+export type AuthProvider = 'google' | 'apple' | 'email';
 export type CompetitionType = 'league' | 'tournament' | 'friendly' | 'pickup' | 'training';
 export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'training' | 'open_play' | 'club_event';
 export type RegistrationStatus = 'draft' | 'submitted' | 'pending' | 'approved' | 'waitlisted' | 'rejected' | 'cancelled';

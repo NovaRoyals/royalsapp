@@ -261,7 +261,7 @@ export function homeStories(
   const personal =
     role === 'adult_player'
       ? nextOf(men, nowIso)
-      : role === 'coach' || (role === 'guardian' && hasChildren)
+      : role === 'coach' || role === 'guardian'
         ? nextOf(kids, nowIso)
         : undefined;
   if (personal) {

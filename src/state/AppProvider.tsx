@@ -34,9 +34,10 @@ import type {
   RegistrationStatus,
   ScheduleEvent,
   UserRole,
+  ClubRelationship,
 } from '@/types/domain';
 
-const STORAGE_KEY = '@royals/demo-state/v9';
+const STORAGE_KEY = '@royals/demo-state/v10';
 const LEGACY_STORAGE_KEYS = [
   '@royals/demo-state/v1',
   '@royals/demo-state/v2',
@@ -46,6 +47,7 @@ const LEGACY_STORAGE_KEYS = [
   '@royals/demo-state/v6',
   '@royals/demo-state/v7',
   '@royals/demo-state/v8',
+  '@royals/demo-state/v9',
 ];
 
 export const defaultNotificationPrefs: NotificationPrefs = {
@@ -74,6 +76,7 @@ type PersistedState = {
   onboardingCompleted: boolean;
   introCompleted: boolean;
   pendingStaffRole?: 'coach' | 'competition_manager' | null;
+  relationship?: ClubRelationship | null;
 };
 
 type NewRegistration = Omit<Registration, 'id' | 'submittedAt' | 'demo'>;
@@ -84,8 +87,9 @@ interface AppState extends PersistedState {
   loadDemoPersona: (role: UserRole) => void;
   completeOnboarding: (input: {
     role: UserRole;
+    relationship?: ClubRelationship | null;
     children?: Person[];
-    followedIds: string[];
+    followedIds?: string[];
     notificationPrefs: NotificationPrefs;
     guardianName?: string;
     email?: string;
@@ -160,11 +164,12 @@ function visitorSeed(role: UserRole = 'guest'): PersistedState {
     announcements: demoAnnouncements,
     messages: [],
     documents: [],
-    followedIds: defaultFollowedIds,
+    followedIds: [],
     notificationPrefs: defaultNotificationPrefs,
     onboardingCompleted: false,
     introCompleted: false,
     pendingStaffRole: null,
+    relationship: null,
   };
 }
 
@@ -184,6 +189,7 @@ function demoSeed(role: UserRole): PersistedState {
     onboardingCompleted: role !== 'guest',
     introCompleted: true,
     pendingStaffRole: null,
+    relationship: null,
   };
 }
 
@@ -245,7 +251,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           introCompleted: parsed.introCompleted ?? false,
           notifications: parsed.notifications ?? visitorNotifications(),
           schedule: mergeClubSchedule(parsed.schedule),
-          followedIds: mergeFollowedIds(parsed.followedIds),
+          followedIds: parsed.followedIds ?? [],
+          relationship: parsed.relationship ?? null,
         });
       })
       .catch(() => setState({ ...initialState, schedule: mergeClubSchedule() }))
@@ -286,32 +293,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const completeOnboarding = useCallback(
     (input: {
       role: UserRole;
+      relationship?: ClubRelationship | null;
       children?: Person[];
-      followedIds: string[];
+      followedIds?: string[];
       notificationPrefs: NotificationPrefs;
       guardianName?: string;
       email?: string;
       pendingStaffRole?: 'coach' | 'competition_manager' | null;
     }) => {
+      const name = input.guardianName?.trim() ?? '';
       setState((current) => ({
-        ...current,
+        ...visitorSeed(input.role),
         persona: 'visitor',
         role: input.role,
+        relationship: input.relationship ?? null,
         onboardingCompleted: true,
         introCompleted: true,
         pendingStaffRole: input.pendingStaffRole ?? null,
-        followedIds: input.followedIds,
+        followedIds: input.followedIds ?? [],
         notificationPrefs: input.notificationPrefs,
         household: {
-          id: 'household-local',
-          guardianName: input.guardianName?.trim() || current.household.guardianName || 'Your household',
-          email: input.email?.trim() || current.household.email,
-          phone: current.household.phone,
-          address: current.household.address,
+          ...emptyHousehold,
+          guardianName: name,
+          email: input.email?.trim() || '',
           children: input.children ?? [],
         },
-        registrations: current.registrations.filter((item) => !item.demo),
-        documents: current.documents.filter((item) => item.id !== 'doc-reg-demo-1'),
+        schedule: mergeClubSchedule(current.schedule),
+        registrations: [],
+        documents: [],
         messages: [],
       }));
       hapticLight();

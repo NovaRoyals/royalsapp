@@ -14,12 +14,13 @@ export type RoyProps = {
   autoIdle?: boolean;
   still?: boolean;
   scene?: 'light' | 'dark';
+  decorative?: boolean;
   style?: StyleProp<ViewStyle>;
   onComplete?: (state: RoyState) => void;
 };
 
 export const Roy = forwardRef<RoyHandle, RoyProps>(function Roy(
-  { state = 'idle', pose = 'idle', size = 220, autoIdle = true, still = false, scene = 'light', style, onComplete },
+  { state = 'idle', pose = 'idle', size = 220, autoIdle = true, still = false, scene = 'light', decorative = false, style, onComplete },
   ref,
 ) {
   const reduced = useReducedMotion();
@@ -34,9 +35,11 @@ export const Roy = forwardRef<RoyHandle, RoyProps>(function Roy(
 
   return (
     <View
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel="Roy, Nova Royals mascot"
+      accessible={!decorative}
+      accessibilityRole={decorative ? undefined : 'image'}
+      accessibilityLabel={decorative ? undefined : 'Roy, Nova Royals mascot'}
+      accessibilityElementsHidden={decorative}
+      importantForAccessibility={decorative ? 'no-hide-descendants' : 'auto'}
       style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}
     >
       <RoyFigure size={size} values={values} pose={pose} still={still} scene={scene} />

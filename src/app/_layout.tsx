@@ -48,7 +48,15 @@ export default function RootLayout() {
             <Stack.Screen name="message/[id]" />
             <Stack.Screen name="about" />
             <Stack.Screen name="notifications" />
-            <Stack.Screen name="onboarding" options={{ animation: 'slide_from_bottom', animationDuration: 280 }} />
+            <Stack.Screen
+              name="onboarding"
+              options={{
+                presentation: 'fullScreenModal',
+                animation: 'slide_from_bottom',
+                animationDuration: 280,
+                gestureEnabled: true,
+              }}
+            />
             <Stack.Screen name="admin" />
             <Stack.Screen name="lab" />
             <Stack.Screen name="roy" />
