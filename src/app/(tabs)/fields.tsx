@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Href, router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Platform,
@@ -17,10 +16,7 @@ import { FieldToolbar } from '@/components/fields/FieldToolbar';
 import PitchMap from '@/components/fields/PitchMap';
 import { PitchDetail } from '@/components/fields/PitchDetail';
 import { PitchRow } from '@/components/fields/PitchRow';
-import { AppHeader, Screen, StatusPill } from '@/components/ui';
-import { venueCatalog, venueTitle } from '@/data/venues';
-import { latestVenueUpdate } from '@/lib/operations';
-import { fieldStatusLabel } from '@/services/weather';
+import { AppHeader, Screen } from '@/components/ui';
 import { useFieldCoverage, usePitchDay } from '@/hooks/useFieldCalendar';
 import { clubNowPostedIso } from '@/lib/datetime';
 import {
@@ -39,19 +35,26 @@ import { haptic } from '@/lib/haptics';
 import { locatePitches } from '@/lib/pitchCoords';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { eachDate } from '@/services/fields';
-import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
+function boundedDate(value: string, start?: string, end?: string) {
+  if (!start || !end) return value;
+  if (value < start) return start;
+  if (value > end) return end;
+  return value;
+}
+
 export default function FieldsScreen() {
-  const { schedule, venueUpdates } = useApp();
   const coverage = useFieldCoverage();
   const today = clubDateFromPosted(clubNowPostedIso());
   const windowStart = coverage.data?.coverageStart;
   const windowEnd = coverage.data?.coverageEnd;
-  const [date, setDate] = useState(today);
+  const windowToday = boundedDate(today, windowStart, windowEnd);
+  const [pickedDate, setPickedDate] = useState<string>();
+  const date = boundedDate(pickedDate ?? windowToday, windowStart, windowEnd);
   const [time, setTime] = useState<(typeof PITCH_TIMES)[number]>(DEFAULT_PITCH_TIME);
   const [turfOnly, setTurfOnly] = useState(true);
-  const [selectedId, setSelectedId] = useState<string>();
+  const [pickedPitch, setPickedPitch] = useState<string>();
   const [expandedId, setExpandedId] = useState<string>();
   const [flyNonce, setFlyNonce] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -84,19 +87,9 @@ export default function FieldsScreen() {
     : undefined;
 
   useEffect(() => {
-    if (!windowStart || !windowEnd) return;
-    const floor = today < windowStart ? windowStart : today > windowEnd ? windowEnd : today;
-    setDate((current) => (current < floor ? floor : current > windowEnd ? windowEnd : current));
-  }, [today, windowStart, windowEnd]);
-
-  useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(tick);
   }, []);
-
-  useEffect(() => {
-    setExpandedId(undefined);
-  }, [date, time, turfOnly]);
 
   const day = usePitchDay(date, pickupMinutes, turfOnly, Boolean(windowStart));
   const dates =
@@ -111,17 +104,14 @@ export default function FieldsScreen() {
     () => resolveSuggestionId(pitches, day.data?.suggestionId),
     [pitches, day.data?.suggestionId],
   );
-  const selected = pitches.find((item) => item.id === selectedId) ?? pitches.find((item) => item.id === suggestionId) ?? pitches[0];
+  const selectedId =
+    pickedPitch && pitches.some((item) => item.id === pickedPitch)
+      ? pickedPitch
+      : suggestionId && pitches.some((item) => item.id === suggestionId)
+        ? suggestionId
+        : pitches[0]?.id;
+  const selected = pitches.find((item) => item.id === selectedId);
   const suggestion = pitches.find((item) => item.id === suggestionId);
-
-  useEffect(() => {
-    if (!pitches.length) return;
-    setSelectedId((current) => {
-      if (current && pitches.some((item) => item.id === current)) return current;
-      if (suggestionId && pitches.some((item) => item.id === suggestionId)) return suggestionId;
-      return pitches[0].id;
-    });
-  }, [pitches, suggestionId]);
 
   useEffect(() => {
     if (fullscreen || !expandedId || Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -143,9 +133,24 @@ export default function FieldsScreen() {
   const stale = isUpdatedStale(updatedIso, now);
   const emptyDay = Boolean(day.data && day.data.pitches.every((item) => item.events.length === 0));
 
+  function changeDate(value: string) {
+    setPickedDate(value);
+    setExpandedId(undefined);
+  }
+
+  function changeTime(value: (typeof PITCH_TIMES)[number]) {
+    setTime(value);
+    setExpandedId(undefined);
+  }
+
+  function changeTurf() {
+    setTurfOnly((value) => !value);
+    setExpandedId(undefined);
+  }
+
   function selectPitch(id: string) {
     haptic('light');
-    setSelectedId(id);
+    setPickedPitch(id);
     setExpandedId(id);
     setFlyNonce((value) => value + 1);
     if (fullscreen) {
@@ -198,9 +203,9 @@ export default function FieldsScreen() {
               today={today}
               time={time}
               turfOnly={turfOnly}
-              onDate={setDate}
-              onTime={setTime}
-              onTurf={() => setTurfOnly((value) => !value)}
+              onDate={changeDate}
+              onTime={changeTime}
+              onTurf={changeTurf}
             />
           </View>
         </View>
@@ -267,28 +272,6 @@ export default function FieldsScreen() {
           style={styles.headerTight}
         />
 
-        <View style={styles.clubStatus}>
-          <Text style={styles.clubLabel}>ROYALS fields</Text>
-          {venueCatalog.slice(0, 4).map((place) => {
-            const update = latestVenueUpdate(venueUpdates, place.id);
-            const status = update?.status ?? schedule.find((event) => event.venueId === place.id)?.fieldStatus ?? 'open';
-            return (
-              <Pressable
-                key={place.id}
-                accessibilityRole="button"
-                onPress={() => router.push(`/venue/${place.id}` as Href)}
-                style={styles.clubRow}
-              >
-                <View style={styles.flex}>
-                  <Text style={styles.clubName}>{venueTitle(place)}</Text>
-                  <Text style={styles.clubMeta}>{update ? `${update.updatedBy} · ${update.reason}` : 'No closure posted'}</Text>
-                </View>
-                <StatusPill label={fieldStatusLabel(status)} tone={status === 'closed' ? 'danger' : status === 'open' ? 'success' : 'orange'} />
-              </Pressable>
-            );
-          })}
-        </View>
-
         {coverage.isError && !coverage.data ? (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>Pitch dates didn’t load. We won’t guess the window.</Text>
@@ -311,18 +294,18 @@ export default function FieldsScreen() {
           today={today}
           time={time}
           turfOnly={turfOnly}
-          onDate={setDate}
-          onTime={setTime}
-          onTurf={() => setTurfOnly((value) => !value)}
+          onDate={changeDate}
+          onTime={changeTime}
+          onTurf={changeTurf}
         />
         <Text numberOfLines={1} style={styles.hint}>{PITCH_FILTER_HINT}</Text>
+
+        {fullscreen ? <View style={styles.mapSpacer} /> : null}
+        {mapCard}
 
         {suggestion ? (
           <BestPickBanner pitch={suggestion} time={time} onPress={() => selectPitch(suggestion.id)} />
         ) : null}
-
-        {fullscreen ? <View style={styles.mapSpacer} /> : null}
-        {mapCard}
 
         {emptyDay ? <Text style={styles.empty}>No public-schedule events this day.</Text> : null}
 
@@ -350,12 +333,6 @@ export default function FieldsScreen() {
 
 const styles = StyleSheet.create({
   headerTight: { paddingTop: 4, paddingBottom: 8 },
-  clubStatus: { marginBottom: spacing.md, gap: 2 },
-  clubLabel: { color: colors.stone, fontSize: 12, marginBottom: spacing.sm, ...typography.label },
-  clubRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
-  clubName: { color: colors.ink, fontSize: 14, ...typography.heading },
-  clubMeta: { color: colors.stone, fontSize: 12, ...typography.body },
-  flex: { flex: 1, minWidth: 0 },
   hint: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: spacing.sm, ...typography.body },
   mapCard: {
     height: 320,

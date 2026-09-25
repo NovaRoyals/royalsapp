@@ -74,11 +74,16 @@ export default function PitchMap({
 }: PitchMapProps) {
   const mapRef = useRef<ComponentRef<typeof MapView>>(null);
   const skipFly = useRef(true);
+  const zoomRef = useRef(11);
   const [zoom, setZoom] = useState(11);
   const start = useMemo(
     () => pitches.find((item) => item.id === topPickId) ?? pitches[0],
     [pitches, topPickId],
   );
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   useEffect(() => {
     skipFly.current = true;
@@ -97,7 +102,7 @@ export default function PitchMap({
     }
     const pitch = pitches.find((item) => item.id === selectedId);
     if (!pitch) return;
-    const delta = Math.min(0.08, 360 / 2 ** Math.max(zoom, 13));
+    const delta = Math.min(0.08, 360 / 2 ** Math.max(zoomRef.current, 13));
     mapRef.current?.animateToRegion(
       { latitude: pitch.lat, longitude: pitch.lng, latitudeDelta: delta, longitudeDelta: delta },
       reducedMotion ? 0 : 500,

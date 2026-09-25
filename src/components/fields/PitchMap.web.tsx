@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { LIGHT_TILES, PIN_BUSY, PIN_CLEAR, PIN_GOLD, PIN_INK, type PitchMapProps } from '@/components/fields/mapTypes';
@@ -44,6 +44,8 @@ function ensureLeafletCss() {
     .leaflet-container { font-family: inherit; background: #F3F5F3; height: 100%; width: 100%; touch-action: none; }
     #fields-map { touch-action: none; }
     .leaflet-top.leaflet-left { top: 48px; }
+    .leaflet-touch .leaflet-control-zoom a,
+    .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 18px; }
   `;
   document.head.appendChild(style);
 }
@@ -103,7 +105,9 @@ export default function PitchMap({
   onBackground,
 }: PitchMapProps) {
   const stateRef = useRef({ pitches, selectedId, topPickId, reducedMotion, onSelect, onBackground, frameKey });
-  stateRef.current = { pitches, selectedId, topPickId, reducedMotion, onSelect, onBackground, frameKey };
+  useLayoutEffect(() => {
+    stateRef.current = { pitches, selectedId, topPickId, reducedMotion, onSelect, onBackground, frameKey };
+  });
   const mapRef = useRef<LType.Map | null>(null);
   const layerRef = useRef<LType.LayerGroup | null>(null);
   const leafletRef = useRef<typeof LType | null>(null);

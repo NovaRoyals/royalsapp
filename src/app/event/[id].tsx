@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
 import { RsvpChoices } from '@/components/interactions/RsvpChoices';
@@ -33,6 +33,7 @@ import {
   fieldStatusTone,
   placeLabel,
   rsvpFor,
+  rsvpLabel,
   rsvpSummary,
   summaryLine,
   type RsvpBucket,
@@ -40,7 +41,7 @@ import {
 import { shareContent } from '@/lib/share';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 import { useApp } from '@/state/AppProvider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
 import type { AttendanceMark, ScheduleEvent } from '@/types/domain';
 
 export function generateStaticParams() {
@@ -78,6 +79,8 @@ export default function EventDetailScreen() {
     venueUpdates,
   } = useApp();
   const toast = useToast();
+  const { width } = useWindowDimensions();
+  const wide = width >= 720;
   const event = schedule.find((item) => item.id === id) ?? schedule[0];
   const [bucket, setBucket] = useState<RsvpBucket | 'all'>('all');
   const weather = weatherForEvent(event);
@@ -130,13 +133,13 @@ export default function EventDetailScreen() {
           </PressableScale>
         </View>
 
-        <Text style={styles.title}>{event.title}</Text>
-        <Text style={styles.when}>{formatEventWhen(event.startsAt)}</Text>
+        <MatchHeader event={event} />
         <View style={styles.pills}>
           <StatusPill label={fieldStatusLabel(event.fieldStatus)} tone={fieldStatusTone(event.fieldStatus)} />
           {event.status === 'cancelled' ? <StatusPill label="Cancelled" tone="danger" /> : null}
           {event.status === 'completed' && event.result ? <StatusPill label="Final" tone="neutral" /> : null}
         </View>
+        {event.result && event.status === 'completed' ? <Text style={styles.result}>{event.result}</Text> : null}
 
         {event.fieldStatus === 'closed' || event.status === 'cancelled' || event.previousVenue || event.pendingChange ? (
           <View style={[styles.banner, event.fieldStatus === 'closed' || event.status === 'cancelled' ? styles.bannerDanger : styles.bannerAttention]}>
@@ -157,13 +160,29 @@ export default function EventDetailScreen() {
           </View>
         ) : null}
 
-        <Facts event={event} />
+        <Text style={styles.glanceLabel}>At a glance</Text>
+        <View style={styles.glance}>
+          {glanceRows(event, deadlines).map((row) => (
+            <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && styles.glanceItemWide]}>
+              <Ionicons name={row.icon} size={18} color={colors.stone} />
+              <View style={styles.glanceCopy}>
+                <Text style={styles.factLabel}>{row.label}</Text>
+                <Text selectable style={styles.factValue}>{row.value}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
 
-        {deadlines.map((line) => (
-          <Text key={line} style={styles.deadline}>{line}</Text>
-        ))}
-
-        {event.result && event.status === 'completed' ? <Text style={styles.result}>{event.result}</Text> : null}
+        {showChildRsvp || showPlayerRsvp ? (
+          <View style={styles.responseLine}>
+            <Text style={styles.factLabel}>Your response</Text>
+            <Text style={styles.factValue}>
+              {showChildRsvp
+                ? kids.map((child) => `${child.firstName} — ${rsvpLabel(rsvpFor(event, child.id))}`).join('   ')
+                : rsvpLabel(event.attendance)}
+            </Text>
+          </View>
+        ) : null}
 
         {showSupporter ? (
           <View style={styles.block}>
@@ -302,43 +321,42 @@ export default function EventDetailScreen() {
         ) : null}
 
         <View style={styles.block}>
-          <Text style={styles.section}>Where to go</Text>
+          <Text style={styles.section}>Game day</Text>
           {event.previousVenue ? <Text style={styles.struck}>Previous · {event.previousVenue}</Text> : null}
-          <Text style={styles.placeNow}>{event.venue}</Text>
-          {event.address ? <Text selectable style={styles.hint}>{event.address}</Text> : null}
-          {place ? (
-            <>
-              <Text style={styles.hint}>{place.arrival}</Text>
-              <Text style={styles.hint}>{place.parkingNotes}</Text>
-              <Text style={styles.hint}>Entrance · {place.entrance}</Text>
-              <Text style={styles.hint}>Surface · {place.surface}</Text>
-              {place.restrooms ? <Text style={styles.hint}>{place.restrooms}</Text> : null}
-            </>
-          ) : null}
-          {venueUpdate ? (
-            <Text style={styles.hint}>
-              Updated {formatEventWhen(venueUpdate.updatedAt)} by {venueUpdate.updatedBy}. {venueUpdate.reason}
-            </Text>
-          ) : null}
-          <Pressable accessibilityRole="link" onPress={() => event.venueId && router.push(`/venue/${event.venueId}` as Href)}>
+          {event.address ? <Text selectable style={styles.factValue}>{event.address}</Text> : null}
+          <View style={styles.glance}>
+            {logisticsRows(event, place, venueUpdate?.updatedBy, venueUpdate ? formatEventWhen(venueUpdate.updatedAt) : undefined, venueUpdate?.reason).map((row) => (
+              <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && styles.glanceItemWide]}>
+                <Ionicons name={row.icon} size={18} color={colors.stone} />
+                <View style={styles.glanceCopy}>
+                  <Text style={styles.factLabel}>{row.label}</Text>
+                  <Text selectable style={styles.factValue}>{row.value}</Text>
+                </View>
+              </View>
+            ))}
+            <View style={[styles.glanceItem, wide && styles.glanceItemWide]}>
+              <Ionicons name="cloud-outline" size={18} color={colors.stone} />
+              <View style={styles.glanceCopy}>
+                <Text style={styles.factLabel}>{weather.summary}</Text>
+                <Text style={styles.factValue}>{weather.detail}</Text>
+              </View>
+            </View>
+          </View>
+          <Pressable accessibilityRole="link" onPress={() => event.venueId && router.push(`/venue/${event.venueId}` as Href)} style={styles.linkHit}>
             <Text style={styles.link}>Venue details</Text>
           </Pressable>
           <DirectionsStub destination={{ name: place?.name ?? event.venue, address: event.address, fieldNumber: place?.fieldNumber }} />
         </View>
 
-        <View style={styles.weather}>
-          <Text style={styles.section}>{weather.summary}</Text>
-          <Text style={styles.hint}>{weather.detail}</Text>
-        </View>
-
         <CalendarPrep event={event} season={season.length ? season : [event]} />
 
-        {event.coachName && event.type === 'training' ? (
+        {event.coachName && event.type === 'training' && role !== 'guest' ? (
           <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} style={styles.action} />
         ) : null}
       </ScrollView>
 
       {showChildRsvp || showPlayerRsvp ? (
+        <View style={styles.dockWrap} pointerEvents="box-none">
         <View style={styles.dock}>
           {showChildRsvp
             ? kids.map((child) => (
@@ -358,6 +376,7 @@ export default function EventDetailScreen() {
             : (
                 <RsvpChoices value={event.attendance} goingCount={event.goingCount ?? 0} showCount={false} onChange={(status) => setAttendance(event.id, status)} />
               )}
+        </View>
         </View>
       ) : null}
     </Screen>
@@ -381,71 +400,81 @@ function NoteEditor({ initial, onSave }: { initial: string; onSave: (value: stri
   );
 }
 
-function Facts({ event }: { event: ScheduleEvent }) {
-  if (event.type === 'training' && event.sport === 'soccer') {
-    return (
-      <View style={styles.facts}>
-        <Fact label="Age group" value={event.ageGroup ?? 'Kids Soccer'} />
-        {event.sessionNumber ? <Fact label="Session" value={`${event.sessionNumber}${event.sessionTotal ? ` of ${event.sessionTotal}` : ''}`} /> : null}
-        {event.coachName ? <Fact label="Coach" value={event.coachName} /> : null}
-        {event.arrivalAt ? <Fact label="Arrive" value={event.arrivalAt} /> : null}
-        {event.whatToBring ? <Fact label="Kit" value={event.whatToBring} /> : null}
-      </View>
-    );
-  }
-  if (event.type === 'tournament_match') {
-    return (
-      <View style={styles.facts}>
-        <Fact label="Tournament" value={event.tournamentName ?? event.title} />
-        {event.tournamentRange ? <Fact label="Dates" value={event.tournamentRange} /> : null}
-        <Fact label="Match" value={event.title} />
-        {event.division ? <Fact label="Division" value={event.division} /> : null}
-        <Fact label="Venue" value={placeLabel(event)} />
-        {event.checkInAt ? <Fact label="Check-in" value={event.checkInAt} /> : null}
-        {event.rosterStatus ? <Fact label="Roster" value={event.rosterStatus} /> : null}
-      </View>
-    );
-  }
-  if (event.type === 'club_event') {
-    return (
-      <View style={styles.facts}>
-        <Fact label="Purpose" value={event.purpose ?? event.subtitle} />
-        <Fact label="When" value={formatEventWhen(event.startsAt)} />
-        <Fact label="Location" value={placeLabel(event)} />
-        {event.volunteerNeeds ? <Fact label="Volunteers" value={event.volunteerNeeds} /> : null}
-      </View>
-    );
-  }
-  if (event.sport === 'cricket') {
-    return (
-      <View style={styles.facts}>
-        <Fact label="Match" value={event.title} />
-        {event.opponent ? <Fact label="Opponent" value={event.opponent} /> : null}
-        <Fact label="Ground" value={placeLabel(event)} />
-        <Fact label="Start" value={formatEventWhen(event.startsAt)} />
-        {event.rosterStatus ? <Fact label="Squad" value={event.rosterStatus} /> : null}
-        {event.competitionLabel ? <Fact label="Competition" value={event.competitionLabel} /> : null}
-      </View>
-    );
+function MatchHeader({ event }: { event: ScheduleEvent }) {
+  const opponent = event.opponent?.trim();
+  const competitive = Boolean(opponent) && event.type !== 'training' && event.type !== 'club_event';
+  if (!competitive || !opponent) {
+    return <Text style={styles.title}>{event.type === 'club_event' ? event.purpose ?? event.title : event.title}</Text>;
   }
   return (
-    <View style={styles.facts}>
-      {event.opponent ? <Fact label="Opponent" value={event.opponent} /> : null}
-      {event.competitionLabel ? <Fact label="Competition" value={event.competitionLabel} /> : null}
-      <Fact label="Kickoff" value={formatEventWhen(event.startsAt)} />
-      <Fact label="Venue" value={placeLabel(event)} />
-      {event.rosterStatus ? <Fact label="Roster" value={event.rosterStatus} /> : null}
+    <View style={styles.matchup} accessibilityRole="header">
+      <Text style={styles.side}>ROYALS</Text>
+      <Text style={styles.vs}>vs</Text>
+      <Text style={styles.side}>{opponent}</Text>
     </View>
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.fact}>
-      <Text style={styles.factLabel}>{label}</Text>
-      <Text selectable style={styles.factValue}>{value}</Text>
-    </View>
-  );
+type GlanceIcon = keyof typeof Ionicons.glyphMap;
+
+function glanceRows(event: ScheduleEvent, deadlines: string[]) {
+  const rows: { icon: GlanceIcon; label: string; value: string }[] = [];
+  const push = (icon: GlanceIcon, label: string, value?: string) => {
+    if (value) rows.push({ icon, label, value });
+  };
+  const when = formatEventWhen(event.startsAt);
+  const place = placeLabel(event);
+  const timeLabel = event.sport === 'cricket' ? 'Start' : event.type === 'training' || event.type === 'club_event' ? 'When' : 'Kickoff';
+  const placeName = event.sport === 'cricket' ? 'Ground' : event.type === 'club_event' ? 'Location' : 'Venue';
+
+  if (event.type === 'training') {
+    push('people-outline', 'Age group', event.ageGroup);
+    if (event.sessionNumber) push('list-outline', 'Session', `${event.sessionNumber}${event.sessionTotal ? ` of ${event.sessionTotal}` : ''}`);
+    push('person-outline', 'Coach', event.coachName);
+    push('time-outline', timeLabel, when);
+    push('alarm-outline', 'Arrive', event.arrivalAt);
+    push('shirt-outline', 'Kit', event.whatToBring);
+    push('location-outline', placeName, place);
+  } else if (event.type === 'tournament_match') {
+    push('trophy-outline', 'Tournament', event.tournamentName);
+    push('calendar-outline', 'Dates', event.tournamentRange);
+    push('time-outline', 'Kickoff', when);
+    push('git-network-outline', 'Division', event.division);
+    push('location-outline', 'Venue', place);
+    push('log-in-outline', 'Check-in', event.checkInAt);
+    push('people-outline', 'Roster', event.rosterStatus);
+  } else if (event.type === 'club_event') {
+    push('time-outline', 'When', when);
+    push('location-outline', 'Location', place);
+    push('hand-left-outline', 'Volunteers', event.volunteerNeeds);
+  } else {
+    push('trophy-outline', 'Competition', event.competitionLabel);
+    push('time-outline', timeLabel, when);
+    push('location-outline', placeName, place);
+    push('people-outline', event.sport === 'cricket' ? 'Squad' : 'Roster', event.rosterStatus);
+  }
+  deadlines.forEach((line) => push('alarm-outline', 'Respond by', line));
+  return rows;
+}
+
+function logisticsRows(
+  event: ScheduleEvent,
+  place: ReturnType<typeof venueById>,
+  updatedBy?: string,
+  updatedAt?: string,
+  reason?: string,
+) {
+  const rows: { icon: GlanceIcon; label: string; value: string }[] = [];
+  const push = (icon: GlanceIcon, label: string, value?: string) => {
+    if (value) rows.push({ icon, label, value });
+  };
+  push('walk-outline', 'Arrival', place?.arrival);
+  push('car-outline', 'Parking', place?.parkingNotes ?? event.parkingNotes);
+  push('flag-outline', 'Entrance', place?.entrance);
+  push('layers-outline', 'Surface', place?.surface);
+  push('water-outline', 'Restrooms', place?.restrooms);
+  if (updatedBy && updatedAt) push('refresh-outline', 'Field update', `${updatedBy} · ${updatedAt}${reason ? ` · ${reason}` : ''}`);
+  return rows;
 }
 
 const styles = StyleSheet.create({
@@ -454,9 +483,11 @@ const styles = StyleSheet.create({
   topbar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   topTitle: { color: colors.stone, fontSize: 13, ...typography.label },
-  title: { color: colors.ink, fontSize: 28, lineHeight: 32, ...typography.heading },
-  when: { color: colors.charcoal, fontSize: 15, marginTop: 4, fontVariant: ['tabular-nums'], ...typography.body },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  title: { color: colors.ink, fontSize: 28, lineHeight: 32, marginTop: spacing.xs, ...typography.heading },
+  matchup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.sm, marginTop: spacing.xs },
+  side: { color: colors.ink, fontSize: 28, lineHeight: 32, ...typography.heading },
+  vs: { color: colors.orangeDark, fontSize: 14, ...typography.label },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   banner: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, gap: 4 },
   bannerDanger: { backgroundColor: colors.dangerSoft },
   bannerAttention: { backgroundColor: colors.orangeSoft },
@@ -464,19 +495,22 @@ const styles = StyleSheet.create({
   bannerBody: { color: colors.charcoal, fontSize: 14, lineHeight: 20, ...typography.body },
   bannerMeta: { color: colors.stone, fontSize: 12, marginTop: 4, ...typography.body },
   struck: { color: colors.stone, textDecorationLine: 'line-through', ...typography.body },
-  facts: { marginTop: spacing.lg, gap: spacing.md },
-  fact: { gap: 2 },
+  glanceLabel: { color: colors.stone, fontSize: 12, marginTop: spacing.lg, ...typography.label },
+  glance: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.sm, rowGap: 14, columnGap: spacing.lg },
+  glanceItem: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  glanceItemWide: { width: '47%', flexGrow: 1 },
+  glanceCopy: { flex: 1, minWidth: 0, gap: 1 },
   factLabel: { color: colors.stone, fontSize: 11, ...typography.label },
-  factValue: { color: colors.ink, fontSize: 16, lineHeight: 22, ...typography.bodyMedium },
-  deadline: { color: colors.charcoal, fontSize: 14, marginTop: spacing.sm, ...typography.body },
-  result: { color: colors.ink, fontSize: 22, marginTop: spacing.lg, ...typography.heading },
-  block: { marginTop: spacing.xl, gap: spacing.sm },
+  factValue: { color: colors.ink, fontSize: 15, lineHeight: 20, ...typography.bodyMedium },
+  responseLine: { marginTop: spacing.lg, gap: 2 },
+  result: { color: colors.ink, fontSize: 20, marginTop: spacing.sm, ...typography.heading },
+  block: { marginTop: spacing.lg, gap: spacing.sm },
   section: { color: colors.ink, fontSize: 18, ...typography.heading },
   hint: { color: colors.stone, fontSize: 14, lineHeight: 20, ...typography.body },
   summaryCount: { color: colors.ink, fontSize: 28, fontVariant: ['tabular-nums'], ...typography.heading },
   summaryLine: { color: colors.charcoal, fontSize: 14, ...typography.body },
   filters: { gap: spacing.sm, paddingVertical: spacing.sm },
-  filter: { minHeight: 36, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.sand, alignItems: 'center', justifyContent: 'center' },
+  filter: { minHeight: 44, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.sand, alignItems: 'center', justifyContent: 'center' },
   filterOn: { backgroundColor: colors.ink },
   filterText: { color: colors.charcoal, fontSize: 12, ...typography.label },
   filterTextOn: { color: colors.white },
@@ -492,14 +526,18 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   noteLine: { marginTop: spacing.md, color: colors.charcoal, fontSize: 15, lineHeight: 21, ...typography.body },
-  placeNow: { color: colors.ink, fontSize: 18, ...typography.heading },
-  link: { color: colors.orangeDark, fontSize: 14, paddingVertical: 8, ...typography.label },
-  weather: { marginTop: spacing.xl, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.sand, gap: 4 },
-  dock: {
+  linkHit: { minHeight: 44, justifyContent: 'center' },
+  link: { color: colors.orangeDark, fontSize: 14, ...typography.label },
+  dockWrap: {
     position: Platform.OS === 'web' ? 'fixed' : 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    alignItems: 'center',
+  },
+  dock: {
+    width: '100%',
+    maxWidth: layout.maxWidth,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
