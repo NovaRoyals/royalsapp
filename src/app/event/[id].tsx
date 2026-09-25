@@ -14,7 +14,8 @@ import { cricketEventHref, cricketProgramHref } from '@/lib/cricket';
 import { estimatedTravelStub, formatEventParts, formatEventWhen, formatLeaveBy } from '@/lib/datetime';
 import { useToast } from '@/components/Toast';
 import { PressableScale } from '@/components/motion';
-import { can } from '@/lib/capabilities';
+import { can, canCreateSessionRecap, canSendSessionRecap } from '@/lib/capabilities';
+import { attendanceCounts, recapForEvent } from '@/lib/coachRecap';
 import { gameDayBrief, isGameDayWindow, travelMinutesStub } from '@/lib/intelligence';
 import { canPlayerRsvp, canSeeFullRoster, COACH_TEAM_ID } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
@@ -32,7 +33,7 @@ export function generateStaticParams() {
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { schedule, setAttendance, setSupporter, setFieldStatus, recordCheckIn, recordAllPresent, role, registrations, household } = useApp();
+  const { schedule, setAttendance, setSupporter, setFieldStatus, recordCheckIn, recordAllPresent, role, registrations, recaps, managerCanSendRecap } = useApp();
   const toast = useToast();
   const event = schedule.find((item) => item.id === id) ?? schedule[0];
   const [calendarAdded, setCalendarAdded] = useState(false);
@@ -52,11 +53,20 @@ export default function EventDetailScreen() {
   const gameDay = isGameDayWindow(event) ? gameDayBrief(event) : null;
   const leaveBy = formatLeaveBy(event.startsAt, travelMinutesStub(event.venue) + 10);
   const missingRsvpIds = roster.filter((person) => !recorded.some((item) => item.personId === person.id)).map((person) => person.id);
+  const recap = recapForEvent(recaps, event.id);
+  const attendance = attendanceCounts(roster, recorded);
+  const showRecap = (event.status === 'completed' || Boolean(recorded.length)) && (canCreateSessionRecap(role, event.teamId) || can(role, 'view_recap_status'));
+  const recapLabel =
+    recap?.status === 'sent'
+      ? 'View send receipt'
+      : recap?.originalText
+        ? 'Continue session recap'
+        : 'Record session recap';
 
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/schedule')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/schedule')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.topTitle}>Event details</Text>
         <PressableScale
           accessibilityLabel="Share event"
@@ -97,9 +107,19 @@ export default function EventDetailScreen() {
         ) : null}
       </View>
 
-      {event.status === 'completed' ? (
+      {recap?.status === 'sent' ? (
+        <View style={styles.sentBanner}>
+          <Text style={styles.sentTitle}>Session recap sent</Text>
+          <Text style={styles.sentMeta}>
+            {recap.recipientCount} families · {recap.notes.length} individual note{recap.notes.length === 1 ? '' : 's'}
+          </Text>
+          <Button label="View send receipt" variant="secondary" onPress={() => router.push(`/session/${event.id}/recap` as never)} />
+        </View>
+      ) : null}
+
+      {event.status === 'completed' && event.result ? (
         <View style={styles.result}><Text style={styles.resultLabel}>{event.demo ? 'FINAL · DEMO' : 'FINAL'}</Text><Text style={styles.resultValue}>{event.result}</Text></View>
-      ) : showPlayerRsvp ? (
+      ) : event.status === 'completed' && isTraining ? null : showPlayerRsvp ? (
         <View style={styles.rsvpHero}>
           <Text style={styles.sectionTitle}>Can you make it?</Text>
           <RsvpChoices
@@ -164,8 +184,14 @@ export default function EventDetailScreen() {
 
       {staffAttendance && roster.length ? (
         <View style={styles.staff}>
-          <Text style={styles.sectionTitle}>Take attendance</Text>
-          <Text style={styles.hint}>U8 roster for this session. Mark everyone present, then record exceptions. Unrecorded names are treated as missing RSVP in this demo.</Text>
+          <Text style={styles.sectionTitle}>{event.status === 'completed' ? 'Attendance' : 'Take attendance'}</Text>
+          {recorded.length ? (
+            <Text style={styles.countsLine}>
+              {attendance.presentCount} present · {attendance.absentCount} absent
+            </Text>
+          ) : (
+            <Text style={styles.hint}>U8 roster for this session. Mark everyone present, then record exceptions.</Text>
+          )}
           <AttendanceRoster
             roster={roster}
             recorded={recorded}
@@ -181,6 +207,17 @@ export default function EventDetailScreen() {
             }
             onMarkAllPresent={() => recordAllPresent(event.id, roster)}
           />
+          {showRecap && recap?.status !== 'sent' ? (
+            <Button
+              label={recapLabel}
+              icon="mic-outline"
+              onPress={() => router.push(`/session/${event.id}/recap` as never)}
+              style={styles.secondary}
+            />
+          ) : null}
+          {can(role, 'view_recap_status') && recap?.status === 'sent' && !canSendSessionRecap(role, managerCanSendRecap) ? (
+            <Text style={styles.hint}>Recap sent to {recap.recipientCount} families.</Text>
+          ) : null}
           {canClose ? (
             <Button
               label={event.fieldStatus === 'closed' ? 'Reopen field' : 'Close field (urgent alert)'}
@@ -197,6 +234,8 @@ export default function EventDetailScreen() {
           onPress={() => setFieldStatus(event.id, event.fieldStatus === 'closed' ? 'open' : 'closed')}
           style={styles.secondary}
         />
+      ) : showRecap && recap?.status !== 'sent' ? (
+        <Button label={recapLabel} icon="mic-outline" onPress={() => router.push(`/session/${event.id}/recap` as never)} style={styles.secondary} />
       ) : null}
 
       <Text style={styles.sectionTitle}>Plan ahead</Text>
@@ -258,6 +297,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   counts: { marginTop: spacing.md, gap: 2 },
   countLine: { color: colors.charcoal, fontSize: 13, ...typography.body },
+  countsLine: { color: colors.ink, fontSize: 16, marginBottom: spacing.md, ...typography.heading },
   sectionTitle: { color: colors.ink, fontSize: 19, marginTop: spacing.xxl, marginBottom: spacing.sm, ...typography.heading },
   hint: { color: colors.stone, fontSize: 12, lineHeight: 17, marginBottom: spacing.md, ...typography.body },
   rsvpOptions: { flexDirection: 'row', gap: spacing.sm },
@@ -270,6 +310,9 @@ const styles = StyleSheet.create({
   staff: { marginTop: spacing.md },
   checkRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border },
   checkName: { color: colors.ink, ...typography.heading },
+  sentBanner: { marginTop: spacing.xl, paddingVertical: spacing.lg, gap: spacing.sm },
+  sentTitle: { color: colors.ink, fontSize: 22, ...typography.heading },
+  sentMeta: { color: colors.stone, fontSize: 15, marginBottom: spacing.sm, ...typography.body },
   result: { marginTop: spacing.xl, padding: spacing.xl, borderRadius: radius.md, backgroundColor: colors.orangeSoft, alignItems: 'center' },
   resultLabel: { color: colors.orangeDark, fontSize: 10, ...typography.label, letterSpacing: 1 },
   resultValue: { color: colors.ink, fontSize: 28, marginTop: spacing.sm, ...typography.display },

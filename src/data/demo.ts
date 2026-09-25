@@ -1,15 +1,19 @@
 import type {
   Announcement,
   AppNotification,
+  AttendanceMark,
   Competition,
   DirectMessage,
   Household,
   HouseholdDocument,
+  Person,
   Program,
   Registration,
   ScheduleEvent,
   Team,
+  UserRole,
 } from '@/types/domain';
+import { ACTIVE_COACH, demoCoachReminder } from '@/lib/coachRecap';
 import { fxa35PlusMatches, soccerResultText } from '@/data/fxa';
 
 export const kidsProgramId = 'fall-kids-2026';
@@ -231,6 +235,19 @@ export const demoHousehold: Household = {
   ],
 };
 
+export const coachHousehold: Household = {
+  id: 'household-coach',
+  guardianName: ACTIVE_COACH.fullName,
+  email: ACTIVE_COACH.email,
+  phone: '(571) 555-0190',
+  address: 'Centreville, VA',
+  children: [],
+};
+
+export function householdForRole(role: UserRole): Household {
+  return role === 'coach' ? coachHousehold : demoHousehold;
+}
+
 export const demoRegistrations: Registration[] = [
   {
     id: 'reg-demo-1',
@@ -324,6 +341,33 @@ const cricketRoster = [
   ].map((name) => cricketNamed(name, name === 'Biplav Gautam' ? 'Vice captain · All-rounder' : 'All-rounder')),
 ];
 
+export const kidsU8Roster: Person[] = [
+  { id: 'child-maya', firstName: 'Maya', lastName: 'Williams', displayName: 'Maya W.', isMinor: true },
+  { id: 'u8-ap', firstName: 'Aria', lastName: 'Patel', displayName: 'Aria P.', isMinor: true },
+  { id: 'u8-jl', firstName: 'Jonah', lastName: 'Lee', displayName: 'Jonah L.', isMinor: true },
+  { id: 'u8-sk', firstName: 'Samir', lastName: 'Khan', displayName: 'Samir K.', isMinor: true },
+  { id: 'u8-em', firstName: 'Elena', lastName: 'Martinez', displayName: 'Elena M.', isMinor: true },
+  { id: 'u8-nw', firstName: 'Noah', lastName: 'Wright', displayName: 'Noah W.', isMinor: true },
+  { id: 'u8-lc', firstName: 'Lila', lastName: 'Chen', displayName: 'Lila C.', isMinor: true },
+  { id: 'u8-ob', firstName: 'Omar', lastName: 'Brooks', displayName: 'Omar B.', isMinor: true },
+  { id: 'u8-ih', firstName: 'Ivy', lastName: 'Hassan', displayName: 'Ivy H.', isMinor: true },
+  { id: 'u8-td', firstName: 'Theo', lastName: 'Diaz', displayName: 'Theo D.', isMinor: true },
+  { id: 'u8-rk', firstName: 'Ruby', lastName: 'Kim', displayName: 'Ruby K.', isMinor: true },
+  { id: 'u8-fn', firstName: 'Felix', lastName: 'Nguyen', displayName: 'Felix N.', isMinor: true },
+  { id: 'u8-kj', firstName: 'Kai', lastName: 'Jones', displayName: 'Kai J.', isMinor: true },
+  { id: 'u8-mp', firstName: 'Mina', lastName: 'Park', displayName: 'Mina P.', isMinor: true },
+  { id: 'u8-ls', firstName: 'Leo', lastName: 'Santos', displayName: 'Leo S.', isMinor: true },
+  { id: 'u8-qa', firstName: 'Quinn', lastName: 'Adeyemi', displayName: 'Quinn A.', isMinor: true },
+  { id: 'u8-sr', firstName: 'Sage', lastName: 'Rivera', displayName: 'Sage R.', isMinor: true },
+];
+
+const U8_ABSENT_SEP20 = new Set(['u8-fn', 'u8-rk', 'u8-ih']);
+
+export const u8Sep20Attendance: AttendanceMark[] = kidsU8Roster.map((person) => {
+  const present = !U8_ABSENT_SEP20.has(person.id);
+  return { personId: person.id, personName: person.displayName, present, status: present ? 'present' : 'absent' };
+});
+
 export const demoTeams: Team[] = [
   {
     id: 'nova-royals-men',
@@ -353,24 +397,11 @@ export const demoTeams: Team[] = [
     season: 'Fall 2026',
     record: 'Training',
     accent: '#F36A21',
-    memberCount: 12,
+    memberCount: kidsU8Roster.length,
     managed: true,
     coachName: 'Coach Priya Sharma',
     coachContact: 'infonovaroyals@gmail.com',
-    roster: [
-      { id: 'child-maya', firstName: 'Maya', lastName: 'Williams', displayName: 'Maya W.', isMinor: true },
-      { id: 'u8-ap', firstName: 'Aria', lastName: 'Patel', displayName: 'Aria P.', isMinor: true },
-      { id: 'u8-jl', firstName: 'Jonah', lastName: 'Lee', displayName: 'Jonah L.', isMinor: true },
-      { id: 'u8-sk', firstName: 'Samir', lastName: 'Khan', displayName: 'Samir K.', isMinor: true },
-      { id: 'u8-em', firstName: 'Elena', lastName: 'Martinez', displayName: 'Elena M.', isMinor: true },
-      { id: 'u8-nw', firstName: 'Noah', lastName: 'Wright', displayName: 'Noah W.', isMinor: true },
-      { id: 'u8-lc', firstName: 'Lila', lastName: 'Chen', displayName: 'Lila C.', isMinor: true },
-      { id: 'u8-ob', firstName: 'Omar', lastName: 'Brooks', displayName: 'Omar B.', isMinor: true },
-      { id: 'u8-ih', firstName: 'Ivy', lastName: 'Hassan', displayName: 'Ivy H.', isMinor: true },
-      { id: 'u8-td', firstName: 'Theo', lastName: 'Diaz', displayName: 'Theo D.', isMinor: true },
-      { id: 'u8-rk', firstName: 'Ruby', lastName: 'Kim', displayName: 'Ruby K.', isMinor: true },
-      { id: 'u8-fn', firstName: 'Felix', lastName: 'Nguyen', displayName: 'Felix N.', isMinor: true },
-    ],
+    roster: kidsU8Roster,
   },
   {
     id: 'nova-royals-women',
@@ -801,26 +832,31 @@ const ccplMatches: ScheduleEvent[] = [
   },
 ];
 
-const kidsFallSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd, index) => ({
-  id: index === 0 ? 'kids-session-1' : `kids-${ymd}`,
-  type: 'training',
-  sport: 'soccer',
-  title: 'Fall Soccer Training',
-  subtitle: `Session ${index + 1} of ${FALL_SUNDAYS_2026.length} · Kids · 9–10 AM`,
-  startsAt: atEastern(ymd, '09:00'),
-  endsAt: atEastern(ymd, '10:00'),
-  venue: ARROWHEAD_3A.venue,
-  address: ARROWHEAD_3A.address,
-  programId: kidsProgramId,
-  teamId: 'nova-royals-kids-u8',
-  competitionId: 'kids-training-2026',
-  status: 'scheduled',
-  fieldStatus: 'open',
-  parkingNotes: ARROWHEAD_3A.parkingNotes,
-  weatherSummary: 'Check Sunday morning conditions',
-  whatToBring: 'Shin guards, water, labeled jacket',
-  coachName: 'Coach Priya Sharma',
-}));
+const kidsFallSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd, index) => {
+  const id = index === 0 ? 'kids-session-1' : `kids-${ymd}`;
+  const past = ymd <= '2026-09-20';
+  return {
+    id,
+    type: 'training',
+    sport: 'soccer',
+    title: 'Fall Soccer Training',
+    subtitle: `Session ${index + 1} of ${FALL_SUNDAYS_2026.length} · Kids · 9–10 AM`,
+    startsAt: atEastern(ymd, '09:00'),
+    endsAt: atEastern(ymd, '10:00'),
+    venue: ARROWHEAD_3A.venue,
+    address: ARROWHEAD_3A.address,
+    programId: kidsProgramId,
+    teamId: 'nova-royals-kids-u8',
+    competitionId: 'kids-training-2026',
+    status: past ? 'completed' : 'scheduled',
+    fieldStatus: 'open',
+    parkingNotes: ARROWHEAD_3A.parkingNotes,
+    weatherSummary: 'Check Sunday morning conditions',
+    whatToBring: 'Shin guards, water, labeled jacket',
+    coachName: 'Coach Priya Sharma',
+    checkIns: id === 'kids-2026-09-20' ? u8Sep20Attendance : undefined,
+  };
+});
 
 const womensPracticeSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd) => ({
   id: `women-practice-${ymd}`,
@@ -950,6 +986,7 @@ export const demoDocuments: HouseholdDocument[] = [
 ];
 
 export const demoNotifications: AppNotification[] = [
+  demoCoachReminder(),
   {
     id: 'notification-1',
     type: 'reminder',

@@ -192,7 +192,7 @@ export interface DirectMessage {
 
 export interface AppNotification {
   id: string;
-  type: 'registration' | 'reminder' | 'change' | 'weather' | 'announcement' | 'result';
+  type: 'registration' | 'reminder' | 'change' | 'weather' | 'announcement' | 'result' | 'coach_update' | 'coach_reminder';
   title: string;
   body: string;
   createdAt: string;
@@ -200,6 +200,7 @@ export interface AppNotification {
   route?: string;
   urgency?: NoticeUrgency;
   wouldPush?: boolean;
+  childId?: string;
 }
 
 export interface NotificationPrefs {
@@ -216,4 +217,56 @@ export interface HouseholdDocument {
   status: string;
   updatedAt: string;
   registrationId?: string;
+}
+
+export type CoachNoteTag =
+  | 'strong_effort'
+  | 'great_teamwork'
+  | 'improved_confidence'
+  | 'excellent_listening'
+  | 'practice_first_touch'
+  | 'practice_passing'
+  | 'coach_follow_up';
+
+export type RecapPolishMode = 'cleanup' | 'warm' | 'verbatim';
+export type RecapStatus = 'draft' | 'ready' | 'sent' | 'failed';
+export type CoachUpdateKind = 'session_recap' | 'private_note' | 'practice_suggestion';
+
+export interface IndividualCoachNote {
+  childId: string;
+  childFirstName: string;
+  tags: CoachNoteTag[];
+  originalText: string;
+  approvedText: string;
+}
+
+export interface SessionRecap {
+  id: string;
+  eventId: string;
+  teamId: string;
+  coachName: string;
+  originalText: string;
+  polishedText: string;
+  polishMode: RecapPolishMode | null;
+  notes: IndividualCoachNote[];
+  status: RecapStatus;
+  recipientCount: number;
+  sentAt?: string;
+  deliveryStatus?: 'queued' | 'delivered' | 'failed';
+  updatedAt: string;
+}
+
+export interface CoachUpdate {
+  id: string;
+  recapId: string;
+  eventId: string;
+  kind: CoachUpdateKind;
+  title: string;
+  body: string;
+  childId?: string;
+  childFirstName?: string;
+  coachName: string;
+  sessionTitle: string;
+  sessionStartsAt: string;
+  sentAt: string;
 }

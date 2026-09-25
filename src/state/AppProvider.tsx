@@ -6,23 +6,27 @@ import {
   demoAnnouncements,
   demoDirectMessages,
   demoDocuments,
-  demoHousehold,
   demoNotifications,
   demoRegistrations,
   demoSchedule,
   emptyHousehold,
+  householdForRole,
 } from '@/data/demo';
+import { InkHold } from '@/components/HydrationGate';
+import { SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import { resetAnalytics, track } from '@/lib/analytics';
-import { can } from '@/lib/capabilities';
+import { can, canSendSessionRecap } from '@/lib/capabilities';
+import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapBody } from '@/lib/coachRecap';
+import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import { clearRegistrationDraft } from '@/lib/registrationDraft';
-import { SplashOverlay, SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import type {
   Announcement,
   AnnouncementReply,
   AppNotification,
   AttendanceMark,
   AttendanceStatus,
+  CoachUpdate,
   DirectMessage,
   FieldStatus,
   Household,
@@ -33,11 +37,12 @@ import type {
   Registration,
   RegistrationStatus,
   ScheduleEvent,
+  SessionRecap,
   UserRole,
   ClubRelationship,
 } from '@/types/domain';
 
-const STORAGE_KEY = '@royals/demo-state/v10';
+const STORAGE_KEY = '@royals/demo-state/v11';
 const LEGACY_STORAGE_KEYS = [
   '@royals/demo-state/v1',
   '@royals/demo-state/v2',
@@ -48,6 +53,7 @@ const LEGACY_STORAGE_KEYS = [
   '@royals/demo-state/v7',
   '@royals/demo-state/v8',
   '@royals/demo-state/v9',
+  '@royals/demo-state/v10',
 ];
 
 export const defaultNotificationPrefs: NotificationPrefs = {
@@ -77,12 +83,16 @@ type PersistedState = {
   introCompleted: boolean;
   pendingStaffRole?: 'coach' | 'competition_manager' | null;
   relationship?: ClubRelationship | null;
+  recaps: SessionRecap[];
+  coachUpdates: CoachUpdate[];
+  managerCanSendRecap: boolean;
 };
 
 type NewRegistration = Omit<Registration, 'id' | 'submittedAt' | 'demo'>;
 
 interface AppState extends PersistedState {
   hydrated: boolean;
+  hasHydrated: boolean;
   setRole: (role: UserRole) => void;
   loadDemoPersona: (role: UserRole) => void;
   completeOnboarding: (input: {
@@ -118,6 +128,9 @@ interface AppState extends PersistedState {
   sendDirectMessage: (threadId: string, body: string) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+  saveRecapDraft: (recap: SessionRecap) => void;
+  sendSessionRecap: (recap: SessionRecap) => { ok: boolean; error?: string };
+  setManagerCanSendRecap: (granted: boolean) => void;
   resetDemo: () => Promise<void>;
   completeIntro: () => void;
 }
@@ -149,6 +162,24 @@ function mergeFollowedIds(ids?: string[]) {
   return [...new Set([...(ids?.length ? ids : defaultFollowedIds), 'nova-royals-35plus', 'veterans-soccer'])];
 }
 
+function keepClubComms(next: PersistedState, current: PersistedState): PersistedState {
+  const sent = (current.coachUpdates ?? []).length > 0;
+  return {
+    ...next,
+    recaps: (current.recaps ?? []).length ? current.recaps : next.recaps,
+    coachUpdates: sent ? current.coachUpdates : next.coachUpdates,
+    managerCanSendRecap: current.managerCanSendRecap,
+    notifications: sent
+      ? [
+          ...current.notifications.filter((item) => item.type === 'coach_update' || item.type === 'coach_reminder'),
+          ...next.notifications.filter((item) => item.type !== 'coach_update' && item.id !== 'notification-coach-recap-sep20'),
+        ]
+      : (current.recaps ?? []).some((item) => item.status === 'sent')
+        ? current.notifications
+        : next.notifications,
+  };
+}
+
 function visitorNotifications() {
   return demoNotifications.filter((item) => item.type === 'announcement' || item.type === 'weather');
 }
@@ -170,6 +201,9 @@ function visitorSeed(role: UserRole = 'guest'): PersistedState {
     introCompleted: false,
     pendingStaffRole: null,
     relationship: null,
+    recaps: [],
+    coachUpdates: [],
+    managerCanSendRecap: false,
   };
 }
 
@@ -177,7 +211,7 @@ function demoSeed(role: UserRole): PersistedState {
   return {
     persona: 'demo',
     role,
-    household: demoHousehold,
+    household: householdForRole(role),
     registrations: demoRegistrations,
     schedule: demoSchedule,
     notifications: demoNotifications,
@@ -190,6 +224,9 @@ function demoSeed(role: UserRole): PersistedState {
     introCompleted: true,
     pendingStaffRole: null,
     relationship: null,
+    recaps: [demoDraftRecap()],
+    coachUpdates: [],
+    managerCanSendRecap: false,
   };
 }
 
@@ -210,53 +247,87 @@ function notice(partial: Omit<AppNotification, 'id' | 'createdAt' | 'read'>): Ap
   };
 }
 
+function readPersistedState(saved: string | null): PersistedState {
+  if (!saved) return { ...initialState, schedule: mergeClubSchedule() };
+  const parsed = JSON.parse(saved) as Partial<PersistedState>;
+  const role = parsed.role ?? 'guest';
+  const demoHouseholdLoaded =
+    parsed.household?.id === 'household-demo' || parsed.household?.id === 'household-coach';
+  const persona: Persona =
+    parsed.persona ?? (role !== 'guest' && demoHouseholdLoaded ? 'demo' : 'visitor');
+  if (persona === 'demo' && role !== 'guest') {
+    return {
+      ...demoSeed(role),
+      ...parsed,
+      persona: 'demo',
+      role,
+      introCompleted: parsed.introCompleted ?? true,
+      schedule: mergeClubSchedule(parsed.schedule),
+      followedIds: mergeFollowedIds(parsed.followedIds),
+      household: householdForRole(role),
+      recaps: (parsed.recaps ?? [demoDraftRecap()]).map((item) => ({ ...item, coachName: ACTIVE_COACH.displayName })),
+      coachUpdates: (parsed.coachUpdates ?? []).map((item) => ({ ...item, coachName: ACTIVE_COACH.displayName })),
+      managerCanSendRecap: parsed.managerCanSendRecap ?? false,
+    };
+  }
+  return {
+    ...visitorSeed(role),
+    ...parsed,
+    persona: 'visitor',
+    role,
+    household: demoHouseholdLoaded || !parsed.household ? emptyHousehold : parsed.household,
+    registrations: (parsed.registrations ?? []).filter((item) => !item.demo),
+    documents: parsed.documents ?? [],
+    messages: parsed.messages ?? [],
+    introCompleted: parsed.introCompleted ?? false,
+    notifications: parsed.notifications ?? visitorNotifications(),
+    schedule: mergeClubSchedule(parsed.schedule),
+    followedIds: parsed.followedIds ?? [],
+    relationship: parsed.relationship ?? null,
+    recaps: parsed.recaps ?? [],
+    coachUpdates: parsed.coachUpdates ?? [],
+    managerCanSendRecap: parsed.managerCanSendRecap ?? false,
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PersistedState>(initialState);
   const [hydrated, setHydrated] = useState(false);
 
+  hydrateTrace('AppProvider', {
+    hasHydrated: hydrated,
+    introCompleted: state.introCompleted,
+    role: state.role,
+    sentRecaps: state.recaps.filter((item) => item.status === 'sent').length,
+    coachUpdates: state.coachUpdates.length,
+  });
+
   useEffect(() => {
+    let alive = true;
     Promise.all(LEGACY_STORAGE_KEYS.map((key) => AsyncStorage.removeItem(key)))
       .then(() => AsyncStorage.getItem(STORAGE_KEY))
       .then((saved) => {
-        if (!saved) {
-          setState({ ...initialState, schedule: mergeClubSchedule() });
-          return;
-        }
-        const parsed = JSON.parse(saved) as Partial<PersistedState>;
-        const role = parsed.role ?? 'guest';
-        const demoHouseholdLoaded = parsed.household?.id === 'household-demo';
-        const persona: Persona =
-          parsed.persona ?? (role !== 'guest' && demoHouseholdLoaded ? 'demo' : 'visitor');
-        if (persona === 'demo' && role !== 'guest') {
-          setState({
-            ...demoSeed(role),
-            ...parsed,
-            persona: 'demo',
-            role,
-            introCompleted: parsed.introCompleted ?? true,
-            schedule: mergeClubSchedule(parsed.schedule),
-            followedIds: mergeFollowedIds(parsed.followedIds),
-          });
-          return;
-        }
-        setState({
-          ...visitorSeed(role),
-          ...parsed,
-          persona: 'visitor',
-          role,
-          household: demoHouseholdLoaded || !parsed.household ? emptyHousehold : parsed.household,
-          registrations: (parsed.registrations ?? []).filter((item) => !item.demo),
-          documents: parsed.documents ?? [],
-          messages: parsed.messages ?? [],
-          introCompleted: parsed.introCompleted ?? false,
-          notifications: parsed.notifications ?? visitorNotifications(),
-          schedule: mergeClubSchedule(parsed.schedule),
-          followedIds: parsed.followedIds ?? [],
-          relationship: parsed.relationship ?? null,
+        const next = readPersistedState(saved);
+        hydrateTraceEffect('AppProvider', {
+          hasHydrated: true,
+          introCompleted: next.introCompleted,
+          role: next.role,
+          sentRecaps: next.recaps.filter((item) => item.status === 'sent').length,
+          coachUpdates: next.coachUpdates.length,
+          hadStorage: Boolean(saved),
         });
+        if (!alive) return;
+        setState(next);
+        setHydrated(true);
       })
-      .catch(() => setState({ ...initialState, schedule: mergeClubSchedule() }))
-      .finally(() => setHydrated(true));
+      .catch(() => {
+        if (!alive) return;
+        setState({ ...initialState, schedule: mergeClubSchedule() });
+        setHydrated(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -272,7 +343,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState((current) => {
       const schedule = mergeClubSchedule(current.schedule);
       if (role === 'guest') return { ...visitorSeed('guest'), introCompleted: true, schedule };
-      return { ...demoSeed(role), schedule };
+      return keepClubComms({ ...demoSeed(role), schedule }, current);
     });
   }, []);
 
@@ -287,7 +358,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadDemoPersona = useCallback((role: UserRole) => {
     hapticLight();
-    setState((current) => ({ ...demoSeed(role), schedule: mergeClubSchedule(current.schedule) }));
+    setState((current) => keepClubComms({ ...demoSeed(role), schedule: mergeClubSchedule(current.schedule) }, current));
   }, []);
 
   const completeOnboarding = useCallback(
@@ -322,6 +393,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         registrations: [],
         documents: [],
         messages: [],
+        recaps: current.recaps,
+        coachUpdates: current.coachUpdates,
+        managerCanSendRecap: current.managerCanSendRecap,
       }));
       hapticLight();
     },
@@ -639,6 +713,97 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const saveRecapDraft = useCallback((recap: SessionRecap) => {
+    setState((current) => {
+      if (!can(current.role, 'create_session_recap')) return current;
+      if (current.role === 'coach' && recap.teamId !== COACH_TEAM_ID) return current;
+      const next: SessionRecap = {
+        ...recap,
+        coachName: ACTIVE_COACH.displayName,
+        updatedAt: new Date().toISOString(),
+        status: recap.status === 'sent' ? 'sent' : 'draft',
+      };
+      const others = current.recaps.filter((item) => item.eventId !== recap.eventId);
+      return { ...current, recaps: [next, ...others] };
+    });
+    hapticLight();
+  }, []);
+
+  const sendSessionRecap = useCallback((recap: SessionRecap): { ok: boolean; error?: string } => {
+    let result: { ok: boolean; error?: string } = { ok: false, error: 'Could not send.' };
+    setState((current) => {
+      if (!canSendSessionRecap(current.role, current.managerCanSendRecap)) {
+        result = { ok: false, error: 'You do not have permission to send this recap.' };
+        return current;
+      }
+      if (current.role === 'coach' && recap.teamId !== COACH_TEAM_ID) {
+        result = { ok: false, error: 'This session is not on your assigned team.' };
+        return current;
+      }
+      const body = recapBody(recap);
+      if (!body) {
+        result = { ok: false, error: 'Add a session recap before sending.' };
+        return current;
+      }
+      const event = mergeClubSchedule(current.schedule).find((item) => item.id === recap.eventId);
+      if (!event) {
+        result = { ok: false, error: 'Session not found.' };
+        return current;
+      }
+      const sentAt = new Date().toISOString();
+      const notes = recap.notes.map((note) => ({
+        ...note,
+        approvedText: note.approvedText.trim() || note.originalText.trim(),
+      }));
+      const sentRecap: SessionRecap = {
+        ...recap,
+        coachName: ACTIVE_COACH.displayName,
+        notes,
+        status: 'sent',
+        sentAt,
+        deliveryStatus: 'delivered',
+        updatedAt: sentAt,
+      };
+      const updates = parentUpdatesFromRecap(sentRecap, event, sentAt);
+      const alerts: AppNotification[] = updates
+        .filter((item) => item.kind === 'session_recap' || item.childId === 'child-maya')
+        .map((item) =>
+          notice({
+            type: 'coach_update',
+            title: item.kind === 'session_recap' ? 'New session recap' : item.title,
+            body: item.kind === 'session_recap' ? `${item.coachName} shared Sunday’s training note.` : item.body,
+            route: `/updates/${item.id}`,
+            urgency: 'normal',
+            wouldPush: true,
+            childId: item.childId,
+          }),
+        );
+      result = { ok: true };
+      return {
+        ...current,
+        recaps: [sentRecap, ...current.recaps.filter((item) => item.eventId !== recap.eventId)],
+        coachUpdates: [
+          ...updates,
+          ...current.coachUpdates.filter((item) => item.recapId !== recap.id && item.eventId !== recap.eventId),
+        ],
+        notifications: [
+          ...alerts,
+          ...current.notifications.filter((item) => item.type !== 'coach_reminder'),
+        ],
+      };
+    });
+    if (result.ok) haptic('success');
+    else haptic('warning');
+    return result;
+  }, []);
+
+  const setManagerCanSendRecap = useCallback((granted: boolean) => {
+    setState((current) => {
+      if (current.role !== 'admin') return current;
+      return { ...current, managerCanSendRecap: granted };
+    });
+  }, []);
+
   const resetDemo = useCallback(async () => {
     await Promise.all([STORAGE_KEY, ...LEGACY_STORAGE_KEYS].map((key) => AsyncStorage.removeItem(key)));
     await resetAnalytics();
@@ -659,6 +824,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...state,
       schedule,
       hydrated,
+      hasHydrated: hydrated,
       setRole,
       loadDemoPersona,
       completeIntro,
@@ -681,6 +847,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sendDirectMessage,
       markNotificationRead,
       markAllNotificationsRead,
+      saveRecapDraft,
+      sendSessionRecap,
+      setManagerCanSendRecap,
       resetDemo,
     }),
     [
@@ -709,11 +878,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sendDirectMessage,
       markNotificationRead,
       markAllNotificationsRead,
+      saveRecapDraft,
+      sendSessionRecap,
+      setManagerCanSendRecap,
       resetDemo,
     ],
   );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={value}>{hydrated ? children : <InkHold />}</AppContext.Provider>;
 }
 
 export function useApp() {

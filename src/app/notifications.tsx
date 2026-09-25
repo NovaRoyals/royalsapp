@@ -19,12 +19,14 @@ const icons = {
   weather: 'rainy-outline',
   announcement: 'megaphone-outline',
   result: 'trophy-outline',
+  coach_update: 'chatbubble-ellipses-outline',
+  coach_reminder: 'mic-outline',
 } as const;
 
 export default function NotificationsScreen() {
-  const { notifications, markNotificationRead, markAllNotificationsRead, role } = useApp();
+  const { notifications, markNotificationRead, markAllNotificationsRead, role, household } = useApp();
   const toast = useToast();
-  const visible = notificationsForRole(role, notifications);
+  const visible = notificationsForRole(role, notifications, household.children.map((child) => child.id));
   const reduced = useReducedMotion();
 
   return (

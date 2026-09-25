@@ -50,10 +50,10 @@ export default function ProfileScreen() {
   const staff = isStaff(role);
   const parentView = role === 'guardian';
   const [funnel, setFunnel] = useState<ReturnType<typeof funnelCounts> | null>(null);
-  const kidsEvent = schedule.find((event) => event.id === 'kids-session-1');
+  const kidsEvent = schedule.find((event) => event.id === 'kids-2026-09-20');
   const recorded = kidsEvent?.checkIns ?? [];
   const presentNow = recorded.filter((item) => item.present).length;
-  const unrecorded = Math.max(0, 12 - recorded.length);
+  const unrecorded = Math.max(0, 17 - recorded.length);
 
   useEffect(() => {
     getEvents().then((events) => setFunnel(funnelCounts(events)));
@@ -159,12 +159,22 @@ export default function ProfileScreen() {
 
           {role === 'coach' || role === 'admin' ? (
             <>
-              <SectionHeading title="Session attendance" />
-              <Pressable onPress={() => router.push('/event/kids-session-1')} style={styles.registration}>
-                <Text style={styles.registrationTitle}>Take attendance · U8</Text>
+              <SectionHeading title="Session recap" />
+              <Pressable onPress={() => router.push('/event/kids-2026-09-20')} style={styles.registration}>
+                <Text style={styles.registrationTitle}>U8 Sunday · attendance</Text>
                 <Text style={styles.registrationPeople}>{presentNow} present · {unrecorded} not recorded</Text>
               </Pressable>
+              <Pressable onPress={() => router.push('/session/kids-2026-09-20/recap' as never)} style={styles.registration}>
+                <Text style={styles.registrationTitle}>Record session recap</Text>
+                <Text style={styles.registrationPeople}>Shared note for attending families</Text>
+              </Pressable>
             </>
+          ) : null}
+          {parentView ? (
+            <Pressable onPress={() => router.push('/updates' as never)} style={styles.registration}>
+              <Text style={styles.registrationTitle}>Coach updates</Text>
+              <Text style={styles.registrationPeople}>Session recaps and notes about your child</Text>
+            </Pressable>
           ) : null}
 
           {parentView ? (
@@ -259,8 +269,6 @@ export default function ProfileScreen() {
         <Ionicons name="arrow-forward" size={20} color={colors.orange} />
       </Pressable>
 
-      {persona === 'demo' ? (
-        <>
       <SectionHeading title="Preview roles" />
       <Text style={styles.previewNote}>Board review only. These chips load a seeded household and are not part of a real account.</Text>
       <Pressable onPress={() => router.push('/lab')} style={[styles.adminCard, { marginBottom: 16 }]}>
@@ -279,13 +287,17 @@ export default function ProfileScreen() {
       </Pressable>
       <View style={styles.roleGrid}>
         {(['guest', 'guardian', 'adult_player', 'coach', 'volunteer', 'admin'] as UserRole[]).map((item) => (
-          <Pressable key={item} onPress={() => setRole(item)} style={[styles.roleChip, role === item && styles.roleActive]}>
+          <Pressable
+            key={item}
+            accessibilityRole="button"
+            accessibilityState={{ selected: role === item }}
+            onPress={() => setRole(item)}
+            style={[styles.roleChip, role === item && styles.roleActive]}
+          >
             <Text style={[styles.roleChipText, role === item && styles.roleActiveText]}>{roleLabels[item]}</Text>
           </Pressable>
         ))}
       </View>
-        </>
-      ) : null}
       <Button label="Reset demo data" variant="ghost" onPress={resetDemo} style={styles.reset} />
     </Screen>
   );

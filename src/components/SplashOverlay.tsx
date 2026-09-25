@@ -32,16 +32,19 @@ export function SplashOverlay({
       setVisible(false);
       return;
     }
-    setVisible(true);
-    veil.value = 1;
-    lift.value = 0;
+    let settled = false;
     const finish = () => {
+      if (settled) return;
+      settled = true;
       setVisible(false);
       onFinished?.();
     };
+    setVisible(true);
+    veil.value = 1;
+    lift.value = 0;
+    const failsafe = setTimeout(finish, reduced ? 220 : 2200);
     if (reduced) {
-      const t = setTimeout(finish, 180);
-      return () => clearTimeout(t);
+      return () => clearTimeout(failsafe);
     }
     lift.value = withDelay(1100, withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }));
     veil.value = withDelay(
@@ -50,7 +53,8 @@ export function SplashOverlay({
         if (finished) runOnJS(finish)();
       }),
     );
-  }, [play, reduced, lift, veil]);
+    return () => clearTimeout(failsafe);
+  }, [play, reduced, lift, veil, onFinished]);
 
   const veilStyle = useAnimatedStyle(() => ({ opacity: veil.value }));
   const markStyle = useAnimatedStyle(() => ({

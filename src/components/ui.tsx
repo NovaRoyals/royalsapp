@@ -102,8 +102,8 @@ export function AppHeader({
   compactTitle?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const { hydrated, notifications, role } = useApp();
-  const unread = hydrated ? notificationsForRole(role, notifications).filter((item) => !item.read).length : 0;
+  const { hydrated, notifications, role, household } = useApp();
+  const unread = hydrated ? notificationsForRole(role, notifications, household.children.map((child) => child.id)).filter((item) => !item.read).length : 0;
   const reduced = useReducedMotion();
   return (
     <View style={[styles.header, style]}>

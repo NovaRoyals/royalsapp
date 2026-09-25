@@ -1,15 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { isDemoMode } from '@/lib/supabase';
 import { colors, typography } from '@/theme/tokens';
 
 /** Unobtrusive prototype marker — not a claim that data is saved to a server. */
 export function PrototypeMark() {
-  const insets = useSafeAreaInsets();
   if (!isDemoMode) return null;
   return (
-    <View pointerEvents="none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 8) + 4 }]}>
+    <View pointerEvents="none" style={[styles.wrap, { bottom: 12 }]}>
       <Text style={styles.text}>Prototype</Text>
     </View>
   );

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Screen, SectionHeading, StatusPill } from '@/components/ui';
 import { demoTeams } from '@/data/demo';
 import { privacyName } from '@/lib/attendance';
+import { recapForEvent } from '@/lib/coachRecap';
 import { formatEventParts } from '@/lib/datetime';
 import { canSeeFullRoster } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
@@ -17,7 +18,7 @@ export function generateStaticParams() {
 
 export default function TeamDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { schedule, announcements, role } = useApp();
+  const { schedule, announcements, role, recaps } = useApp();
   const team = demoTeams.find((item) => item.id === id) ?? demoTeams[0];
   const next = schedule.find((event) => event.teamId === team.id && event.status === 'scheduled');
   const recent = schedule.find((event) => event.teamId === team.id && event.status === 'completed');
@@ -71,7 +72,22 @@ export default function TeamDetailScreen() {
         </>
       )}
 
-      {recent && (
+      {recent && team.id === 'nova-royals-kids-u8' ? (
+        <>
+          <SectionHeading title="Last session" />
+          <Link href={`/session/${recent.id}/recap` as never} asChild>
+            <Pressable style={styles.nextCard}>
+              <View style={styles.flex}>
+                <Text style={styles.nextTitle}>{recent.title}</Text>
+                <Text style={styles.nextMeta}>
+                  {recapForEvent(recaps, recent.id)?.status === 'sent' ? 'Recap sent' : 'Attendance recorded · recap ready'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.stone} />
+            </Pressable>
+          </Link>
+        </>
+      ) : recent ? (
         <>
           <SectionHeading title="Recent result" />
           <View style={styles.resultCard}>
@@ -80,7 +96,7 @@ export default function TeamDetailScreen() {
             <Text style={styles.resultMeta}>{recent.subtitle}</Text>
           </View>
         </>
-      )}
+      ) : null}
 
       <SectionHeading title="Squad" actionLabel={`${team.memberCount} members`} href={`/team/${team.id}`} />
       <View style={styles.roster}>

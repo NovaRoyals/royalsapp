@@ -8,6 +8,7 @@ import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms, demoTeams } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
 import { formatEventParts } from '@/lib/datetime';
+import { ACTIVE_COACH } from '@/lib/coachRecap';
 import { can } from '@/lib/capabilities';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
@@ -28,6 +29,9 @@ export default function AdminScreen() {
     assignRegistrationTeam,
     setFieldStatus,
     upsertEvent,
+    recaps,
+    managerCanSendRecap,
+    setManagerCanSendRecap,
   } = useApp();
   const [tab, setTab] = useState<AdminTab>(can(role, 'review_registrations') ? 'registrations' : 'announcements');
   const [title, setTitle] = useState('');
@@ -79,7 +83,7 @@ export default function AdminScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <View style={styles.flex}><Text style={styles.eyebrow}>ROLE-PROTECTED · DEMO</Text><Text style={styles.title}>{role === 'coach' ? 'U8 staff tools' : 'Club management'}</Text></View>
         <View style={styles.adminMark}><Text style={styles.adminText}>A</Text></View>
       </View>
@@ -89,6 +93,24 @@ export default function AdminScreen() {
         <Metric value={String(role === 'coach' ? 1 : demoTeams.length)} label="TEAMS" />
         <Metric value={canReview && funnel ? 'FUNNEL' : 'STAFF'} label={canReview ? funnel || 'ANALYTICS' : 'SCOPED ACCESS'} />
       </View>
+
+      {can(role, 'audit_coach_updates') ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Coach update delivery</Text>
+          <Text style={styles.sectionCopy}>Guardians see only their household. Child logins do not receive these notes. Managers send only with an explicit grant.</Text>
+          {recaps.filter((item) => item.status === 'sent').map((item) => (
+            <Text key={item.id} style={styles.sectionCopy}>
+              {item.coachName} · {item.recipientCount} families · {item.deliveryStatus ?? 'delivered'}
+            </Text>
+          ))}
+          {!recaps.some((item) => item.status === 'sent') ? <Text style={styles.sectionCopy}>No recaps sent yet.</Text> : null}
+          <Button
+            label={managerCanSendRecap ? 'Revoke manager send' : 'Grant manager send'}
+            variant="secondary"
+            onPress={() => setManagerCanSendRecap(!managerCanSendRecap)}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.tabs}>
         {(
@@ -122,7 +144,7 @@ export default function AdminScreen() {
                 <Button label="Approve" variant={registration.status === 'approved' ? 'primary' : 'secondary'} onPress={() => updateRegistrationStatus(registration.id, 'approved')} style={styles.flex} />
                 <Button label="Waitlist" variant="secondary" onPress={() => updateRegistrationStatus(registration.id, 'waitlisted')} style={styles.flex} />
                 {can(role, 'assign_child_team') ? (
-                  <Button label="Assign U8" variant="secondary" onPress={() => assignRegistrationTeam(registration.id, 'nova-royals-kids-u8', 'Coach Priya Sharma')} />
+                  <Button label="Assign U8" variant="secondary" onPress={() => assignRegistrationTeam(registration.id, 'nova-royals-kids-u8', ACTIVE_COACH.displayName)} />
                 ) : null}
               </View>
             </View>

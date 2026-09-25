@@ -41,6 +41,9 @@ export default function RootLayout() {
             <Stack.Screen name="team/[id]" />
             <Stack.Screen name="competition/[id]" />
             <Stack.Screen name="event/[id]" />
+            <Stack.Screen name="session/[eventId]/recap" />
+            <Stack.Screen name="updates/index" />
+            <Stack.Screen name="updates/[id]" />
             <Stack.Screen name="field/[id]" />
             <Stack.Screen name="cricket/match/[id]" />
             <Stack.Screen name="cricket/player/[id]" />

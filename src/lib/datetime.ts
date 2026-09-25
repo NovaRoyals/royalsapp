@@ -150,6 +150,14 @@ export function isEventOver(event: { startsAt: string; endsAt?: string; status?:
   return eventPhase(event, nowIso) === 'past';
 }
 
+export function hoursAfterEnd(
+  event: { startsAt: string; endsAt?: string },
+  hours: number,
+  nowIso = clubNowIso(),
+) {
+  return new Date(nowIso).getTime() >= new Date(eventEndsAt(event)).getTime() + hours * 3_600_000;
+}
+
 export function relativeDayLabel(startsAt: string, nowPostedIso = clubNowPostedIso()) {
   if (isSameWallDay(startsAt, nowPostedIso)) return 'today';
   const tomorrow = addMinutesToWall(nowPostedIso, 24 * 60);

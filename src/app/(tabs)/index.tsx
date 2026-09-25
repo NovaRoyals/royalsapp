@@ -12,7 +12,8 @@ import { PressableScale } from '@/components/motion';
 import { AppHeader, Button, Screen } from '@/components/ui';
 import { demoPrograms, kidsProgramId } from '@/data/demo';
 import { mayaAttendanceHistory } from '@/lib/attendance';
-import { clubNowIso, formatEventParts, relativeDayLabel } from '@/lib/datetime';
+import { clubNowIso, formatEventParts, hoursAfterEnd, relativeDayLabel } from '@/lib/datetime';
+import { RECAP_EVENT_ID, recapForEvent } from '@/lib/coachRecap';
 import {
   gameDayBrief,
   homeStories,
@@ -37,15 +38,15 @@ const TILE_TINT: Record<Tint, { bg: string; fg: string }> = {
 };
 
 export default function HomeScreen() {
-  const { role, household, registrations, schedule, notifications, hydrated, notificationPrefs, persona, pendingStaffRole } = useApp();
+  const { role, household, registrations, schedule, notifications, hydrated, notificationPrefs, persona, pendingStaffRole, recaps } = useApp();
   const reduced = useReducedMotion();
   const enter = (delay: number, duration = 360) =>
     Platform.OS === 'web' || reduced ? undefined : FadeInDown.delay(delay).duration(duration);
   const [childId, setChildId] = useState(household.children[0]?.id);
   const kidsProgram = demoPrograms.find((item) => item.id === kidsProgramId)!;
-  const unread = notificationsForRole(role, notifications).filter((item) => !item.read);
+  const unread = notificationsForRole(role, notifications, household.children.map((child) => child.id)).filter((item) => !item.read);
   const urgent = unread.find((item) => item.urgency === 'urgent');
-  const [nowIso, setNowIso] = useState(clubNowIso);
+  const [nowIso, setNowIso] = useState('2026-09-25T12:00:00-04:00');
   useEffect(() => {
     const tick = setInterval(() => setNowIso(clubNowIso()), 60_000);
     return () => clearInterval(tick);
@@ -59,7 +60,7 @@ export default function HomeScreen() {
   const hasChildren = household.children.length > 0;
   const staffPending = Boolean(pendingStaffRole);
   const hello = homeGreeting(role, household.guardianName);
-  const missingRsvps = Math.max(0, 12 - (kidsEvent?.goingCount ?? 0));
+  const missingRsvps = Math.max(0, 17 - (kidsEvent?.goingCount ?? 0));
   const mayaCheckedIn = kidsEvent?.checkIns?.some((row) => row.personId === 'child-maya' && row.present);
   const stories = useMemo(
     () => homeStories(schedule, role, hasChildren, nowIso),
@@ -80,11 +81,11 @@ export default function HomeScreen() {
     { label: 'Schedule', detail: 'View upcoming', icon: 'calendar', tint: 'blue', href: '/(tabs)/schedule' },
     { label: 'Fields', detail: 'Tonight’s pickup', icon: 'location', tint: 'teal', href: '/(tabs)/fields' },
     {
-      label: role === 'guardian' && !hasChildren ? 'Register' : 'Updates',
-      detail: role === 'guardian' && !hasChildren ? 'Add a player' : 'News & alerts',
-      icon: role === 'guardian' && !hasChildren ? 'person-add' : 'notifications',
+      label: role === 'guardian' && !hasChildren ? 'Register' : role === 'guardian' ? 'Coach updates' : 'Updates',
+      detail: role === 'guardian' && !hasChildren ? 'Add a player' : role === 'guardian' ? 'From training' : 'News & alerts',
+      icon: role === 'guardian' && !hasChildren ? 'person-add' : role === 'guardian' ? 'chatbubble-ellipses-outline' : 'notifications',
       tint: 'amber',
-      href: role === 'guardian' && !hasChildren ? `/registration/${kidsProgramId}` : '/notifications',
+      href: role === 'guardian' && !hasChildren ? `/registration/${kidsProgramId}` : role === 'guardian' ? '/updates' : '/notifications',
     },
   ];
 
@@ -189,11 +190,15 @@ export default function HomeScreen() {
       {role === 'coach' && kidsEvent ? (
         <Brief title="Take attendance" detail={`${missingRsvps} families still need RSVP`} href={`/event/${kidsEvent.id}`} />
       ) : null}
+      {role === 'coach' || role === 'admin' ? <RecapNudge schedule={schedule} recaps={recaps} /> : null}
       {role === 'adult_player' && menEvent && !menEvent.attendance ? (
         <Brief title="RSVP for the next match" detail="Going, maybe, or can’t go" href={`/event/${menEvent.id}`} />
       ) : null}
       {role === 'admin' && hydrated ? (
         <Brief title="Pending registrations" detail={`${pendingRegs.length} waiting on club review`} href="/admin" />
+      ) : null}
+      {role === 'guardian' && hasChildren ? (
+        <Brief title="Coach updates" detail="Session recaps and notes about your child" href="/updates" />
       ) : null}
       {role === 'guardian' && parentReg && parentReg.paymentStatus !== 'paid' ? (
         <Brief title="Payment still pending" detail={`${parentReg.participantNames.join(', ')} · $${parentReg.amountDue}`} href={`/season/${parentReg.id}`} />
@@ -270,6 +275,26 @@ function StoryCard({ kicker, title, meta, href, startsAt, kind }: HomeStory) {
         </View>
       </PressableScale>
     </Link>
+  );
+}
+
+function RecapNudge({
+  schedule,
+  recaps,
+}: {
+  schedule: ReturnType<typeof useApp>['schedule'];
+  recaps: ReturnType<typeof useApp>['recaps'];
+}) {
+  const session = schedule.find((event) => event.id === RECAP_EVENT_ID);
+  const recap = recapForEvent(recaps, RECAP_EVENT_ID);
+  if (!session || recap?.status === 'sent') return null;
+  if (!hoursAfterEnd(session, 2)) return null;
+  return (
+    <Brief
+      title="Send families a quick session recap"
+      detail="U8 Sunday is complete. Nothing sends until you approve it."
+      href={`/session/${RECAP_EVENT_ID}/recap`}
+    />
   );
 }
 

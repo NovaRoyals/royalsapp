@@ -35,9 +35,20 @@ export function canPlayerRsvp(role: UserRole, event: ScheduleEvent, registration
   return isTeamParticipant(role, event, registrations);
 }
 
-export function notificationsForRole<T extends { type: string; title: string; body: string }>(role: UserRole, items: T[]) {
+export function notificationsForRole<T extends { type: string; title: string; body: string; childId?: string }>(
+  role: UserRole,
+  items: T[],
+  childIds: string[] = ['child-maya'],
+) {
   return items.filter((item) => {
     if (role === 'guest' || role === 'volunteer') return item.type === 'announcement' || item.type === 'weather';
+    if (item.type === 'coach_reminder') return role === 'coach' || role === 'admin';
+    if (item.type === 'coach_update') {
+      if (role === 'admin') return true;
+      if (role !== 'guardian') return false;
+      if (!item.childId) return true;
+      return childIds.includes(item.childId);
+    }
     if (role === 'adult_player') return item.type !== 'registration' && !/Maya/i.test(`${item.title} ${item.body}`);
     if (role === 'coach') return item.type !== 'registration';
     return true;
