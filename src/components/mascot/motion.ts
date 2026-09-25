@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   cancelAnimation,
   Easing,
@@ -174,7 +174,9 @@ export function useRoyMotion({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playingRef = useRef<RoyState>('idle');
   const opts = useRef({ reduced, autoIdle, onComplete, values });
-  opts.current = { reduced, autoIdle, onComplete, values };
+  useLayoutEffect(() => {
+    opts.current = { reduced, autoIdle, onComplete, values };
+  }, [autoIdle, onComplete, reduced, values]);
 
   const clearTimer = () => {
     if (timer.current) {
@@ -381,14 +383,10 @@ export function useRoyMotion({
       didMount.current = true;
       return;
     }
-    if (playingRef.current === 'idle') {
-      if (reduced) {
-        snapRest(values);
-        values.opacity.value = 1;
-      } else {
-        startIdle(values);
-      }
-    }
+    if (playingRef.current !== 'idle') return;
+    const motionValues = opts.current.values;
+    if (opts.current.reduced) snapRest(motionValues);
+    else startIdle(motionValues);
   }, [reduced, values]);
 
   useEffect(

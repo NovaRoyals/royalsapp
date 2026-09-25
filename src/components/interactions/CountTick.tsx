@@ -17,36 +17,34 @@ export function CountTick({
 }) {
   const reduced = useReducedMotion();
   const fromRef = useRef(value);
-  const [shown, setShown] = useState(value);
+  const [animated, setAnimated] = useState(value);
+  const shown = reduced ? value : animated;
   const bump = useSharedValue(1);
 
   useEffect(() => {
-    if (fromRef.current === value) {
-      setShown(value);
+    if (reduced) {
+      fromRef.current = value;
       return;
     }
+    if (fromRef.current === value) return;
     const from = fromRef.current;
     fromRef.current = value;
-    if (reduced) {
-      setShown(value);
-      return;
-    }
     bump.value = 1.08;
     bump.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
     const start = Date.now();
     let frame = 0;
     const tick = () => {
       const t = Math.min(1, (Date.now() - start) / motion.duration.enter);
-      setShown(Math.round(from + (value - from) * t));
+      setAnimated(Math.round(from + (value - from) * t));
       if (t < 1) frame = requestAnimationFrame(tick);
-      else setShown(value);
+      else setAnimated(value);
     };
     frame = requestAnimationFrame(tick);
-    const fallback = setTimeout(() => setShown(value), motion.duration.enter + 40);
+    const fallback = setTimeout(() => setAnimated(value), motion.duration.enter + 40);
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(fallback);
-      setShown(value);
+      setAnimated(value);
     };
   }, [value, reduced, bump]);
 

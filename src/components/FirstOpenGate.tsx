@@ -12,7 +12,8 @@ export function FirstOpenGate({ children }: { children: ReactNode }) {
   const { hasHydrated, introCompleted } = useApp();
   const pathname = usePathname();
   const router = useRouter();
-  const [splashPlay, setSplashPlay] = useState(true);
+  const [splashDecision, setSplashDecision] = useState<{ intro: boolean; mode: 'play' | 'skip' } | null>(null);
+  const [dismissedIntro, setDismissedIntro] = useState<boolean | null>(null);
   const [splashDone, setSplashDone] = useState(false);
 
   hydrateTrace('FirstOpenGate', {
@@ -31,29 +32,26 @@ export function FirstOpenGate({ children }: { children: ReactNode }) {
     }
   }, [hasHydrated, introCompleted, pathname, router]);
 
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (!introCompleted) {
-      setSplashPlay(true);
-      setSplashDone(false);
-      return;
-    }
-    try {
-      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(SPLASH_SESSION_KEY)) {
-        setSplashPlay(false);
-        setSplashDone(true);
-        return;
+  if (hasHydrated && splashDecision?.intro !== introCompleted) {
+    let skip = false;
+    if (introCompleted && typeof sessionStorage !== 'undefined') {
+      try {
+        skip = sessionStorage.getItem(SPLASH_SESSION_KEY) === '1';
+        if (!skip) sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
+      } catch {
+        skip = false;
       }
-      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
-    } catch {
-      undefined;
     }
-    setSplashPlay(true);
-  }, [hasHydrated, introCompleted]);
+    setSplashDecision({ intro: introCompleted, mode: skip ? 'skip' : 'play' });
+  }
+  if (splashDecision && dismissedIntro !== splashDecision.intro) {
+    setDismissedIntro(splashDecision.intro);
+    setSplashDone(splashDecision.mode === 'skip');
+  }
+  const splashPlay = splashDecision?.mode === 'play' && !splashDone;
 
   const onFinished = useCallback(() => {
     setSplashDone(true);
-    setSplashPlay(false);
   }, []);
 
   if (!hasHydrated) return <InkHold />;

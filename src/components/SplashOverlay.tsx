@@ -23,23 +23,25 @@ export function SplashOverlay({
   onFinished?: () => void;
 }) {
   const reduced = useReducedMotion();
-  const [visible, setVisible] = useState(play);
+  const [playCycle, setPlayCycle] = useState(play);
+  const [hidden, setHidden] = useState(false);
+  if (play !== playCycle) {
+    setPlayCycle(play);
+    if (play) setHidden(false);
+  }
+  const visible = play && !hidden;
   const veil = useSharedValue(play ? 1 : 0);
   const lift = useSharedValue(0);
 
   useEffect(() => {
-    if (!play) {
-      setVisible(false);
-      return;
-    }
+    if (!play) return;
     let settled = false;
     const finish = () => {
       if (settled) return;
       settled = true;
-      setVisible(false);
+      setHidden(true);
       onFinished?.();
     };
-    setVisible(true);
     veil.value = 1;
     lift.value = 0;
     const failsafe = setTimeout(finish, reduced ? 220 : 2200);
