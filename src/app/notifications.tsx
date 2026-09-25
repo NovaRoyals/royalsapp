@@ -21,6 +21,9 @@ const icons = {
   result: 'trophy-outline',
   coach_update: 'chatbubble-ellipses-outline',
   coach_reminder: 'mic-outline',
+  rsvp: 'checkmark-circle-outline',
+  supporter: 'heart-outline',
+  field: 'warning-outline',
 } as const;
 
 export default function NotificationsScreen() {

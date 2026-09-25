@@ -7,8 +7,10 @@ export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'trai
 export type RegistrationStatus = 'draft' | 'submitted' | 'pending' | 'approved' | 'waitlisted' | 'rejected' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded';
 export type AttendanceStatus = 'going' | 'maybe' | 'not_going';
-export type FieldStatus = 'open' | 'closed' | 'delayed';
+export type FieldStatus = 'open' | 'delayed' | 'inspection_pending' | 'closed' | 'relocated';
 export type NoticeUrgency = 'urgent' | 'high' | 'normal' | 'low';
+export type EventChangeKind = 'closure' | 'relocation' | 'cancellation' | 'time_change' | 'instruction';
+export type ChangeApproval = 'requested' | 'published';
 
 export interface Program {
   id: string;
@@ -95,6 +97,64 @@ export interface AttendanceMark {
   status: 'present' | 'absent' | 'late';
 }
 
+/** Intended participation before a session. Distinct from AttendanceMark. */
+export interface ParticipantRsvp {
+  personId: string;
+  personName: string;
+  status: AttendanceStatus;
+  updatedAt: string;
+}
+
+export interface EventChange {
+  id: string;
+  kind: EventChangeKind;
+  reason: string;
+  previousVenue?: string;
+  previousAddress?: string;
+  nextVenue?: string;
+  nextAddress?: string;
+  actorName: string;
+  actorRole: UserRole;
+  createdAt: string;
+  approval: ChangeApproval;
+  notificationStatus: 'queued' | 'delivered';
+  reschedulePending?: boolean;
+}
+
+export interface VenuePlace {
+  id: string;
+  name: string;
+  fieldNumber: string;
+  address: string;
+  arrival: string;
+  parkingNotes: string;
+  entrance: string;
+  surface: string;
+  restrooms?: string;
+}
+
+export interface VenueStatusUpdate {
+  id: string;
+  venueId: string;
+  status: FieldStatus;
+  reason: string;
+  updatedAt: string;
+  updatedBy: string;
+  actorRole: UserRole;
+  replacementVenueId?: string;
+  affectedEventIds: string[];
+}
+
+export interface AuditRecord {
+  id: string;
+  action: string;
+  targetId: string;
+  actorName: string;
+  actorRole: UserRole;
+  at: string;
+  detail: string;
+}
+
 export interface ScheduleEvent {
   id: string;
   type: EventType;
@@ -122,6 +182,30 @@ export interface ScheduleEvent {
   checkIns?: AttendanceMark[];
   volunteerSpots?: number;
   demo?: boolean;
+  venueId?: string;
+  participantIds?: string[];
+  participantRsvps?: ParticipantRsvp[];
+  ageGroup?: string;
+  sessionNumber?: number;
+  sessionTotal?: number;
+  arrivalAt?: string;
+  rsvpDeadline?: string;
+  opponent?: string;
+  competitionLabel?: string;
+  rosterStatus?: string;
+  division?: string;
+  checkInAt?: string;
+  tournamentName?: string;
+  tournamentRange?: string;
+  purpose?: string;
+  volunteerNeeds?: string;
+  instructions?: string;
+  previousVenue?: string;
+  previousAddress?: string;
+  changes?: EventChange[];
+  pendingChange?: EventChange;
+  reschedulePending?: boolean;
+  cancellationReason?: string;
 }
 
 export interface StandingRow {
@@ -192,7 +276,7 @@ export interface DirectMessage {
 
 export interface AppNotification {
   id: string;
-  type: 'registration' | 'reminder' | 'change' | 'weather' | 'announcement' | 'result' | 'coach_update' | 'coach_reminder';
+  type: 'registration' | 'reminder' | 'change' | 'weather' | 'announcement' | 'result' | 'coach_update' | 'coach_reminder' | 'rsvp' | 'supporter' | 'field';
   title: string;
   body: string;
   createdAt: string;
@@ -201,6 +285,9 @@ export interface AppNotification {
   urgency?: NoticeUrgency;
   wouldPush?: boolean;
   childId?: string;
+  eventId?: string;
+  /** Skip an identical unread alert. Demo stand-in for a server uniqueness key. */
+  dedupeKey?: string;
 }
 
 export interface NotificationPrefs {

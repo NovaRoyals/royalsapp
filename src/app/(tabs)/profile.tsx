@@ -19,7 +19,7 @@ const roleLabels: Record<UserRole, string> = {
   guardian: 'Parent / guardian',
   coach: 'Coach / manager',
   volunteer: 'Volunteer',
-  competition_manager: 'Competition manager',
+  competition_manager: 'Team manager',
   admin: 'Club administrator',
 };
 
@@ -286,7 +286,7 @@ export default function ProfileScreen() {
         <Ionicons name="sparkles-outline" size={20} color={colors.orange} />
       </Pressable>
       <View style={styles.roleGrid}>
-        {(['guest', 'guardian', 'adult_player', 'coach', 'volunteer', 'admin'] as UserRole[]).map((item) => (
+        {(['guest', 'guardian', 'adult_player', 'coach', 'competition_manager', 'volunteer', 'admin'] as UserRole[]).map((item) => (
           <Pressable
             key={item}
             accessibilityRole="button"

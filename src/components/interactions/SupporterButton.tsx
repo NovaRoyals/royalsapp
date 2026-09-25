@@ -49,9 +49,9 @@ export function SupporterButton({
         accessibilityRole="button"
         accessibilityState={{ selected: going }}
         onPress={() => {
-          const next = !going;
-          haptic(next ? hapticKind : 'light');
-          onToggle(next);
+          if (going) return;
+          haptic(hapticKind);
+          onToggle(true);
         }}
         style={[styles.button, going && styles.buttonOn]}
       >
@@ -66,8 +66,20 @@ export function SupporterButton({
       <View style={styles.meta}>
         <FaceStack count={count} joined={going} />
         <Animated.View style={bumpStyle}>
-          <CountTick value={count} suffix="Royals going" style={styles.count} />
+          <CountTick value={count} suffix={going ? 'supporting' : 'Royals going'} style={styles.count} />
         </Animated.View>
+        {going ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Change supporter response"
+            onPress={() => {
+              haptic('light');
+              onToggle(false);
+            }}
+          >
+            <Text style={styles.change}>Change</Text>
+          </PressableScale>
+        ) : null}
       </View>
     </View>
   );
@@ -106,9 +118,9 @@ export function CalendarConfirmButton({
         <Animated.View style={iconStyle}>
           <Ionicons name={added ? 'checkmark' : 'calendar-outline'} size={18} color={added ? colors.white : colors.ink} />
         </Animated.View>
-        <Text style={[styles.calLabel, added && styles.labelOn]}>{added ? 'Added to calendar' : labelIdle}</Text>
+        <Text style={[styles.calLabel, added && styles.labelOn]}>{added ? 'Preview ready' : labelIdle}</Text>
       </PressableScale>
-      {added ? <Text style={styles.note}>Saved on this device · calendar write is a stub.</Text> : null}
+      {added ? <Text style={styles.note}>Not written to a calendar. Google, Apple, and .ics can connect later.</Text> : null}
     </View>
   );
 }
@@ -131,6 +143,7 @@ const styles = StyleSheet.create({
   labelOn: { color: colors.white },
   meta: { gap: spacing.sm, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   count: { color: colors.charcoal, fontSize: 13, ...typography.body },
+  change: { color: colors.orangeDark, fontSize: 13, paddingVertical: 8, ...typography.label },
   note: { color: colors.success, fontSize: 13, marginTop: spacing.sm, ...typography.bodyMedium },
   cal: {
     minHeight: 52,

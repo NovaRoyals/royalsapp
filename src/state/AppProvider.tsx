@@ -19,6 +19,21 @@ import { can, canSendSessionRecap } from '@/lib/capabilities';
 import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapBody } from '@/lib/coachRecap';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
 import { COACH_TEAM_ID } from '@/lib/membership';
+import {
+  auditEntry,
+  canEditEventInstructions,
+  canPublishOperations,
+  canRemindNonResponders,
+  canRequestOperationalChange,
+  canRsvpForPerson,
+  changeEntry,
+  nonResponders,
+  pushUnique,
+  rosterForEvent,
+  venueUpdate,
+  withRsvp,
+} from '@/lib/operations';
+import { venueById, venueTitle } from '@/data/venues';
 import { clearRegistrationDraft } from '@/lib/registrationDraft';
 import type {
   Announcement,
@@ -26,6 +41,7 @@ import type {
   AppNotification,
   AttendanceMark,
   AttendanceStatus,
+  AuditRecord,
   CoachUpdate,
   DirectMessage,
   FieldStatus,
@@ -39,6 +55,7 @@ import type {
   ScheduleEvent,
   SessionRecap,
   UserRole,
+  VenueStatusUpdate,
   ClubRelationship,
 } from '@/types/domain';
 
@@ -86,6 +103,8 @@ type PersistedState = {
   recaps: SessionRecap[];
   coachUpdates: CoachUpdate[];
   managerCanSendRecap: boolean;
+  venueUpdates: VenueStatusUpdate[];
+  audit: AuditRecord[];
 };
 
 type NewRegistration = Omit<Registration, 'id' | 'submittedAt' | 'demo'>;
@@ -110,8 +129,15 @@ interface AppState extends PersistedState {
   addChild: (child: Omit<Person, 'id' | 'displayName' | 'isMinor'>) => Person;
   submitRegistration: (registration: NewRegistration) => Registration;
   setAttendance: (eventId: string, status: AttendanceStatus) => void;
+  setParticipantRsvp: (eventId: string, personId: string, status: AttendanceStatus) => void;
   setSupporter: (eventId: string, going: boolean) => void;
   setFieldStatus: (eventId: string, status: FieldStatus, reason?: string) => void;
+  closeVenue: (venueId: string, reason: string) => void;
+  relocateEvent: (eventId: string, venueId: string, reason?: string) => void;
+  cancelEvent: (eventId: string, reason: string) => void;
+  requestOperationalChange: (eventId: string, kind: 'relocation' | 'cancellation', reason: string) => void;
+  setEventInstructions: (eventId: string, instructions: string) => void;
+  remindNonResponders: (eventId: string) => number;
   recordCheckIn: (eventId: string, mark: AttendanceMark) => void;
   recordAllPresent: (eventId: string, people: Person[]) => void;
   updateRegistrationStatus: (registrationId: string, status: RegistrationStatus) => void;
@@ -152,6 +178,18 @@ function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
         checkIns: overlay.checkIns ?? event.checkIns,
         result: event.sport === 'cricket' ? event.result : overlay.result ?? event.result,
         status: overlay.status ?? event.status,
+        participantRsvps: overlay.participantRsvps ?? event.participantRsvps,
+        participantIds: overlay.participantIds ?? event.participantIds,
+        venue: overlay.venue ?? event.venue,
+        address: overlay.address ?? event.address,
+        venueId: overlay.venueId ?? event.venueId,
+        previousVenue: overlay.previousVenue ?? event.previousVenue,
+        previousAddress: overlay.previousAddress ?? event.previousAddress,
+        changes: overlay.changes ?? event.changes,
+        pendingChange: overlay.pendingChange ?? event.pendingChange,
+        instructions: overlay.instructions ?? event.instructions,
+        cancellationReason: overlay.cancellationReason ?? event.cancellationReason,
+        reschedulePending: overlay.reschedulePending ?? event.reschedulePending,
       };
     }),
     ...extra,
@@ -184,6 +222,12 @@ function visitorNotifications() {
   return demoNotifications.filter((item) => item.type === 'announcement' || item.type === 'weather');
 }
 
+function mergeRegistrations(saved?: Registration[]) {
+  const base = saved ?? [];
+  const ids = new Set(base.map((item) => item.id));
+  return [...base, ...demoRegistrations.filter((item) => !ids.has(item.id))];
+}
+
 function visitorSeed(role: UserRole = 'guest'): PersistedState {
   return {
     persona: 'visitor',
@@ -204,6 +248,8 @@ function visitorSeed(role: UserRole = 'guest'): PersistedState {
     recaps: [],
     coachUpdates: [],
     managerCanSendRecap: false,
+    venueUpdates: [],
+    audit: [],
   };
 }
 
@@ -227,6 +273,8 @@ function demoSeed(role: UserRole): PersistedState {
     recaps: [demoDraftRecap()],
     coachUpdates: [],
     managerCanSendRecap: false,
+    venueUpdates: [],
+    audit: [],
   };
 }
 
@@ -263,8 +311,11 @@ function readPersistedState(saved: string | null): PersistedState {
       role,
       introCompleted: parsed.introCompleted ?? true,
       schedule: mergeClubSchedule(parsed.schedule),
+      registrations: mergeRegistrations(parsed.registrations),
       followedIds: mergeFollowedIds(parsed.followedIds),
       household: householdForRole(role),
+      venueUpdates: parsed.venueUpdates ?? [],
+      audit: parsed.audit ?? [],
       recaps: (parsed.recaps ?? [demoDraftRecap()]).map((item) => ({ ...item, coachName: ACTIVE_COACH.displayName })),
       coachUpdates: (parsed.coachUpdates ?? []).map((item) => ({ ...item, coachName: ACTIVE_COACH.displayName })),
       managerCanSendRecap: parsed.managerCanSendRecap ?? false,
@@ -287,6 +338,8 @@ function readPersistedState(saved: string | null): PersistedState {
     recaps: parsed.recaps ?? [],
     coachUpdates: parsed.coachUpdates ?? [],
     managerCanSendRecap: parsed.managerCanSendRecap ?? false,
+    venueUpdates: parsed.venueUpdates ?? [],
+    audit: parsed.audit ?? [],
   };
 }
 
@@ -465,24 +518,85 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setAttendance = useCallback((eventId: string, status: AttendanceStatus) => {
-    setState((current) => ({
-      ...current,
-      schedule: mergeClubSchedule(current.schedule).map((event) => {
+    setState((current) => {
+      if (current.role !== 'adult_player' && current.role !== 'admin') return current;
+      const schedule = mergeClubSchedule(current.schedule).map((event) => {
         if (event.id !== eventId) return event;
+        if (current.role === 'adult_player' && event.teamId !== 'nova-royals-men') return event;
         const prev = event.attendance;
         let goingCount = event.goingCount ?? 0;
         if (status === 'going' && prev !== 'going') goingCount += 1;
         if (prev === 'going' && status !== 'going') goingCount = Math.max(0, goingCount - 1);
         return { ...event, attendance: status, goingCount };
-      }),
-    }));
+      });
+      const event = schedule.find((item) => item.id === eventId);
+      const alert = event
+        ? notice({
+            type: 'rsvp',
+            title: status === 'going' ? 'You’re going' : status === 'maybe' ? 'Marked as not sure' : 'Can’t make it',
+            body: `${event.title} · ${event.venue}`,
+            route: `/event/${eventId}`,
+            eventId,
+            urgency: 'normal',
+            dedupeKey: `rsvp-self:${eventId}:${status}`,
+          })
+        : null;
+      return {
+        ...current,
+        schedule,
+        notifications: alert ? pushUnique(current.notifications, alert) : current.notifications,
+      };
+    });
     track('rsvp_completed', { eventId });
   }, []);
 
+  const setParticipantRsvp = useCallback((eventId: string, personId: string, status: AttendanceStatus) => {
+    setState((current) => {
+      const child = current.household.children.find((item) => item.id === personId);
+      if (!canRsvpForPerson(current.role, personId, current.household.children) || !child) return current;
+      const schedule = mergeClubSchedule(current.schedule).map((event) => {
+        if (event.id !== eventId) return event;
+        if (!event.participantIds?.includes(personId)) return event;
+        return withRsvp(event, child, status, new Date().toISOString());
+      });
+      const event = schedule.find((item) => item.id === eventId);
+      const label = status === 'going' ? 'Going' : status === 'maybe' ? 'Not sure' : 'Can’t make it';
+      const alert = event
+        ? notice({
+            type: 'rsvp',
+            title: `${child.firstName} — ${label}`,
+            body: `${event.title} · ${event.venue}`,
+            route: `/event/${eventId}`,
+            eventId,
+            childId: child.id,
+            urgency: 'normal',
+            dedupeKey: `rsvp:${eventId}:${personId}:${status}`,
+          })
+        : null;
+      return {
+        ...current,
+        schedule,
+        notifications: alert ? pushUnique(current.notifications, alert) : current.notifications,
+        audit: [
+          auditEntry({
+            action: 'participant_rsvp',
+            targetId: eventId,
+            actorName: current.household.guardianName || 'Parent',
+            actorRole: current.role,
+            detail: `${child.firstName} · ${label}`,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
+    track('rsvp_completed', { eventId, personId });
+    hapticLight();
+  }, []);
+
   const setSupporter = useCallback((eventId: string, going: boolean) => {
-    setState((current) => ({
-      ...current,
-      schedule: mergeClubSchedule(current.schedule).map((event) => {
+    setState((current) => {
+      if (current.role === 'guest') return current;
+      const schedule = mergeClubSchedule(current.schedule).map((event) => {
         if (event.id !== eventId) return event;
         const base = event.supporterCount ?? 0;
         const was = Boolean(event.supporterGoing);
@@ -490,40 +604,385 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (going && !was) count += 1;
         if (!going && was) count = Math.max(0, count - 1);
         return { ...event, supporterGoing: going, supporterCount: count };
-      }),
-    }));
+      });
+      const event = schedule.find((item) => item.id === eventId);
+      const alert =
+        event && going
+          ? notice({
+              type: 'supporter',
+              title: 'You’re supporting',
+              body: `${event.title} · ${event.venue}. This does not add you to the roster.`,
+              route: `/event/${eventId}`,
+              eventId,
+              urgency: 'normal',
+              dedupeKey: `support:${eventId}`,
+            })
+          : null;
+      return {
+        ...current,
+        schedule,
+        notifications: alert ? pushUnique(current.notifications, alert) : current.notifications,
+      };
+    });
+    hapticLight();
+  }, []);
+
+  const closeVenue = useCallback((venueId: string, reason: string) => {
+    setState((current) => {
+      if (!canPublishOperations(current.role)) return current;
+      const place = venueById(venueId);
+      const placeName = place ? venueTitle(place) : 'Field';
+      const schedule = mergeClubSchedule(current.schedule);
+      const affected = schedule.filter((event) => event.venueId === venueId && event.status !== 'completed');
+      const change = changeEntry({
+        kind: 'closure',
+        reason,
+        actorName: 'Club administrator',
+        actorRole: 'admin',
+        approval: 'published',
+        previousVenue: placeName,
+      });
+      const next = schedule.map((event) =>
+        affected.some((item) => item.id === event.id)
+          ? { ...event, fieldStatus: 'closed' as const, changes: [change, ...(event.changes ?? [])] }
+          : event,
+      );
+      const primary = affected[0];
+      const alert = notice({
+        type: 'field',
+        title: `${placeName} is closed`,
+        body: reason,
+        route: primary ? `/event/${primary.id}` : `/venue/${venueId}`,
+        eventId: primary?.id,
+        urgency: 'urgent',
+        wouldPush: true,
+        dedupeKey: `field-closed:${venueId}`,
+      });
+      const update = venueUpdate({
+        venueId,
+        status: 'closed',
+        reason,
+        updatedBy: 'Club administrator',
+        actorRole: 'admin',
+        affectedEventIds: affected.map((item) => item.id),
+      });
+      return {
+        ...current,
+        schedule: next,
+        venueUpdates: [update, ...current.venueUpdates],
+        notifications: pushUnique(current.notifications, alert),
+        audit: [
+          auditEntry({
+            action: 'field_closure',
+            targetId: venueId,
+            actorName: 'Club administrator',
+            actorRole: 'admin',
+            detail: reason,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
+    haptic('warning');
   }, []);
 
   const setFieldStatus = useCallback((eventId: string, status: FieldStatus, reason?: string) => {
     setState((current) => {
-      const schedule = mergeClubSchedule(current.schedule).map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              fieldStatus: status,
-              status: status === 'closed' ? 'cancelled' : event.status === 'cancelled' && status === 'open' ? 'scheduled' : event.status,
-            }
-          : event,
-      );
+      if (!canPublishOperations(current.role)) return current;
+      const base = mergeClubSchedule(current.schedule);
+      const target = base.find((item) => item.id === eventId);
+      if (!target) return current;
+      if (status === 'closed' && target.venueId) {
+        const place = venueById(target.venueId);
+        const placeName = place ? venueTitle(place) : target.venue;
+        const affected = base.filter((event) => event.venueId === target.venueId && event.status !== 'completed');
+        const closureReason = reason || `${placeName} is closed due to unsafe conditions.`;
+        const change = changeEntry({
+          kind: 'closure',
+          reason: closureReason,
+          actorName: 'Club administrator',
+          actorRole: 'admin',
+          approval: 'published',
+          previousVenue: placeName,
+        });
+        const schedule = base.map((event) =>
+          affected.some((item) => item.id === event.id)
+            ? { ...event, fieldStatus: 'closed' as const, changes: [change, ...(event.changes ?? [])] }
+            : event,
+        );
+        const alert = notice({
+          type: 'field',
+          title: `${placeName} is closed`,
+          body: closureReason,
+          route: `/event/${eventId}`,
+          eventId,
+          urgency: 'urgent',
+          wouldPush: true,
+          dedupeKey: `field-closed:${target.venueId}`,
+        });
+        return {
+          ...current,
+          schedule,
+          notifications: pushUnique(current.notifications, alert),
+          venueUpdates: [
+            venueUpdate({
+              venueId: target.venueId,
+              status: 'closed',
+              reason: closureReason,
+              updatedBy: 'Club administrator',
+              actorRole: 'admin',
+              affectedEventIds: affected.map((item) => item.id),
+            }),
+            ...current.venueUpdates,
+          ],
+          audit: [
+            auditEntry({
+              action: 'field_closure',
+              targetId: target.venueId,
+              actorName: 'Club administrator',
+              actorRole: 'admin',
+              detail: closureReason,
+            }),
+            ...current.audit,
+          ],
+        };
+      }
+      const reopening = status === 'open' && target.venueId;
+      const schedule = base.map((event) => {
+        if (reopening && event.venueId === target.venueId && event.fieldStatus === 'closed') {
+          return { ...event, fieldStatus: 'open' as const };
+        }
+        if (event.id === eventId) return { ...event, fieldStatus: status };
+        return event;
+      });
+      return { ...current, schedule };
+    });
+    haptic(status === 'closed' ? 'warning' : 'light');
+  }, []);
+
+  const relocateEvent = useCallback((eventId: string, venueId: string, reason?: string) => {
+    setState((current) => {
+      if (!canPublishOperations(current.role)) return current;
+      const place = venueById(venueId);
+      if (!place) return current;
+      const nextLabel = venueTitle(place);
+      const schedule = mergeClubSchedule(current.schedule).map((event) => {
+        if (event.id !== eventId) return event;
+        const change = changeEntry({
+          kind: 'relocation',
+          reason: reason || `Moved to ${nextLabel}.`,
+          previousVenue: event.venue,
+          previousAddress: event.address,
+          nextVenue: nextLabel,
+          nextAddress: place.address,
+          actorName: 'Club administrator',
+          actorRole: 'admin',
+          approval: 'published',
+        });
+        return {
+          ...event,
+          previousVenue: event.venue,
+          previousAddress: event.address,
+          venue: nextLabel,
+          address: place.address,
+          venueId: place.id,
+          fieldStatus: 'relocated' as const,
+          parkingNotes: place.parkingNotes,
+          pendingChange: undefined,
+          changes: [change, ...(event.changes ?? [])],
+        };
+      });
       const event = schedule.find((item) => item.id === eventId);
-      const urgent = status === 'closed';
       const alert = event
         ? notice({
-            type: 'weather',
-            title: urgent ? `${event.venue} closed` : `Field update · ${event.title}`,
-            body: reason || (urgent ? 'Do not travel. We will post the makeup plan.' : `Status is now ${status}.`),
+            type: 'field',
+            title: `${event.title} moved to ${event.venue}`,
+            body: event.previousVenue ? `Previous location: ${event.previousVenue}. Directions now use ${event.venue}.` : `Now at ${event.venue}.`,
             route: `/event/${eventId}`,
-            urgency: urgent ? 'urgent' : 'high',
+            eventId,
+            urgency: 'high',
             wouldPush: true,
+            dedupeKey: `relocated:${eventId}:${venueId}`,
           })
         : null;
       return {
         ...current,
         schedule,
-        notifications: alert ? [alert, ...current.notifications] : current.notifications,
+        notifications: alert ? pushUnique(current.notifications, alert) : current.notifications,
+        audit: [
+          auditEntry({
+            action: 'relocation',
+            targetId: eventId,
+            actorName: 'Club administrator',
+            actorRole: 'admin',
+            detail: event ? `${event.previousVenue} → ${event.venue}` : venueId,
+          }),
+          ...current.audit,
+        ],
       };
     });
-    haptic(status === 'closed' ? 'warning' : 'light');
+    haptic('warning');
+  }, []);
+
+  const cancelEvent = useCallback((eventId: string, reason: string) => {
+    setState((current) => {
+      if (!canPublishOperations(current.role)) return current;
+      const schedule = mergeClubSchedule(current.schedule).map((event) => {
+        if (event.id !== eventId) return event;
+        const change = changeEntry({
+          kind: 'cancellation',
+          reason,
+          actorName: 'Club administrator',
+          actorRole: 'admin',
+          approval: 'published',
+          reschedulePending: true,
+        });
+        return {
+          ...event,
+          status: 'cancelled' as const,
+          cancellationReason: reason,
+          reschedulePending: true,
+          pendingChange: undefined,
+          changes: [change, ...(event.changes ?? [])],
+        };
+      });
+      const event = schedule.find((item) => item.id === eventId);
+      const alert = event
+        ? notice({
+            type: 'change',
+            title: `${event.title} is cancelled`,
+            body: `${reason} Rescheduling information is pending.`,
+            route: `/event/${eventId}`,
+            eventId,
+            urgency: 'urgent',
+            wouldPush: true,
+            dedupeKey: `cancelled:${eventId}`,
+          })
+        : null;
+      return {
+        ...current,
+        schedule,
+        notifications: alert ? pushUnique(current.notifications, alert) : current.notifications,
+        audit: [
+          auditEntry({
+            action: 'cancellation',
+            targetId: eventId,
+            actorName: 'Club administrator',
+            actorRole: 'admin',
+            detail: reason,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
+    haptic('warning');
+  }, []);
+
+  const requestOperationalChange = useCallback((eventId: string, kind: 'relocation' | 'cancellation', reason: string) => {
+    setState((current) => {
+      const scheduleBase = mergeClubSchedule(current.schedule);
+      const target = scheduleBase.find((item) => item.id === eventId);
+      if (!target || !canRequestOperationalChange(current.role, target.teamId)) return current;
+      const actorName = current.role === 'coach' ? 'Coach Priya Sharma' : 'Team manager';
+      const pending = changeEntry({
+        kind,
+        reason,
+        actorName,
+        actorRole: current.role,
+        approval: 'requested',
+        previousVenue: target.venue,
+      });
+      const schedule = scheduleBase.map((event) => (event.id === eventId ? { ...event, pendingChange: pending } : event));
+      const alert = notice({
+        type: 'change',
+        title: kind === 'relocation' ? 'Relocation requested' : 'Cancellation requested',
+        body: `${target.title}. ${reason} A club admin still needs to publish this.`,
+        route: `/event/${eventId}`,
+        eventId,
+        urgency: 'high',
+        dedupeKey: `request:${eventId}:${kind}`,
+      });
+      return {
+        ...current,
+        schedule,
+        notifications: pushUnique(current.notifications, alert),
+        audit: [
+          auditEntry({
+            action: `request_${kind}`,
+            targetId: eventId,
+            actorName,
+            actorRole: current.role,
+            detail: reason,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
+    hapticLight();
+  }, []);
+
+  const setEventInstructions = useCallback((eventId: string, instructions: string) => {
+    setState((current) => {
+      const target = mergeClubSchedule(current.schedule).find((item) => item.id === eventId);
+      if (!target || !canEditEventInstructions(current.role, target.teamId)) return current;
+      const actorName = current.role === 'admin' ? 'Club administrator' : current.role === 'coach' ? 'Coach Priya Sharma' : 'Team manager';
+      return {
+        ...current,
+        schedule: mergeClubSchedule(current.schedule).map((event) =>
+          event.id === eventId ? { ...event, instructions: instructions.trim() } : event,
+        ),
+        audit: [
+          auditEntry({
+            action: 'event_instructions',
+            targetId: eventId,
+            actorName,
+            actorRole: current.role,
+            detail: instructions.trim(),
+          }),
+          ...current.audit,
+        ],
+      };
+    });
+    hapticLight();
+  }, []);
+
+  const remindNonResponders = useCallback((eventId: string) => {
+    let sent = 0;
+    setState((current) => {
+      const event = mergeClubSchedule(current.schedule).find((item) => item.id === eventId);
+      if (!event || !canRemindNonResponders(current.role, event.teamId)) return current;
+      const waiting = nonResponders(event, rosterForEvent(event));
+      sent = waiting.length;
+      if (!waiting.length) return current;
+      const familyAlerts = waiting
+        .filter((person) => current.household.children.some((child) => child.id === person.id))
+        .map((person) =>
+          notice({
+            type: 'reminder',
+            title: 'Coach is waiting for a response',
+            body: `${person.firstName} has not responded for ${event.title}.`,
+            route: `/event/${eventId}`,
+            eventId,
+            childId: person.id,
+            urgency: 'high',
+            dedupeKey: `remind:${eventId}:${person.id}`,
+          }),
+        );
+      const coachAlert = notice({
+        type: 'coach_reminder',
+        title: 'Reminder queued',
+        body: `${waiting.length} ${waiting.length === 1 ? 'family has' : 'families have'} not responded. Families who already replied were not included.`,
+        route: `/event/${eventId}`,
+        eventId,
+        urgency: 'normal',
+        dedupeKey: `remind-coach:${eventId}:${waiting.map((person) => person.id).sort().join(',')}`,
+      });
+      let notifications = current.notifications;
+      for (const alert of [coachAlert, ...familyAlerts]) notifications = pushUnique(notifications, alert);
+      return { ...current, notifications };
+    });
+    hapticLight();
+    return sent;
   }, []);
 
   const recordCheckIn = useCallback((eventId: string, mark: AttendanceMark) => {
@@ -834,8 +1293,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addChild,
       submitRegistration,
       setAttendance,
+      setParticipantRsvp,
       setSupporter,
       setFieldStatus,
+      closeVenue,
+      relocateEvent,
+      cancelEvent,
+      requestOperationalChange,
+      setEventInstructions,
+      remindNonResponders,
       recordCheckIn,
       recordAllPresent,
       updateRegistrationStatus,
@@ -865,8 +1331,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addChild,
       submitRegistration,
       setAttendance,
+      setParticipantRsvp,
       setSupporter,
       setFieldStatus,
+      closeVenue,
+      relocateEvent,
+      cancelEvent,
+      requestOperationalChange,
+      setEventInstructions,
+      remindNonResponders,
       recordCheckIn,
       recordAllPresent,
       updateRegistrationStatus,

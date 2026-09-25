@@ -2,19 +2,26 @@ import type { FieldStatus, ScheduleEvent } from '@/types/domain';
 
 export type WeatherSnapshot = {
   summary: string;
-  source: 'stub';
+  detail: string;
+  source: 'unconfigured';
 };
 
-/** Placeholder until a weather / parks field-status provider is approved. */
-export function weatherForEvent(event: ScheduleEvent): WeatherSnapshot {
-  if (event.weatherSummary) return { summary: event.weatherSummary, source: 'stub' };
-  if (event.fieldStatus === 'closed') return { summary: 'Fields closed · do not travel', source: 'stub' };
-  if (event.fieldStatus === 'delayed') return { summary: 'Start delayed · check back before leaving', source: 'stub' };
-  return { summary: 'Clear enough to play · stub forecast', source: 'stub' };
+/**
+ * Live weather is not configured. Callers must show this as a placeholder.
+ * Do not invent a temperature or a current condition.
+ */
+export function weatherForEvent(_event?: ScheduleEvent): WeatherSnapshot {
+  return {
+    summary: 'Weather placeholder',
+    detail: 'Live weather is not connected. This is not a current forecast.',
+    source: 'unconfigured',
+  };
 }
 
 export function fieldStatusLabel(status: FieldStatus = 'open') {
   if (status === 'closed') return 'Closed';
   if (status === 'delayed') return 'Delayed';
+  if (status === 'inspection_pending') return 'Inspection pending';
+  if (status === 'relocated') return 'Relocated';
   return 'Open';
 }

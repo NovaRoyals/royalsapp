@@ -91,7 +91,7 @@ export function AttendanceRoster({
             </View>
             <View style={styles.flex}>
               <Text style={styles.name}>{privacyName(person, authorizedNames)}</Text>
-              {missing && !mark ? <Text style={styles.missing}>Missing RSVP</Text> : null}
+              {missing && !mark ? <Text style={styles.missing}>No response yet · attendance is separate</Text> : null}
             </View>
             <StatusPill label={mark ? mark.status : 'Not recorded'} tone={tone} />
           </Pressable>

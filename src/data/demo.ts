@@ -13,6 +13,7 @@ import type {
   Team,
   UserRole,
 } from '@/types/domain';
+import { annotateSchedule, extraOperationalEvents } from '@/data/operationsDemo';
 import { ACTIVE_COACH, demoCoachReminder } from '@/lib/coachRecap';
 import { fxa35PlusMatches, soccerResultText } from '@/data/fxa';
 
@@ -264,6 +265,22 @@ export const demoRegistrations: Registration[] = [
     coachName: 'Coach Priya Sharma',
     waiverVersion: 'placeholder-2026.1',
     firstSessionEventId: 'kids-session-1',
+  },
+  {
+    id: 'reg-demo-noah',
+    programId: 'fall-kids-u6-2026',
+    participantIds: ['child-noah'],
+    participantNames: ['Noah Williams'],
+    submittedAt: '2026-09-08T11:00:00-04:00',
+    status: 'approved',
+    amountDue: 120,
+    discountAmount: 0,
+    paymentStatus: 'paid',
+    demo: true,
+    teamId: 'nova-royals-kids-u6',
+    coachName: 'Coach Priya Sharma',
+    waiverVersion: 'placeholder-2026.1',
+    firstSessionEventId: 'kids-noah-2026-09-27',
   },
 ];
 
@@ -878,13 +895,17 @@ const womensPracticeSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd) => (
   whatToBring: 'Cleats, water, training kit',
 }));
 
-export const demoSchedule: ScheduleEvent[] = [
-  ...kidsFallSessions,
-  ...womensPracticeSessions,
-  ...mensOpenMatches,
-  ...veterans35Matches,
-  ...ccplMatches,
-].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()) as ScheduleEvent[];
+export const demoSchedule: ScheduleEvent[] = annotateSchedule(
+  [
+    ...kidsFallSessions,
+    ...womensPracticeSessions,
+    ...mensOpenMatches,
+    ...veterans35Matches,
+    ...ccplMatches,
+    ...extraOperationalEvents(),
+  ].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+  kidsU8Roster,
+);
 
 export const demoAnnouncements: Announcement[] = [
   {

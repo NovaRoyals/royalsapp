@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Href, router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Platform,
@@ -16,7 +17,10 @@ import { FieldToolbar } from '@/components/fields/FieldToolbar';
 import PitchMap from '@/components/fields/PitchMap';
 import { PitchDetail } from '@/components/fields/PitchDetail';
 import { PitchRow } from '@/components/fields/PitchRow';
-import { AppHeader, Screen } from '@/components/ui';
+import { AppHeader, Screen, StatusPill } from '@/components/ui';
+import { venueCatalog, venueTitle } from '@/data/venues';
+import { latestVenueUpdate } from '@/lib/operations';
+import { fieldStatusLabel } from '@/services/weather';
 import { useFieldCoverage, usePitchDay } from '@/hooks/useFieldCalendar';
 import { clubNowPostedIso } from '@/lib/datetime';
 import {
@@ -35,9 +39,11 @@ import { haptic } from '@/lib/haptics';
 import { locatePitches } from '@/lib/pitchCoords';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { eachDate } from '@/services/fields';
+import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export default function FieldsScreen() {
+  const { schedule, venueUpdates } = useApp();
   const coverage = useFieldCoverage();
   const today = clubDateFromPosted(clubNowPostedIso());
   const windowStart = coverage.data?.coverageStart;
@@ -261,6 +267,28 @@ export default function FieldsScreen() {
           style={styles.headerTight}
         />
 
+        <View style={styles.clubStatus}>
+          <Text style={styles.clubLabel}>ROYALS fields</Text>
+          {venueCatalog.slice(0, 4).map((place) => {
+            const update = latestVenueUpdate(venueUpdates, place.id);
+            const status = update?.status ?? schedule.find((event) => event.venueId === place.id)?.fieldStatus ?? 'open';
+            return (
+              <Pressable
+                key={place.id}
+                accessibilityRole="button"
+                onPress={() => router.push(`/venue/${place.id}` as Href)}
+                style={styles.clubRow}
+              >
+                <View style={styles.flex}>
+                  <Text style={styles.clubName}>{venueTitle(place)}</Text>
+                  <Text style={styles.clubMeta}>{update ? `${update.updatedBy} · ${update.reason}` : 'No closure posted'}</Text>
+                </View>
+                <StatusPill label={fieldStatusLabel(status)} tone={status === 'closed' ? 'danger' : status === 'open' ? 'success' : 'orange'} />
+              </Pressable>
+            );
+          })}
+        </View>
+
         {coverage.isError && !coverage.data ? (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>Pitch dates didn’t load. We won’t guess the window.</Text>
@@ -322,6 +350,12 @@ export default function FieldsScreen() {
 
 const styles = StyleSheet.create({
   headerTight: { paddingTop: 4, paddingBottom: 8 },
+  clubStatus: { marginBottom: spacing.md, gap: 2 },
+  clubLabel: { color: colors.stone, fontSize: 12, marginBottom: spacing.sm, ...typography.label },
+  clubRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
+  clubName: { color: colors.ink, fontSize: 14, ...typography.heading },
+  clubMeta: { color: colors.stone, fontSize: 12, ...typography.body },
+  flex: { flex: 1, minWidth: 0 },
   hint: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: spacing.sm, ...typography.body },
   mapCard: {
     height: 320,

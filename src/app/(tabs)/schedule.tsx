@@ -1,239 +1,292 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Href, Link } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, useSyncExternalStore } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { CricketMark } from '@/components/icons/CricketMark';
-import { PressableScale } from '@/components/motion';
-import { AppHeader, Chip, Screen } from '@/components/ui';
-import { kidsProgramId } from '@/data/demo';
-import { formatEventParts, isEventOver } from '@/lib/datetime';
+import { AppHeader, Screen, StatusPill } from '@/components/ui';
+import { clubNowPostedIso, formatEventParts, isEventOver } from '@/lib/datetime';
+import {
+  childNamesOnEvent,
+  deadlineCopy,
+  eventTypeLabel,
+  householdConflicts,
+  involvesUser,
+  isUrgentEvent,
+  laneLabel,
+  needsAttentionCopy,
+  placeLabel,
+  programLane,
+  rsvpFor,
+  rsvpLabel,
+  type ClubLane,
+} from '@/lib/operations';
+import { readChildFilter, readScheduleScope, subscribeScheduleSession, writeChildFilter, writeScheduleScope, type ScheduleScope } from '@/lib/scheduleSession';
+import { fieldStatusLabel } from '@/services/weather';
 import { useApp } from '@/state/AppProvider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { colors, spacing, typography } from '@/theme/tokens';
 import type { ScheduleEvent } from '@/types/domain';
 
-type Filter = 'mine' | 'soccer' | 'cricket' | 'community';
-
-const filters: { id: Filter; label: string }[] = [
-  { id: 'mine', label: 'My schedule' },
-  { id: 'soccer', label: 'Soccer' },
+const lanes: { id: ClubLane; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'kids', label: 'Kids' },
+  { id: 'open', label: 'Open' },
+  { id: 'plus35', label: '35+' },
+  { id: 'women', label: 'Women' },
   { id: 'cricket', label: 'Cricket' },
-  { id: 'community', label: 'Club' },
+  { id: 'tournament', label: 'Cup' },
+  { id: 'community', label: 'Community' },
 ];
 
-function matchesFilter(event: ScheduleEvent, filter: Filter, followedIds: string[]) {
-  if (filter === 'soccer' || filter === 'cricket') return event.sport === filter;
-  if (filter === 'community') return event.type === 'club_event';
-  if (isKids(event) || isWomen(event) || is35Plus(event)) return true;
-  return Boolean(
-    event.attendance ||
-      event.supporterGoing ||
-      (event.programId && followedIds.includes(event.programId)) ||
-      (event.teamId && followedIds.includes(event.teamId)),
-  );
+function addDays(ymd: string, days: number) {
+  const [year, month, day] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
-function iconFor(event: ScheduleEvent): { kind: 'cricket' } | { kind: 'ion'; name: keyof typeof Ionicons.glyphMap } {
-  if (event.sport === 'cricket') return { kind: 'cricket' };
-  if (event.type === 'training') return { kind: 'ion', name: 'stopwatch-outline' };
-  if (event.type === 'club_event') return { kind: 'ion', name: 'people-outline' };
-  return { kind: 'ion', name: 'football-outline' };
-}
-
-function isKids(event: ScheduleEvent) {
-  return event.programId === kidsProgramId || event.teamId === 'nova-royals-kids-u8';
-}
-
-function isWomen(event: ScheduleEvent) {
-  return event.programId === 'womens-soccer' || event.teamId === 'nova-royals-women';
-}
-
-function is35Plus(event: ScheduleEvent) {
-  return event.programId === 'veterans-soccer' || event.teamId === 'nova-royals-35plus';
-}
-
-function dayStamp(iso: string) {
-  return iso.slice(0, 10);
-}
-
-function timeLabel(event: ScheduleEvent) {
-  const start = formatEventParts(event.startsAt).time;
-  if (!event.endsAt) return start;
-  return `${start} – ${formatEventParts(event.endsAt).time}`;
-}
-
-type ScheduleRow =
-  | { kind: 'pair'; kids: ScheduleEvent; women: ScheduleEvent }
-  | { kind: 'single'; event: ScheduleEvent };
-
-function groupRows(events: ScheduleEvent[]): ScheduleRow[] {
-  const used = new Set<string>();
-  const rows: ScheduleRow[] = [];
-  for (const event of events) {
-    if (used.has(event.id)) continue;
-    const day = dayStamp(event.startsAt);
-    if (isKids(event)) {
-      const women = events.find((item) => !used.has(item.id) && isWomen(item) && dayStamp(item.startsAt) === day);
-      if (women) {
-        used.add(event.id);
-        used.add(women.id);
-        rows.push({ kind: 'pair', kids: event, women });
-        continue;
-      }
-    }
-    if (isWomen(event)) {
-      const kids = events.find((item) => !used.has(item.id) && isKids(item) && dayStamp(item.startsAt) === day);
-      if (kids) {
-        used.add(event.id);
-        used.add(kids.id);
-        rows.push({ kind: 'pair', kids, women: event });
-        continue;
-      }
-    }
-    used.add(event.id);
-    rows.push({ kind: 'single', event });
-  }
-  return rows;
-}
-
-function EventCard({ event, raised, flush }: { event: ScheduleEvent; raised?: boolean; flush?: boolean }) {
-  const glyph = iconFor(event);
-  return (
-    <Link href={`/event/${event.id}` as Href} asChild>
-      <PressableScale style={StyleSheet.flatten([styles.eventCard, !flush && styles.singleCard, event.status === 'completed' && styles.completedCard, raised && styles.raisedCard])}>
-        <View style={styles.eventTop}>
-          <View style={[styles.eventIcon, event.sport === 'cricket' && styles.cricketIcon]}>
-            {glyph.kind === 'cricket'
-              ? <CricketMark size={16} color={colors.success} />
-              : <Ionicons name={glyph.name} size={18} color={colors.orange} />}
-          </View>
-          <Text style={styles.time}>{timeLabel(event)}</Text>
-        </View>
-        <Text style={styles.title}>{event.title}</Text>
-        <Text style={styles.subtitle}>{event.subtitle}</Text>
-        <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={15} color={colors.stone} />
-          <Text numberOfLines={1} style={styles.location}>{event.venue}</Text>
-        </View>
-        {event.result ? (
-          <View style={styles.result}>
-            <Text style={styles.resultText}>{event.result}</Text>
-          </View>
-        ) : event.attendance ? (
-          <View style={styles.rsvp}>
-            <Ionicons name="checkmark-circle" size={16} color={event.attendance === 'going' ? colors.success : colors.warning} />
-            <Text style={styles.rsvpText}>RSVP · {event.attendance.replace('_', ' ')}</Text>
-          </View>
-        ) : null}
-      </PressableScale>
-    </Link>
-  );
+function toneFor(event: ScheduleEvent, rsvp?: string) {
+  if (event.status === 'cancelled' || event.fieldStatus === 'closed' || rsvp === 'not_going') return 'danger' as const;
+  if (event.fieldStatus === 'relocated' || event.previousVenue || rsvp === 'maybe') return 'orange' as const;
+  if (rsvp === 'going' || event.supporterGoing) return 'success' as const;
+  if (!rsvp) return 'neutral' as const;
+  if (event.fieldStatus === 'open') return 'success' as const;
+  return 'neutral' as const;
 }
 
 export default function ScheduleScreen() {
-  const { schedule, followedIds } = useApp();
-  const [filter, setFilter] = useState<Filter>('mine');
+  const { schedule, role, household, registrations } = useApp();
+  const storedScope = useSyncExternalStore(subscribeScheduleSession, readScheduleScope, () => undefined);
+  const childFilter = useSyncExternalStore(subscribeScheduleSession, readChildFilter, () => 'all');
+  const scope: ScheduleScope = storedScope ?? (role === 'guest' ? 'club' : 'mine');
+  const [lane, setLane] = useState<ClubLane>('all');
   const [showPast, setShowPast] = useState(false);
-  const filtered = useMemo(
-    () =>
-      schedule
-        .filter((event) => matchesFilter(event, filter, followedIds) && (showPast || !isEventOver(event)))
-        .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-    [filter, schedule, showPast, followedIds],
+  const today = clubNowPostedIso().slice(0, 10);
+  const weekEnd = addDays(today, 6);
+
+  function selectScope(next: ScheduleScope) {
+    writeScheduleScope(next);
+  }
+
+  function selectChild(next: string) {
+    writeChildFilter(next);
+  }
+
+  const childIds = household.children.map((child) => child.id);
+  const conflicts = useMemo(
+    () => (role === 'guardian' ? householdConflicts(schedule, household.children) : []),
+    [household.children, role, schedule],
   );
-  const rows = useMemo(() => groupRows(filtered), [filtered]);
-  const banner = useMemo(() => {
-    if (!filtered.length) return { month: 'Fall', year: '2026' };
-    const months = [...new Set(filtered.map((event) => formatEventParts(event.startsAt).month))];
-    const names: Record<string, string> = {
-      JAN: 'January', FEB: 'February', MAR: 'March', APR: 'April', MAY: 'May', JUN: 'June',
-      JUL: 'July', AUG: 'August', SEP: 'September', OCT: 'October', NOV: 'November', DEC: 'December',
-    };
-    return {
-      month: months.length === 1 ? names[months[0]] ?? months[0] : months.map((item) => names[item]?.slice(0, 3) ?? item).join(' – '),
-      year: '2026',
-    };
-  }, [filtered]);
+
+  const visible = useMemo(() => {
+    return schedule
+      .filter((event) => {
+        if (!showPast && isEventOver(event) && event.status !== 'cancelled') return false;
+        if (scope === 'club') {
+          if (lane !== 'all' && programLane(event) !== lane) return false;
+          return true;
+        }
+        if (role === 'guest') return false;
+        if (!involvesUser(event, role, childIds, registrations) && !conflicts.some((item) => item.a.id === event.id || item.b.id === event.id)) {
+          return false;
+        }
+        if (role === 'guardian' && childFilter !== 'all') {
+          const names = childNamesOnEvent(event, household.children);
+          const child = household.children.find((item) => item.id === childFilter);
+          if (child && names.length && !names.includes(child.firstName)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  }, [childFilter, childIds, conflicts, household.children, lane, registrations, role, schedule, scope, showPast]);
+
+  const sections = useMemo(() => {
+    const urgent = visible.filter((event) => !isEventOver(event) && isUrgentEvent(event));
+    const urgentIds = new Set(urgent.map((event) => event.id));
+    const rest = visible.filter((event) => !urgentIds.has(event.id) && !isEventOver(event));
+    const todayEvents = rest.filter((event) => event.startsAt.slice(0, 10) === today);
+    const todayIds = new Set(todayEvents.map((event) => event.id));
+    const afterToday = rest.filter((event) => !todayIds.has(event.id));
+    const next = afterToday.find((event) => involvesUser(event, role, childIds, registrations));
+    const afterNext = next ? afterToday.filter((event) => event.id !== next.id) : afterToday;
+    const week = afterNext.filter((event) => event.startsAt.slice(0, 10) <= weekEnd);
+    const later = afterNext.filter((event) => event.startsAt.slice(0, 10) > weekEnd);
+    const earlier = showPast ? visible.filter((event) => isEventOver(event)) : [];
+    return [
+      { id: 'urgent', title: 'Needs attention', events: urgent },
+      { id: 'today', title: 'Today', events: todayEvents },
+      { id: 'next', title: 'Next for you', events: next ? [next] : [] },
+      { id: 'week', title: 'This week', events: week },
+      { id: 'later', title: 'Later', events: later },
+      { id: 'earlier', title: 'Earlier', events: earlier },
+    ].filter((section) => section.events.length > 0);
+  }, [childIds, registrations, role, showPast, today, visible, weekEnd]);
 
   return (
     <Screen tabScene>
-      <AppHeader eyebrow="One club calendar" title="Schedule" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {filters.map((item) => (
-          <Chip key={item.id} label={item.label} active={filter === item.id} onPress={() => setFilter(item.id)} />
-        ))}
-      </ScrollView>
-
-      <View style={styles.monthRow}>
-        <View>
-          <Text style={styles.month}>{banner.month}</Text>
-          <Text style={styles.year}>{banner.year}</Text>
-        </View>
-        <PressableScale accessibilityRole="button" onPress={() => setShowPast((value) => !value)} style={styles.pastToggle}>
-          <Ionicons name={showPast ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={showPast ? colors.orange : colors.stone} />
-          <Text style={styles.pastText}>Show results</Text>
-        </PressableScale>
-      </View>
-
-      {filtered.length === 0 ? (
-        <Text style={styles.subtitle}>{showPast ? 'No completed results in this filter.' : 'Nothing in this filter yet.'}</Text>
-      ) : null}
-      <View style={styles.timeline}>
-        {rows.map((row, index) => {
-          const anchor = row.kind === 'pair' ? row.kids : row.event;
-          const parts = formatEventParts(anchor.startsAt);
+      <AppHeader eyebrow="Schedule" title="What’s on" compactTitle />
+      <View accessibilityRole="tablist" style={styles.switch}>
+        {([
+          ['mine', 'My Schedule'],
+          ['club', 'Club Schedule'],
+        ] as const).map(([id, label]) => {
+          const selected = scope === id;
           return (
-            <View key={row.kind === 'pair' ? `${row.kids.id}|${row.women.id}` : row.event.id} style={styles.eventRow}>
-              <View style={styles.dateColumn}>
-                <Text style={styles.day}>{parts.weekday}</Text>
-                <Text style={styles.dayNumber}>{parts.day}</Text>
-                {index < rows.length - 1 ? <View style={styles.line} /> : null}
-              </View>
-              {row.kind === 'pair' ? (
-                <View style={styles.pair}>
-                  <View style={styles.pairCol}><EventCard event={row.kids} flush /></View>
-                  <View style={styles.pairCol}><EventCard event={row.women} raised flush /></View>
-                </View>
-              ) : (
-                <EventCard event={row.event} />
-              )}
-            </View>
+            <Pressable
+              key={id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              onPress={() => selectScope(id)}
+              style={[styles.switchItem, selected && styles.switchOn]}
+            >
+              <Text style={[styles.switchText, selected && styles.switchTextOn]}>{label}</Text>
+            </Pressable>
           );
         })}
       </View>
+
+      {scope === 'mine' && role === 'guardian' ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          <FilterChip label="Both children" selected={childFilter === 'all'} onPress={() => selectChild('all')} />
+          {household.children.map((child) => (
+            <FilterChip key={child.id} label={child.firstName} selected={childFilter === child.id} onPress={() => selectChild(child.id)} />
+          ))}
+        </ScrollView>
+      ) : null}
+
+      {scope === 'club' ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          {lanes.map((item) => (
+            <FilterChip key={item.id} label={item.label} selected={lane === item.id} onPress={() => setLane(item.id)} />
+          ))}
+        </ScrollView>
+      ) : null}
+
+      {scope === 'mine' && role === 'guest' ? (
+        <Text style={styles.empty}>Club Schedule is open. Household schedules stay with a signed-in family.</Text>
+      ) : null}
+
+      {sections.length === 0 && !(scope === 'mine' && role === 'guest') ? (
+        <Text style={styles.empty}>{showPast ? 'Nothing earlier in this view.' : 'Nothing coming up in this view.'}</Text>
+      ) : null}
+
+      {sections.map((section) => (
+        <View key={section.id} style={styles.section}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <View style={styles.group}>
+            {section.events.map((event, index) => {
+              const conflict = conflicts.find((item) => item.a.id === event.id || item.b.id === event.id);
+              const anchorId = conflict && visible.some((item) => item.id === conflict.a.id) ? conflict.a.id : conflict?.b.id;
+              const conflictNote =
+                conflict && event.id === anchorId
+                  ? `${conflict.names.join(' and ')} overlap by ${conflict.minutes} min. One adult may not cover both.`
+                  : null;
+              return (
+                <View key={event.id} style={index > 0 ? styles.rowDivider : undefined}>
+                  <EventRow event={event} personal={scope === 'mine'} householdChildren={household.children} />
+                  {conflictNote ? <Text style={styles.conflict}>{conflictNote}</Text> : null}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+
+      <Pressable accessibilityRole="button" onPress={() => setShowPast((value) => !value)} style={styles.past}>
+        <Text style={styles.pastText}>{showPast ? 'Hide earlier events' : 'Show earlier events'}</Text>
+      </Pressable>
     </Screen>
   );
 }
 
+function FilterChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.filter, selected && styles.filterOn]}>
+      <Text style={[styles.filterText, selected && styles.filterTextOn]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function EventRow({
+  event,
+  personal,
+  householdChildren,
+}: {
+  event: ScheduleEvent;
+  personal: boolean;
+  householdChildren: { id: string; firstName: string }[];
+}) {
+  const parts = formatEventParts(event.startsAt);
+  const names = personal ? childNamesOnEvent(event, householdChildren) : [];
+  const own = names.map((name) => {
+    const child = householdChildren.find((item) => item.firstName === name);
+    const status = child ? rsvpFor(event, child.id) : undefined;
+    return status ? `${name} — ${rsvpLabel(status)}` : name;
+  });
+  const childResponse = names
+    .map((name) => {
+      const child = householdChildren.find((item) => item.firstName === name);
+      return child ? rsvpFor(event, child.id) : undefined;
+    })
+    .find(Boolean);
+  const response = event.attendance ? rsvpLabel(event.attendance) : event.supporterGoing ? 'Supporting' : childResponse ? rsvpLabel(childResponse) : names.length ? 'No response' : undefined;
+  const waitingNote = personal ? deadlineCopy(event, 0)[0] : undefined;
+  const statusLabel =
+    event.status === 'cancelled' ? 'Cancelled' : event.fieldStatus && event.fieldStatus !== 'open' ? fieldStatusLabel(event.fieldStatus) : response || fieldStatusLabel(event.fieldStatus);
+
+  return (
+    <Link href={`/event/${event.id}` as Href} asChild>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${eventTypeLabel(event)}, ${event.title}, ${parts.weekday} ${parts.time}`} style={styles.row}>
+        <View style={styles.date}>
+          <Text style={styles.weekday}>{parts.weekday}</Text>
+          <Text style={styles.dayNumber}>{parts.day}</Text>
+        </View>
+        <View style={styles.copy}>
+          <Text style={styles.meta}>
+            {eventTypeLabel(event)} · {parts.time}
+            {personal ? '' : ` · ${laneLabel(programLane(event))}`}
+          </Text>
+          <Text numberOfLines={2} style={styles.title}>{event.title}</Text>
+          <Text numberOfLines={1} style={styles.sub}>
+            {personal && names.length ? names.join(' · ') : event.ageGroup || event.competitionLabel || event.purpose || event.subtitle}
+          </Text>
+          <Text numberOfLines={1} style={styles.place}>{placeLabel(event)}</Text>
+          {event.previousVenue ? <Text style={styles.previous}>Previous · {event.previousVenue}</Text> : null}
+          {isUrgentEvent(event) ? <Text style={styles.attention}>{needsAttentionCopy(event)}</Text> : null}
+          {waitingNote && !event.attendance && !own.length ? <Text style={styles.deadline}>{waitingNote}</Text> : null}
+          <View style={styles.pill}><StatusPill label={statusLabel} tone={toneFor(event, event.attendance ?? childResponse)} /></View>
+        </View>
+      </Pressable>
+    </Link>
+  );
+}
+
 const styles = StyleSheet.create({
-  filters: { gap: spacing.sm, paddingRight: spacing.xl, paddingBottom: spacing.sm },
-  monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xxl, marginBottom: spacing.lg },
-  month: { color: colors.ink, fontSize: 24, ...typography.heading },
-  year: { color: colors.stone, fontSize: 12, ...typography.label },
-  pastToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
-  pastText: { color: colors.charcoal, fontSize: 12, ...typography.label },
-  timeline: { gap: 0 },
-  eventRow: { flexDirection: 'row', gap: spacing.md },
-  dateColumn: { width: 44, alignItems: 'center' },
-  day: { color: colors.orangeDark, fontSize: 10, ...typography.label },
-  dayNumber: { color: colors.ink, fontSize: 23, ...typography.heading },
-  line: { width: 1, flex: 1, minHeight: 110, marginVertical: 6, backgroundColor: colors.border },
-  pair: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.lg },
-  pairCol: { flex: 1, minWidth: 0 },
-  eventCard: { flex: 1, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
-  singleCard: { marginBottom: spacing.lg },
-  raisedCard: { marginTop: -14 },
-  completedCard: { opacity: 0.82 },
-  eventTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  eventIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.orangeSoft },
-  cricketIcon: { backgroundColor: colors.successSoft },
-  time: { flex: 1, color: colors.charcoal, fontSize: 11, ...typography.label },
-  title: { color: colors.ink, fontSize: 15, ...typography.heading },
-  subtitle: { color: colors.stone, fontSize: 12, marginTop: 3, ...typography.body },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.md },
-  location: { flex: 1, color: colors.stone, fontSize: 12, ...typography.body },
-  rsvp: { marginTop: spacing.md, flexDirection: 'row', gap: 6, alignItems: 'center' },
-  rsvpText: { color: colors.charcoal, fontSize: 11, textTransform: 'uppercase', ...typography.label },
-  result: { alignSelf: 'flex-start', marginTop: spacing.md, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: colors.ink },
-  resultText: { color: colors.white, fontSize: 11, ...typography.label },
+  switch: { flexDirection: 'row', backgroundColor: colors.sand, borderRadius: 12, padding: 3, marginBottom: spacing.md },
+  switchItem: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  switchOn: { backgroundColor: colors.paper },
+  switchText: { color: colors.stone, fontSize: 13, ...typography.label },
+  switchTextOn: { color: colors.ink },
+  filters: { gap: spacing.sm, paddingBottom: spacing.md },
+  filter: { minHeight: 36, paddingHorizontal: 12, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper },
+  filterOn: { backgroundColor: colors.ink },
+  filterText: { color: colors.charcoal, fontSize: 12, ...typography.label },
+  filterTextOn: { color: colors.white },
+  empty: { color: colors.stone, fontSize: 15, lineHeight: 22, marginTop: spacing.lg, ...typography.body },
+  section: { marginTop: spacing.lg },
+  sectionTitle: { color: colors.stone, fontSize: 12, marginBottom: spacing.sm, ...typography.label },
+  group: { backgroundColor: colors.paper, borderRadius: 16 },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.md },
+  date: { width: 44, alignItems: 'center', paddingTop: 2 },
+  weekday: { color: colors.orangeDark, fontSize: 10, ...typography.label },
+  dayNumber: { color: colors.ink, fontSize: 20, fontVariant: ['tabular-nums'], ...typography.heading },
+  copy: { flex: 1, minWidth: 0, gap: 2 },
+  meta: { color: colors.stone, fontSize: 12, ...typography.body },
+  title: { color: colors.ink, fontSize: 16, ...typography.heading },
+  sub: { color: colors.charcoal, fontSize: 13, ...typography.body },
+  place: { color: colors.stone, fontSize: 13, ...typography.body },
+  previous: { color: colors.stone, fontSize: 12, textDecorationLine: 'line-through', ...typography.body },
+  attention: { color: colors.orangeDark, fontSize: 12, marginTop: 2, ...typography.bodyMedium },
+  deadline: { color: colors.charcoal, fontSize: 12, ...typography.body },
+  pill: { alignSelf: 'flex-start', marginTop: 4 },
+  conflict: { color: colors.charcoal, fontSize: 13, lineHeight: 18, paddingHorizontal: spacing.md, paddingBottom: spacing.md, ...typography.body },
+  past: { minHeight: 48, justifyContent: 'center', marginTop: spacing.lg },
+  pastText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
 });

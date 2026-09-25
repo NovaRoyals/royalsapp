@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -14,10 +14,10 @@ import type { AttendanceStatus } from '@/types/domain';
 
 export type RsvpVariant = 'a' | 'b' | 'c';
 
-const choices: { id: AttendanceStatus; label: string }[] = [
-  { id: 'going', label: 'Going' },
-  { id: 'maybe', label: 'Maybe' },
-  { id: 'not_going', label: 'Can’t go' },
+const choices: { id: AttendanceStatus; label: string; hint: string }[] = [
+  { id: 'going', label: 'Going', hint: 'You’re going.' },
+  { id: 'not_going', label: 'Can’t make it', hint: 'Marked as can’t make it.' },
+  { id: 'maybe', label: 'Not sure', hint: 'Marked as not sure.' },
 ];
 
 export function RsvpChoices({
@@ -27,6 +27,8 @@ export function RsvpChoices({
   variant = 'a',
   hapticKind = 'light',
   durationMs,
+  showCount = true,
+  confirmation,
 }: {
   value?: AttendanceStatus;
   goingCount: number;
@@ -34,6 +36,8 @@ export function RsvpChoices({
   variant?: RsvpVariant;
   hapticKind?: HapticKind;
   durationMs?: number;
+  showCount?: boolean;
+  confirmation?: string | null;
 }) {
   const reduced = useReducedMotion();
   const duration = durationMs ?? motion.duration.base;
@@ -56,8 +60,8 @@ export function RsvpChoices({
         ))}
       </View>
       <View style={styles.meta}>
-        <CountTick value={goingCount} suffix="participants going" style={styles.count} />
-        {value === 'going' ? <Text style={styles.note}>You’re in. See you Sunday.</Text> : null}
+        {showCount ? <CountTick value={goingCount} suffix="participants going" style={styles.count} /> : null}
+        {value ? <Text style={styles.note}>{confirmation ?? choices.find((item) => item.id === value)?.hint}</Text> : null}
       </View>
     </View>
   );
@@ -85,11 +89,17 @@ function RsvpCard({
   const fillStyle = useAnimatedStyle(() => ({ opacity: fill.value }));
 
   return (
-    <PressableScale onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: active }} style={[styles.card, active && styles.cardActive]}>
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active, checked: active }}
+      accessibilityLabel={choice.label}
+      style={[styles.card, active && styles.cardActive]}
+    >
       <Animated.View
         style={[
           styles.fill,
-          { backgroundColor: choice.id === 'going' ? colors.success : choice.id === 'maybe' ? colors.ink : colors.charcoal },
+          { backgroundColor: choice.id === 'going' ? colors.success : choice.id === 'maybe' ? colors.orange : colors.danger },
           fillStyle,
         ]}
       />

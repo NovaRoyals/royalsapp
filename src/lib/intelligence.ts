@@ -99,7 +99,7 @@ export function gameDayBrief(event: ScheduleEvent, childName?: string, nowIso = 
     drive: `${mins}-minute drive · ${estimatedTravelStub(event.venue)}`,
     leaveBy,
     field: `Field ${fieldStatusLabel(event.fieldStatus)}`,
-    weather: weather.summary.includes('°') ? weather.summary : `${weather.summary} · 74°F stub`,
+    weather: `${weather.summary} · not a live forecast`,
     bring: event.whatToBring
       ? `${event.whatToBring}${weather.summary.toLowerCase().includes('mild') ? ' · light jacket' : ''}`
       : weather.summary.toLowerCase().includes('mild')
