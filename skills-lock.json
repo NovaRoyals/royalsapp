@@ -162,6 +162,12 @@
       "sourceType": "github",
       "skillPath": "plugins/expo/skills/expo-web-to-native/SKILL.md",
       "computedHash": "33ce1949d1d0affb65dfeccbc22e1b2179c7b9bda71467418c0ed29d0fed18d4"
+    },
+    "libraries-dev": {
+      "source": "Jakubantalik/Libraries.dev",
+      "sourceType": "github",
+      "skillPath": "skills/libraries-dev/SKILL.md",
+      "computedHash": "007578dd0c49905277bc099972ce9b0bdfb0bc01b70e82bd27a9019a3419a7c3"
     }
   }
 }
