@@ -8,6 +8,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { z } from 'zod';
 
 import { ConfirmationPeak, shareRegistration } from '@/components/interactions/ConfirmationPeak';
+import { useToast } from '@/components/Toast';
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoHousehold, demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
 import { track } from '@/lib/analytics';
@@ -57,6 +58,7 @@ export default function RegistrationScreen() {
   const { programId } = useLocalSearchParams<{ programId: string }>();
   const program = demoPrograms.find((item) => item.id === programId) ?? demoPrograms[0];
   const { household, addChild, submitRegistration, registrations, role, persona, hydrated } = useApp();
+  const toast = useToast();
   const isYouth = program.id === kidsProgramId || program.id === 'travel-soccer';
   const reduced = useReducedMotion();
   const [lens, setLens] = useState<'chooser' | 'guest' | 'demo' | 'account'>(role === 'guest' ? 'chooser' : 'account');
@@ -262,7 +264,8 @@ export default function RegistrationScreen() {
 
   if (step === 'confirmation') {
     const first = demoSchedule.find((item) => item.id === 'kids-session-1');
-    const name = selectedChildren[0]?.firstName ?? 'Your player';
+    const names = selectedChildren.map((child) => child.firstName);
+    const name = names.length ? names.join(' & ') : 'Your player';
     return (
       <Screen contentStyle={styles.confirmationPage}>
         <ConfirmationPeak
@@ -271,6 +274,7 @@ export default function RegistrationScreen() {
           sessionLine={first ? 'Sunday · 9:00 AM · Arrowhead 3A' : 'First session posts with the season calendar'}
           onCalendar={() => {
             if (first) calendarGateway.add(first);
+            toast('Calendar not connected yet. Nothing was added.');
           }}
           onCoach={() => router.replace('/message/coach-priya' as never)}
           onSeason={() => router.replace(`/season/${submittedId}` as never)}

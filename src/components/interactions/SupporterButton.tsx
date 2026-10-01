@@ -5,7 +5,6 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 
 import { CountTick } from '@/components/interactions/CountTick';
 import { DrawCheck } from '@/components/interactions/DrawCheck';
-import { FaceStack } from '@/components/interactions/FaceStack';
 import { PressableScale } from '@/components/motion';
 import { haptic, type HapticKind } from '@/lib/haptics';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -26,23 +25,6 @@ export function SupporterButton({
   variant?: SupporterVariant;
   hapticKind?: HapticKind;
 }) {
-  const reduced = useReducedMotion();
-  const fill = useSharedValue(going ? 1 : 0);
-  const bump = useSharedValue(1);
-
-  useEffect(() => {
-    fill.value = reduced ? (going ? 1 : 0) : withTiming(going ? 1 : 0, { duration: 320, easing: Easing.out(Easing.cubic) });
-    if (going && !reduced) {
-      bump.value = 1.06;
-      bump.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
-    }
-  }, [going, fill, reduced, bump]);
-
-  const fillStyle = useAnimatedStyle(() => ({
-    opacity: fill.value,
-  }));
-  const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.value }] }));
-
   return (
     <View style={styles.wrap}>
       <PressableScale
@@ -55,7 +37,6 @@ export function SupporterButton({
         }}
         style={[styles.button, going && styles.buttonOn]}
       >
-        <Animated.View style={[styles.fill, fillStyle]} />
         <View style={styles.inner}>
           {going ? <DrawCheck active color={colors.white} size={18} /> : <Ionicons name="heart-outline" size={18} color={colors.ink} />}
           <Text style={[styles.label, going && styles.labelOn]}>
@@ -64,10 +45,7 @@ export function SupporterButton({
         </View>
       </PressableScale>
       <View style={styles.meta}>
-        <FaceStack count={count} joined={going} />
-        <Animated.View style={bumpStyle}>
-          <CountTick value={count} suffix={going ? 'supporting' : 'Royals going'} style={styles.count} />
-        </Animated.View>
+        <CountTick value={count} suffix="supporting" style={styles.count} />
         {going ? (
           <PressableScale
             accessibilityRole="button"
@@ -137,8 +115,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonOn: { backgroundColor: colors.orange, borderColor: colors.orange },
-  fill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.orange },
-  inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, zIndex: 1 },
+  inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   label: { color: colors.ink, fontSize: 14, ...typography.label },
   labelOn: { color: colors.white },
   meta: { gap: spacing.sm, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },

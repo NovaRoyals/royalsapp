@@ -1008,14 +1008,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...current,
       schedule: mergeClubSchedule(current.schedule).map((event) => {
         if (event.id !== eventId) return event;
+        const existing = event.checkIns ?? [];
+        const unrecorded = people.filter((person) => !existing.some((mark) => mark.personId === person.id));
         return {
           ...event,
-          checkIns: people.map((person) => ({
-            personId: person.id,
-            personName: person.displayName,
-            present: true,
-            status: 'present' as const,
-          })),
+          checkIns: [
+            ...existing,
+            ...unrecorded.map((person) => ({
+              personId: person.id,
+              personName: person.displayName,
+              present: true,
+              status: 'present' as const,
+            })),
+          ],
         };
       }),
     }));
@@ -1207,6 +1212,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const event = mergeClubSchedule(current.schedule).find((item) => item.id === recap.eventId);
       if (!event) {
         result = { ok: false, error: 'Session not found.' };
+        return current;
+      }
+      if (!(event.checkIns ?? []).some((mark) => mark.present)) {
+        result = { ok: false, error: 'Record attendance first. Recaps go only to families of children marked present.' };
         return current;
       }
       const sentAt = new Date().toISOString();

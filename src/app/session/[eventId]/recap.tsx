@@ -178,6 +178,10 @@ export default function SessionRecapScreen() {
       setSendError('You’re offline. The draft is saved — send when you’re back.');
       return;
     }
+    if (!counts.presentCount) {
+      setSendError('Record attendance first. Recaps go only to families of children marked present.');
+      return;
+    }
     const approved: SessionRecap = {
       ...draft,
       coachName: ACTIVE_COACH.displayName,
@@ -205,6 +209,7 @@ export default function SessionRecapScreen() {
         <Text style={styles.when}>{formatEventWhen(event.startsAt)}</Text>
         <Text style={styles.counts}>
           {counts.presentCount} present · {counts.absentCount} absent
+          {counts.unrecordedCount ? ` · ${counts.unrecordedCount} not recorded` : ''}
         </Text>
 
         {offline ? <Text style={styles.banner}>Offline — drafts save on this device.</Text> : null}
@@ -222,8 +227,15 @@ export default function SessionRecapScreen() {
               ))}
             </View>
             <ParentPreview recap={draft} childId={previewChild} sessionTitle={event.title} when={formatEventWhen(event.startsAt)} />
+            {!counts.presentCount ? (
+              <Text style={styles.error}>Record attendance first. Recaps go only to families of children marked present.</Text>
+            ) : null}
             {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
-            <Button label="Approve and send" onPress={onSend} disabled={!canSend || !display} />
+            <Button
+              label={counts.presentCount ? `Approve and send to ${counts.presentCount} ${counts.presentCount === 1 ? 'family' : 'families'}` : 'Approve and send'}
+              onPress={onSend}
+              disabled={!canSend || !display || !counts.presentCount}
+            />
             <Button label="Keep editing" variant="ghost" onPress={() => setPhase('compose')} />
           </View>
         ) : (

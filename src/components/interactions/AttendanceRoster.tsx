@@ -57,15 +57,9 @@ export function AttendanceRoster({
         </Animated.View>
       </View>
       {!complete ? (
-        <PressableScale
-          onPress={() => {
-            onMarkAllPresent();
-            haptic('success');
-          }}
-          style={styles.markAll}
-        >
+        <PressableScale accessibilityRole="button" onPress={onMarkAllPresent} style={styles.markAll}>
           <Ionicons name="checkmark-done-outline" size={18} color={colors.white} />
-          <Text style={styles.markAllText}>Mark everyone present</Text>
+          <Text style={styles.markAllText}>{recorded.length ? 'Mark the rest present' : 'Mark everyone present'}</Text>
         </PressableScale>
       ) : (
         <Text style={styles.done}>Roster is complete. Tap a name to record an exception.</Text>

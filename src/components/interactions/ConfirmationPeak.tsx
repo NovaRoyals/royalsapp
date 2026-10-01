@@ -41,13 +41,14 @@ export function ConfirmationPeak({
       <Animated.View style={[styles.shield, ringStyle]}>
         <Text style={styles.mark}>R</Text>
       </Animated.View>
-      <Text style={styles.kicker}>CONFIRMED</Text>
-      <Text style={styles.title}>{name.toUpperCase()} IS A ROYAL</Text>
+      <Text style={styles.kicker}>REGISTRATION SUBMITTED</Text>
+      <Text style={styles.title}>WELCOME, {name.toUpperCase()}</Text>
       <Text style={styles.program}>{program}</Text>
       <Text style={styles.session}>{sessionLine}</Text>
-      <Button label="Add season to calendar" onPress={onCalendar} />
+      <Text style={styles.session}>Pending club review. Payment has not been taken.</Text>
+      <Button label="Preview season calendar" onPress={onCalendar} />
       <Button label="Meet the coach" variant="secondary" onPress={onCoach} />
-      <Button label={`View ${name}’s season`} variant="ghost" onPress={onSeason} />
+      <Button label="View season" variant="ghost" onPress={onSeason} />
       <Button label="Share the news" variant="ghost" onPress={onShare} />
     </View>
   );
@@ -55,8 +56,8 @@ export function ConfirmationPeak({
 
 export async function shareRegistration(name: string) {
   return shareContent({
-    title: `${name} is a Royal`,
-    message: `${name} just joined Nova Royals Athletic Club.`,
+    title: `${name} signed up with ROYALS`,
+    message: `${name} signed up for Nova Royals Athletic Club.`,
     url: typeof window !== 'undefined' ? window.location.origin : undefined,
   });
 }

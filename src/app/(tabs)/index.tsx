@@ -48,8 +48,13 @@ export default function HomeScreen() {
   const urgent = unread.find((item) => item.urgency === 'urgent');
   const [nowIso, setNowIso] = useState('2026-09-25T12:00:00-04:00');
   useEffect(() => {
-    const tick = setInterval(() => setNowIso(clubNowIso()), 60_000);
-    return () => clearInterval(tick);
+    const sync = () => setNowIso(clubNowIso());
+    const first = setTimeout(sync, 0);
+    const tick = setInterval(sync, 60_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(tick);
+    };
   }, []);
   const kidsEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === COACH_TEAM_ID), nowIso);
   const menEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === PLAYER_TEAM_ID), nowIso);

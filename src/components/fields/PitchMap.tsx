@@ -35,7 +35,7 @@ function GlowPin({
       scale.value = 1;
       return;
     }
-    scale.value = withRepeat(withTiming(1.45, { duration: 800, easing: Easing.inOut(Easing.quad) }), -1, true);
+    scale.value = withRepeat(withTiming(1.45, { duration: 800, easing: Easing.inOut(Easing.quad) }), 6, true);
   }, [pulse, reducedMotion, scale]);
   const glowStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -80,6 +80,16 @@ export default function PitchMap({
     () => pitches.find((item) => item.id === topPickId) ?? pitches[0],
     [pitches, topPickId],
   );
+  const visible = useMemo(() => {
+    if (zoom >= 13) return pitches;
+    const seen = new Set<string>();
+    return pitches.filter((pitch) => {
+      if (pitch.id === selectedId || pitch.id === topPickId) return true;
+      if (seen.has(pitch.venueKey)) return false;
+      seen.add(pitch.venueKey);
+      return true;
+    });
+  }, [pitches, selectedId, topPickId, zoom]);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -131,12 +141,12 @@ export default function PitchMap({
       onPress={() => onBackground?.()}
     >
       <UrlTile urlTemplate={LIGHT_TILES_A} maximumZ={16} zIndex={0} />
-      {pitches.map((pitch) => {
+      {visible.map((pitch) => {
         const selected = pitch.id === selectedId;
         const top = pitch.id === topPickId;
         const color = pitch.status === 'conflict' ? PIN_BUSY : PIN_CLEAR;
-        const showVenue = pitch.isVenueLabel || selected || top;
-        const showSub = zoom >= 15 || selected || top;
+        const showVenue = selected || top;
+        const showSub = selected || top;
         return (
           <Marker
             key={pitch.id}

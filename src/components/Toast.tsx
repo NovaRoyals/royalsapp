@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 
@@ -8,16 +8,24 @@ const ToastContext = createContext<(message: string) => void>(() => undefined);
 
 export function ToastHost({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const show = useCallback((next: string) => {
+    if (timer.current) clearTimeout(timer.current);
     setMessage(next);
-    setTimeout(() => setMessage(null), 2400);
+    timer.current = setTimeout(() => setMessage(null), 2400);
   }, []);
 
   return (
     <ToastContext.Provider value={show}>
       {children}
       {message ? (
-        <Animated.View entering={FadeInDown.duration(180)} exiting={FadeOutDown.duration(180)} style={styles.toast}>
+        <Animated.View
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+          entering={FadeInDown.duration(180)}
+          exiting={FadeOutDown.duration(180)}
+          style={styles.toast}
+        >
           <Text style={styles.text}>{message}</Text>
         </Animated.View>
       ) : null}

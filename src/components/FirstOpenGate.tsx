@@ -8,6 +8,8 @@ import { SplashOverlay, SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
 import { useApp } from '@/state/AppProvider';
 
+const TAB_PATHS = new Set(['/', '/programs', '/schedule', '/fields', '/profile']);
+
 export function FirstOpenGate({ children }: { children: ReactNode }) {
   const { hasHydrated, introCompleted } = useApp();
   const pathname = usePathname();
@@ -61,7 +63,7 @@ export function FirstOpenGate({ children }: { children: ReactNode }) {
   return (
     <View style={styles.fill}>
       {waitingForOnboarding ? <InkHold /> : children}
-      <PrototypeMark />
+      <PrototypeMark aboveTabs={TAB_PATHS.has(pathname)} />
       <SplashOverlay play={splashPlay && !splashDone} onFinished={onFinished} />
     </View>
   );

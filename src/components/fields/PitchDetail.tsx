@@ -37,7 +37,7 @@ export function PitchDetail({
         </View>
       </View>
 
-      <Text style={styles.scheduleLabel}>Full day schedule</Text>
+      <Text style={styles.scheduleLabel}>Day schedule</Text>
       {pitch.events.length ? (
         pitch.events.map((event, index) => (
           <View key={`${event.time}-${event.title}-${index}`} style={styles.event}>

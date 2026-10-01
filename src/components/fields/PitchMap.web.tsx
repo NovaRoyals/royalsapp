@@ -23,9 +23,12 @@ function ensureLeafletCss() {
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(link);
   }
-  if (document.getElementById('nr-pin-css')) return;
-  const style = document.createElement('style');
-  style.id = 'nr-pin-css';
+  const existing = document.getElementById('nr-pin-css');
+  const style = existing ?? document.createElement('style');
+  if (!existing) {
+    style.id = 'nr-pin-css';
+    document.head.appendChild(style);
+  }
   style.textContent = `
     .nr-marker-wrap { background: none !important; border: none !important; }
     .nr-pin { display: flex; flex-direction: column; align-items: center; transform: translate(-50%, calc(-100% + 10px)); pointer-events: auto; }
@@ -34,11 +37,14 @@ function ensureLeafletCss() {
       padding: 4px 8px; border-radius: 999px; margin-bottom: 6px; max-width: 150px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 4px 12px rgba(10,36,28,.25);
     }
+    .nr-pin:not(.labeled) .nr-pin-label { display: none; }
+    .nr-pin:not(.labeled):hover .nr-pin-label,
+    .nr-pin:not(.labeled):focus-within .nr-pin-label { display: block; }
     .nr-pin-sub { display: block; font-size: 10px; font-weight: 600; opacity: .88; overflow: hidden; text-overflow: ellipsis; }
     .nr-dot { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 12px var(--glow); }
     .nr-dot.lg { width: 24px; height: 24px; border-color: ${PIN_GOLD}; box-shadow: 0 0 0 1px ${PIN_GOLD}, 0 0 16px var(--glow); }
     .nr-glow { width: 28px; height: 28px; border-radius: 50%; background: var(--glow); opacity: .28; margin-bottom: -24px; }
-    .nr-pin.pulse .nr-glow { animation: nr-pin-pulse 1.6s ease-in-out infinite; }
+    .nr-pin.pulse .nr-glow { animation: nr-pin-pulse 1.6s ease-in-out 3; }
     @media (prefers-reduced-motion: reduce) { .nr-pin.pulse .nr-glow { animation: none; } }
     @keyframes nr-pin-pulse { 0%,100% { transform: scale(1); opacity: .28; } 50% { transform: scale(1.55); opacity: .12; } }
     .leaflet-container { font-family: inherit; background: #F3F5F3; height: 100%; width: 100%; touch-action: none; }
@@ -47,7 +53,6 @@ function ensureLeafletCss() {
     .leaflet-touch .leaflet-control-zoom a,
     .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 18px; }
   `;
-  document.head.appendChild(style);
 }
 
 function drawPins(
@@ -62,20 +67,24 @@ function drawPins(
 ) {
   layer.clearLayers();
   const zoom = map.getZoom();
-  for (const pitch of pitches) {
+  const seenVenue = new Set<string>();
+  const visible =
+    zoom < 13
+      ? pitches.filter((pitch) => {
+          if (pitch.id === selectedId || pitch.id === topPickId) return true;
+          if (seenVenue.has(pitch.venueKey)) return false;
+          seenVenue.add(pitch.venueKey);
+          return true;
+        })
+      : pitches;
+  for (const pitch of visible) {
     const selected = pitch.id === selectedId;
     const top = pitch.id === topPickId;
-    const showVenue = pitch.isVenueLabel || selected || top;
-    const showSub = zoom >= 15 || selected || top;
+    const labeled = selected || top;
     const color = pitch.status === 'conflict' ? PIN_BUSY : PIN_CLEAR;
-    const large = selected || top;
-    const label =
-      showVenue || showSub
-        ? `<div class="nr-pin-label">${showVenue ? escapeHtml(pitch.name) : ''}${
-            showSub ? `<span class="nr-pin-sub">${escapeHtml(pitch.pitch)}</span>` : ''
-          }</div>`
-        : '';
-    const html = `<div class="nr-pin ${top && !reducedMotion ? 'pulse' : ''}">
+    const large = labeled;
+    const label = `<div class="nr-pin-label">${escapeHtml(pitch.name)}<span class="nr-pin-sub">${escapeHtml(pitch.pitch)}</span></div>`;
+    const html = `<div class="nr-pin ${labeled ? 'labeled' : ''} ${top && !reducedMotion ? 'pulse' : ''}">
         ${label}
         <div class="nr-glow" style="--glow:${large ? PIN_GOLD : color}"></div>
         <div class="nr-dot ${large ? 'lg' : ''}" style="background:${color};--glow:${color}"></div>

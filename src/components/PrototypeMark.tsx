@@ -1,13 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { isDemoMode } from '@/lib/supabase';
 import { colors, typography } from '@/theme/tokens';
 
+const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 82 : 64;
+
 /** Unobtrusive prototype marker — not a claim that data is saved to a server. */
-export function PrototypeMark() {
+export function PrototypeMark({ aboveTabs = false }: { aboveTabs?: boolean }) {
   if (!isDemoMode) return null;
   return (
-    <View pointerEvents="none" style={[styles.wrap, { bottom: 12 }]}>
+    <View pointerEvents="none" style={[styles.wrap, { bottom: aboveTabs ? TAB_BAR_HEIGHT + 6 : 4 }]}>
       <Text style={styles.text}>Prototype</Text>
     </View>
   );
@@ -16,7 +18,7 @@ export function PrototypeMark() {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: 12,
+    right: 8,
     zIndex: 40,
     paddingHorizontal: 8,
     paddingVertical: 4,

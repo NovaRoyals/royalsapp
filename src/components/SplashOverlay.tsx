@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -31,51 +31,47 @@ export function SplashOverlay({
   }
   const visible = play && !hidden;
   const veil = useSharedValue(play ? 1 : 0);
-  const lift = useSharedValue(0);
+  const settled = useRef(false);
+
+  const finish = useCallback(() => {
+    if (settled.current) return;
+    settled.current = true;
+    setHidden(true);
+    onFinished?.();
+  }, [onFinished]);
 
   useEffect(() => {
     if (!play) return;
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      setHidden(true);
-      onFinished?.();
-    };
+    settled.current = false;
     veil.value = 1;
-    lift.value = 0;
-    const failsafe = setTimeout(finish, reduced ? 220 : 2200);
+    const failsafe = setTimeout(finish, reduced ? 220 : 1300);
     if (reduced) {
       return () => clearTimeout(failsafe);
     }
-    lift.value = withDelay(1100, withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }));
     veil.value = withDelay(
-      1480,
-      withTiming(0, { duration: 360, easing: Easing.out(Easing.cubic) }, (finished) => {
+      720,
+      withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) }, (finished) => {
         if (finished) runOnJS(finish)();
       }),
     );
     return () => clearTimeout(failsafe);
-  }, [play, reduced, lift, veil, onFinished]);
+  }, [play, reduced, veil, finish]);
 
   const veilStyle = useAnimatedStyle(() => ({ opacity: veil.value }));
-  const markStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -lift.value * 36 }],
-  }));
 
   if (!visible) return null;
 
   return (
-    <Animated.View pointerEvents="auto" style={[styles.veil, veilStyle]}>
-      <Animated.View style={markStyle}>
+    <Animated.View style={[styles.veil, veilStyle]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Skip intro" onPress={finish} style={styles.hit}>
         <Text style={styles.eyebrow}>NOVA</Text>
         <View style={styles.row}>
           {LETTERS.map((letter, index) => (
-            <Letter key={letter} letter={letter} delay={index * 90} reduced={reduced} />
+            <Letter key={letter} letter={letter} delay={index * 45} reduced={reduced} />
           ))}
         </View>
         <Text style={styles.sub}>Athletic Club</Text>
-      </Animated.View>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -83,11 +79,11 @@ export function SplashOverlay({
 function Letter({ letter, delay, reduced }: { letter: string; delay: number; reduced: boolean }) {
   const progress = useSharedValue(reduced ? 1 : 0);
   useEffect(() => {
-    progress.value = reduced ? 1 : withDelay(delay, withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) }));
+    progress.value = reduced ? 1 : withDelay(delay, withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }));
   }, [delay, progress, reduced]);
   const style = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: [{ translateY: (1 - progress.value) * 22 }, { scale: 0.84 + progress.value * 0.16 }],
+    transform: [{ translateY: (1 - progress.value) * 12 }],
   }));
   return <Animated.Text style={[styles.letter, style]}>{letter}</Animated.Text>;
 }
@@ -101,9 +97,8 @@ const styles = StyleSheet.create({
     left: 0,
     zIndex: 80,
     backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
+  hit: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   eyebrow: { color: colors.mint, textAlign: 'center', fontSize: 11, letterSpacing: 2, fontFamily: typography.label.fontFamily },
   row: { flexDirection: 'row', justifyContent: 'center' },
   letter: { color: colors.white, fontSize: 52, lineHeight: 56, ...typography.display },

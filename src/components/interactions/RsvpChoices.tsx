@@ -40,7 +40,7 @@ export function RsvpChoices({
   confirmation?: string | null;
 }) {
   const reduced = useReducedMotion();
-  const duration = durationMs ?? motion.duration.base;
+  const duration = durationMs ?? motion.duration.fast;
 
   return (
     <View>
@@ -99,7 +99,7 @@ function RsvpCard({
       <Animated.View
         style={[
           styles.fill,
-          { backgroundColor: choice.id === 'going' ? colors.success : choice.id === 'maybe' ? colors.orange : colors.danger },
+          { backgroundColor: choice.id === 'going' ? colors.success : choice.id === 'maybe' ? colors.orange : colors.charcoal },
           fillStyle,
         ]}
       />
@@ -123,8 +123,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.sm },
   card: {
     flex: 1,
-    minHeight: 84,
-    borderRadius: radius.pill,
+    minHeight: 64,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.paper,

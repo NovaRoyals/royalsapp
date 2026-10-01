@@ -17,6 +17,7 @@ import PitchMap from '@/components/fields/PitchMap';
 import { PitchDetail } from '@/components/fields/PitchDetail';
 import { PitchRow } from '@/components/fields/PitchRow';
 import { AppHeader, Screen } from '@/components/ui';
+import { venueCatalog, venueTitle } from '@/data/venues';
 import { useFieldCoverage, usePitchDay } from '@/hooks/useFieldCalendar';
 import { clubNowPostedIso } from '@/lib/datetime';
 import {
@@ -32,9 +33,12 @@ import {
   sortPitches,
 } from '@/lib/fields';
 import { haptic } from '@/lib/haptics';
+import { latestVenueUpdate } from '@/lib/operations';
 import { locatePitches } from '@/lib/pitchCoords';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { eachDate } from '@/services/fields';
+import { fieldStatusLabel } from '@/services/weather';
+import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 function boundedDate(value: string, start?: string, end?: string) {
@@ -44,7 +48,10 @@ function boundedDate(value: string, start?: string, end?: string) {
   return value;
 }
 
+const PREVIEW_COUNT = 5;
+
 export default function FieldsScreen() {
+  const { schedule, venueUpdates } = useApp();
   const coverage = useFieldCoverage();
   const today = clubDateFromPosted(clubNowPostedIso());
   const windowStart = coverage.data?.coverageStart;
@@ -63,7 +70,10 @@ export default function FieldsScreen() {
   const [now, setNow] = useState(Date.now());
   const reduced = useReducedMotion();
   const pickupMinutes = minutesForTime(time);
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const mapHeight = Math.max(220, Math.min(300, height - 520));
+  const [showAllPitches, setShowAllPitches] = useState(false);
+  const [showFieldStatus, setShowFieldStatus] = useState(false);
   const twoCol = width >= 640;
   const panelWidth = Math.min(width * 0.8, 340);
   const webFull: ViewStyle | undefined = fullscreen
@@ -112,6 +122,41 @@ export default function FieldsScreen() {
         : pitches[0]?.id;
   const selected = pitches.find((item) => item.id === selectedId);
   const suggestion = pitches.find((item) => item.id === suggestionId);
+  const ranked = useMemo(() => {
+    const suggested = pitches.find((item) => item.id === suggestionId);
+    const others = pitches.filter((item) => item.id !== suggestionId);
+    return [
+      ...(suggested ? [suggested] : []),
+      ...others.filter((item) => item.status !== 'conflict'),
+      ...others.filter((item) => item.status === 'conflict'),
+    ];
+  }, [pitches, suggestionId]);
+  const listed = showAllPitches
+    ? ranked
+    : ranked.filter((item, index) => index < PREVIEW_COUNT || item.id === selectedId);
+  const fieldRows = useMemo(
+    () =>
+      venueCatalog.map((place) => {
+        const update = latestVenueUpdate(venueUpdates, place.id);
+        const fromEvent = schedule.find(
+          (event) => event.venueId === place.id && event.fieldStatus && event.fieldStatus !== 'open' && event.status !== 'completed',
+        )?.fieldStatus;
+        return {
+          id: place.id,
+          title: venueTitle(place),
+          status: update?.status ?? fromEvent ?? 'open',
+          reason: update?.reason,
+        };
+      }),
+    [schedule, venueUpdates],
+  );
+  const exceptions = fieldRows.filter((row) => row.status !== 'open');
+  const statusLine =
+    exceptions.length === 0
+      ? 'All ROYALS fields currently open'
+      : exceptions.length === 1
+        ? `${exceptions[0].title} is ${fieldStatusLabel(exceptions[0].status).toLowerCase()}`
+        : `${exceptions.length} ROYALS fields need attention`;
 
   useEffect(() => {
     if (fullscreen || !expandedId || Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -136,16 +181,19 @@ export default function FieldsScreen() {
   function changeDate(value: string) {
     setPickedDate(value);
     setExpandedId(undefined);
+    setShowAllPitches(false);
   }
 
   function changeTime(value: (typeof PITCH_TIMES)[number]) {
     setTime(value);
     setExpandedId(undefined);
+    setShowAllPitches(false);
   }
 
   function changeTurf() {
     setTurfOnly((value) => !value);
     setExpandedId(undefined);
+    setShowAllPitches(false);
   }
 
   function selectPitch(id: string) {
@@ -189,7 +237,7 @@ export default function FieldsScreen() {
   }
 
   const mapCard = (
-    <View style={[styles.mapCard, fullscreen && styles.mapFull, fullscreen && webFull, Platform.OS === 'web' && ({ touchAction: 'none' } as ViewStyle)]}>
+    <View style={[styles.mapCard, { height: mapHeight }, fullscreen && styles.mapFull, fullscreen && webFull, Platform.OS === 'web' && ({ touchAction: 'none' } as ViewStyle)]}>
       {fullscreen ? (
         <View style={styles.fullBar}>
           <Pressable accessibilityRole="button" accessibilityLabel="Exit fullscreen map" onPress={exitFullscreen} style={styles.mapBtn}>
@@ -237,8 +285,6 @@ export default function FieldsScreen() {
           <Text style={styles.topPickText}>★ Top pick</Text>
         </Pressable>
       ) : null}
-      <Text style={styles.attr}>© OpenStreetMap © Esri</Text>
-
       {fullscreen && (panelOpen || panelDocked) && selected ? (
         panelOpen ? (
           <View style={[styles.panel, { width: panelWidth }]}>
@@ -298,9 +344,31 @@ export default function FieldsScreen() {
           onTime={changeTime}
           onTurf={changeTurf}
         />
-        <Text numberOfLines={1} style={styles.hint}>{PITCH_FILTER_HINT}</Text>
+        <Text style={styles.hint}>{PITCH_FILTER_HINT}</Text>
 
-        {fullscreen ? <View style={styles.mapSpacer} /> : null}
+        <View style={styles.statusLine}>
+          <Text style={styles.statusCopy}>{statusLine}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showFieldStatus }}
+            onPress={() => setShowFieldStatus((value) => !value)}
+            style={styles.statusAction}
+          >
+            <Text style={styles.statusActionText}>{showFieldStatus ? 'Hide status' : 'View status'}</Text>
+          </Pressable>
+        </View>
+        {showFieldStatus ? (
+          <View style={styles.statusList}>
+            {[...exceptions, ...fieldRows.filter((row) => row.status === 'open')].map((row) => (
+              <Text key={row.id} style={styles.statusItem}>
+                {row.title} · {fieldStatusLabel(row.status)}
+                {row.reason ? ` · ${row.reason}` : ''}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {fullscreen ? <View style={[styles.mapSpacer, { height: mapHeight }]} /> : null}
         {mapCard}
 
         {suggestion ? (
@@ -309,11 +377,11 @@ export default function FieldsScreen() {
 
         {emptyDay ? <Text style={styles.empty}>No public-schedule events this day.</Text> : null}
 
-        <Text style={styles.section}>PITCHES · {pitches.length} pitches</Text>
+        <Text style={styles.section}>{showAllPitches ? `PITCHES · ${pitches.length}` : 'Suggested pitches'}</Text>
         <View style={[styles.list, twoCol && styles.listGrid]} accessibilityLabel="Tap a glowing pin to preview the pitch — green is clear at your time, orange has something on.">
           {day.isPending && !day.data
             ? [0, 1, 2, 3].map((item) => <View key={item} style={[styles.skeleton, twoCol && styles.half]} />)
-            : pitches.map((pitch) => (
+            : listed.map((pitch) => (
                 <PitchRow
                   key={pitch.id}
                   pitch={pitch}
@@ -325,6 +393,11 @@ export default function FieldsScreen() {
                 />
               ))}
         </View>
+        {pitches.length > PREVIEW_COUNT ? (
+          <Pressable accessibilityRole="button" onPress={() => setShowAllPitches((value) => !value)} style={styles.more}>
+            <Text style={styles.moreText}>{showAllPitches ? 'Show suggested pitches' : `View all ${pitches.length} pitches`}</Text>
+          </Pressable>
+        ) : null}
 
         <Text style={styles.footer}>Data: Fieldchecker API · source health</Text>
     </Screen>
@@ -335,7 +408,6 @@ const styles = StyleSheet.create({
   headerTight: { paddingTop: 4, paddingBottom: 8 },
   hint: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: spacing.sm, ...typography.body },
   mapCard: {
-    height: 320,
     borderRadius: radius.lg,
     overflow: 'hidden',
     borderWidth: 1,
@@ -343,7 +415,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F5F3',
     marginBottom: spacing.sm,
   },
-  mapSpacer: { height: 320, marginBottom: spacing.sm },
+  mapSpacer: { marginBottom: spacing.sm },
   mapFull: {
     position: 'absolute',
     top: 0,
@@ -394,7 +466,14 @@ const styles = StyleSheet.create({
   },
   topPickFull: { top: 64 },
   topPickText: { color: colors.white, fontSize: 12, ...typography.label },
-  attr: { position: 'absolute', left: 10, bottom: 8, color: colors.stone, fontSize: 9, ...typography.body },
+  statusLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  statusCopy: { flex: 1, color: colors.ink, fontSize: 14, ...typography.bodyMedium },
+  statusAction: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  statusActionText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
+  statusList: { gap: 4, marginBottom: spacing.sm },
+  statusItem: { color: colors.charcoal, fontSize: 13, lineHeight: 18, ...typography.body },
+  more: { minHeight: 44, justifyContent: 'center', marginTop: spacing.sm },
+  moreText: { color: colors.orangeDark, fontSize: 14, ...typography.label },
   panel: {
     position: 'absolute',
     top: 72,

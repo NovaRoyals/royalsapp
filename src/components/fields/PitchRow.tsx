@@ -44,7 +44,7 @@ export function PitchRow({
           <Text style={styles.status}>{collapsedStatus(pitch, time)}</Text>
         </View>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>{expanded ? 'Hide' : 'Full day'}</Text>
+          <Text style={styles.pillText}>{expanded ? 'Hide' : 'View day'}</Text>
         </View>
       </PressableScale>
       {expanded ? <View style={styles.detail}><PitchDetail pitch={pitch} time={time} /></View> : null}

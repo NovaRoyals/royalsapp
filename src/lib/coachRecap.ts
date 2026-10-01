@@ -43,8 +43,9 @@ export function noteDraftFromTags(tags: CoachNoteTag[], extra: string) {
 
 export function attendanceCounts(roster: Person[], checkIns: AttendanceMark[]) {
   const present = roster.filter((person) => checkIns.some((row) => row.personId === person.id && row.present));
-  const absent = roster.filter((person) => !present.some((row) => row.id === person.id));
-  return { present, absent, presentCount: present.length, absentCount: absent.length };
+  const absent = roster.filter((person) => checkIns.some((row) => row.personId === person.id && !row.present));
+  const unrecordedCount = roster.length - present.length - absent.length;
+  return { present, absent, presentCount: present.length, absentCount: absent.length, unrecordedCount };
 }
 
 export function recapForEvent(recaps: SessionRecap[], eventId: string) {

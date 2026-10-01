@@ -23,7 +23,7 @@ export const PITCH_DISCLAIMER =
   'Public league calendars only — private teams and game bookings aren’t checked. Treat this as a starting point, not a hold on the pitch.';
 
 export const PITCH_FILTER_HINT =
-  'This app cannot verify private permits and private/member practice schedules.';
+  'Private permits and member practices aren’t checked.';
 
 export function minutesForTime(time: string) {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -83,7 +83,7 @@ export function collapsedStatus(pitch: PitchDay, time: string) {
   const label = formatTimeChip(time);
   if (pitch.status === 'conflict') {
     const count = Math.max(1, pitch.overlappingEvents.length);
-    return `${count} conflicting events · ${label}`;
+    return `${count} conflicting ${count === 1 ? 'event' : 'events'} · ${label}`;
   }
   return `No conflicts found · ${label}`;
 }

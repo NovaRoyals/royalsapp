@@ -15,7 +15,7 @@ import { demoSchedule, demoTeams } from '@/data/demo';
 import { ARROWHEAD_2B_ID, venueById } from '@/data/venues';
 import { can, canCreateSessionRecap, canSendSessionRecap } from '@/lib/capabilities';
 import { attendanceCounts, recapForEvent } from '@/lib/coachRecap';
-import { formatEventWhen } from '@/lib/datetime';
+import { eventPhase, formatEventWhen, relativeDayLabel } from '@/lib/datetime';
 import { canPlayerRsvp, canSeeFullRoster, COACH_TEAM_ID } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
 import {
@@ -94,9 +94,13 @@ export default function EventDetailScreen() {
   const showPlayerRsvp = canPlayerRsvp(role, event, registrations);
   const showChildRsvp = role === 'guardian' && kids.length > 0;
   const showSupporter = !showPlayerRsvp && !showChildRsvp && !staffRoster && role !== 'guest' && event.status !== 'cancelled';
+  const showGuestSupport = role === 'guest' && event.status !== 'cancelled';
   const deadlines = deadlineCopy(event, staffRoster ? waiting.length : 0);
   const recorded = event.checkIns ?? [];
   const attendance = attendanceCounts(roster, recorded);
+  const attendanceOpen =
+    event.status === 'completed' || recorded.length > 0 || eventPhase(event) !== 'upcoming' || relativeDayLabel(event.startsAt) === 'today';
+  const [pendingPublish, setPendingPublish] = useState<PublishAction | null>(null);
   const recap = recapForEvent(recaps, event.id);
   const showRecap =
     (event.status === 'completed' || Boolean(recorded.length)) &&
@@ -117,6 +121,7 @@ export default function EventDetailScreen() {
           </Pressable>
           <Text style={styles.topTitle}>{eventTypeLabel(event)}</Text>
           <PressableScale
+            accessibilityRole="button"
             accessibilityLabel="Share event"
             onPress={async () => {
               const result = await shareContent({
@@ -163,7 +168,7 @@ export default function EventDetailScreen() {
         <Text style={styles.glanceLabel}>At a glance</Text>
         <View style={styles.glance}>
           {glanceRows(event, deadlines).map((row) => (
-            <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && styles.glanceItemWide]}>
+            <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && (row.span ? styles.glanceSpan : styles.glanceItemWide)]}>
               <Ionicons name={row.icon} size={18} color={colors.stone} />
               <View style={styles.glanceCopy}>
                 <Text style={styles.factLabel}>{row.label}</Text>
@@ -175,7 +180,7 @@ export default function EventDetailScreen() {
 
         {showChildRsvp || showPlayerRsvp ? (
           <View style={styles.responseLine}>
-            <Text style={styles.factLabel}>Your response</Text>
+            <Text style={styles.factLabel}>{showChildRsvp ? 'RSVP' : 'Your response'}</Text>
             <Text style={styles.factValue}>
               {showChildRsvp
                 ? kids.map((child) => `${child.firstName} — ${rsvpLabel(rsvpFor(event, child.id))}`).join('   ')
@@ -192,7 +197,17 @@ export default function EventDetailScreen() {
           </View>
         ) : null}
 
-        {role === 'guest' ? <Text style={styles.hint}>Public details only. Player responses and household schedules stay signed in.</Text> : null}
+        {showGuestSupport ? (
+          <View style={styles.block}>
+            <Text style={styles.section}>Coming to support?</Text>
+            <Text style={styles.hint}>Supporting does not add you to the roster. Sign in to respond.</Text>
+            <Button label="Sign in to RSVP" onPress={() => router.push('/onboarding?mode=signin' as Href)} />
+          </View>
+        ) : null}
+
+        {role === 'guest' ? (
+          <Text style={styles.privacy}>Public details only. Player responses and household schedules stay signed in.</Text>
+        ) : null}
 
         {staffRoster ? (
           <View style={styles.block}>
@@ -238,9 +253,13 @@ export default function EventDetailScreen() {
             {recorded.length ? (
               <Text style={styles.summaryLine}>
                 {attendance.presentCount} present · {attendance.absentCount} absent
+                {attendance.unrecordedCount ? ` · ${attendance.unrecordedCount} not recorded` : ''}
               </Text>
             ) : null}
-            {can(role, 'record_attendance') && roster.length ? (
+            {can(role, 'record_attendance') && roster.length && !attendanceOpen ? (
+              <Text style={styles.hint}>Attendance opens on session day.</Text>
+            ) : null}
+            {can(role, 'record_attendance') && roster.length && attendanceOpen ? (
               <AttendanceRoster
                 roster={roster}
                 recorded={recorded}
@@ -293,24 +312,43 @@ export default function EventDetailScreen() {
         {canPublishOperations(role) ? (
           <View style={styles.block}>
             <Text style={styles.section}>Publish</Text>
-            <Button
-              label={event.fieldStatus === 'closed' ? 'Reopen field' : 'Close this field'}
-              variant="secondary"
-              onPress={() =>
-                setFieldStatus(
-                  event.id,
-                  event.fieldStatus === 'closed' ? 'open' : 'closed',
-                  event.fieldStatus === 'closed' ? undefined : `${placeLabel(event)} is closed due to unsafe conditions.`,
-                )
-              }
-            />
-            <Button
-              label="Relocate to Field 2B"
-              variant="secondary"
-              onPress={() => relocateEvent(event.id, ARROWHEAD_2B_ID, 'Field 3A is unavailable. The session moves to Field 2B.')}
-              style={styles.action}
-            />
-            <Button label="Cancel session" variant="ghost" onPress={() => cancelEvent(event.id, 'Session cancelled. Rescheduling information is pending.')} style={styles.action} />
+            {pendingPublish ? (
+              <View style={styles.confirm}>
+                <Text style={styles.bannerTitle}>{publishCopy[pendingPublish].title}</Text>
+                <Text style={styles.hint}>
+                  {pendingPublish === 'reopen'
+                    ? 'Families see the field as open again.'
+                    : 'Affected families get an urgent in-app alert. This is recorded in the audit log.'}
+                </Text>
+                <Button
+                  label={publishCopy[pendingPublish].confirm}
+                  onPress={() => {
+                    if (pendingPublish === 'close') {
+                      setFieldStatus(event.id, 'closed', `${placeLabel(event)} is closed due to unsafe conditions.`);
+                    } else if (pendingPublish === 'reopen') {
+                      setFieldStatus(event.id, 'open');
+                    } else if (pendingPublish === 'relocate') {
+                      relocateEvent(event.id, ARROWHEAD_2B_ID, 'Field 3A is unavailable. The session moves to Field 2B.');
+                    } else {
+                      cancelEvent(event.id, 'Session cancelled. Rescheduling information is pending.');
+                    }
+                    setPendingPublish(null);
+                  }}
+                  style={styles.action}
+                />
+                <Button label="Keep as is" variant="ghost" onPress={() => setPendingPublish(null)} />
+              </View>
+            ) : (
+              <>
+                <Button
+                  label={event.fieldStatus === 'closed' ? 'Reopen field' : 'Close this field'}
+                  variant="secondary"
+                  onPress={() => setPendingPublish(event.fieldStatus === 'closed' ? 'reopen' : 'close')}
+                />
+                <Button label="Relocate to Field 2B" variant="secondary" onPress={() => setPendingPublish('relocate')} style={styles.action} />
+                <Button label="Cancel session" variant="ghost" onPress={() => setPendingPublish('cancel')} style={styles.action} />
+              </>
+            )}
             {event.pendingChange?.approval === 'requested' && event.pendingChange.kind === 'relocation' ? (
               <Button label="Approve relocation" onPress={() => relocateEvent(event.id, ARROWHEAD_2B_ID)} style={styles.action} />
             ) : null}
@@ -350,7 +388,7 @@ export default function EventDetailScreen() {
 
         <CalendarPrep event={event} season={season.length ? season : [event]} />
 
-        {event.coachName && event.type === 'training' && role !== 'guest' ? (
+        {event.coachName && event.type === 'training' && (role === 'guardian' || role === 'adult_player') ? (
           <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} style={styles.action} />
         ) : null}
       </ScrollView>
@@ -366,10 +404,8 @@ export default function EventDetailScreen() {
                     value={rsvpFor(event, child.id)}
                     goingCount={0}
                     showCount={false}
-                    onChange={(status) => {
-                      setParticipantRsvp(event.id, child.id, status);
-                      toast(`${child.firstName} — ${status === 'going' ? 'Going' : status === 'maybe' ? 'Not sure' : 'Can’t make it'}`);
-                    }}
+                    confirmation={childConfirmation(child.firstName, rsvpFor(event, child.id))}
+                    onChange={(status) => setParticipantRsvp(event.id, child.id, status)}
                   />
                 </View>
               ))
@@ -381,6 +417,22 @@ export default function EventDetailScreen() {
       ) : null}
     </Screen>
   );
+}
+
+type PublishAction = 'close' | 'reopen' | 'relocate' | 'cancel';
+
+const publishCopy: Record<PublishAction, { title: string; confirm: string }> = {
+  close: { title: 'Close this field?', confirm: 'Close and notify' },
+  reopen: { title: 'Reopen this field?', confirm: 'Reopen' },
+  relocate: { title: 'Move this session to Field 2B?', confirm: 'Relocate and notify' },
+  cancel: { title: 'Cancel this session?', confirm: 'Cancel and notify' },
+};
+
+function childConfirmation(firstName: string, status: string | undefined) {
+  if (status === 'going') return `${firstName} is going.`;
+  if (status === 'not_going') return `${firstName} can’t make it.`;
+  if (status === 'maybe') return `${firstName} is marked not sure.`;
+  return null;
 }
 
 function NoteEditor({ initial, onSave }: { initial: string; onSave: (value: string) => void }) {
@@ -400,6 +452,17 @@ function NoteEditor({ initial, onSave }: { initial: string; onSave: (value: stri
   );
 }
 
+function sideName(event: ScheduleEvent) {
+  if (event.teamId === 'nova-royals-men') return 'ROYALS Open';
+  if (event.teamId === 'nova-royals-35plus') return 'ROYALS 35+';
+  if (event.teamId === 'nova-royals-women') return 'ROYALS Women';
+  if (event.sport === 'cricket' || event.teamId === 'nova-royals-cricket') return 'ROYALS Cricket';
+  if (event.teamId === 'nova-royals-kids-u8' || event.teamId === 'nova-royals-kids-u6') return 'ROYALS Kids';
+  const team = demoTeams.find((item) => item.id === event.teamId);
+  if (team?.shortName && team.shortName !== 'ROYALS') return team.shortName;
+  return 'ROYALS';
+}
+
 function MatchHeader({ event }: { event: ScheduleEvent }) {
   const opponent = event.opponent?.trim();
   const competitive = Boolean(opponent) && event.type !== 'training' && event.type !== 'club_event';
@@ -408,7 +471,7 @@ function MatchHeader({ event }: { event: ScheduleEvent }) {
   }
   return (
     <View style={styles.matchup} accessibilityRole="header">
-      <Text style={styles.side}>ROYALS</Text>
+      <Text style={styles.side}>{sideName(event)}</Text>
       <Text style={styles.vs}>vs</Text>
       <Text style={styles.side}>{opponent}</Text>
     </View>
@@ -418,9 +481,9 @@ function MatchHeader({ event }: { event: ScheduleEvent }) {
 type GlanceIcon = keyof typeof Ionicons.glyphMap;
 
 function glanceRows(event: ScheduleEvent, deadlines: string[]) {
-  const rows: { icon: GlanceIcon; label: string; value: string }[] = [];
-  const push = (icon: GlanceIcon, label: string, value?: string) => {
-    if (value) rows.push({ icon, label, value });
+  const rows: { icon: GlanceIcon; label: string; value: string; span?: boolean }[] = [];
+  const push = (icon: GlanceIcon, label: string, value?: string, span = false) => {
+    if (value) rows.push({ icon, label, value, span });
   };
   const when = formatEventWhen(event.startsAt);
   const place = placeLabel(event);
@@ -453,7 +516,7 @@ function glanceRows(event: ScheduleEvent, deadlines: string[]) {
     push('location-outline', placeName, place);
     push('people-outline', event.sport === 'cricket' ? 'Squad' : 'Roster', event.rosterStatus);
   }
-  deadlines.forEach((line) => push('alarm-outline', 'Respond by', line));
+  deadlines.forEach((line) => push('alarm-outline', 'Respond by', line, true));
   return rows;
 }
 
@@ -499,12 +562,15 @@ const styles = StyleSheet.create({
   glance: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.sm, rowGap: 14, columnGap: spacing.lg },
   glanceItem: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   glanceItemWide: { width: '47%', flexGrow: 1 },
+  glanceSpan: { width: '100%', flexGrow: 1 },
+  privacy: { color: colors.stone, fontSize: 14, lineHeight: 20, marginTop: spacing.xl, ...typography.body },
   glanceCopy: { flex: 1, minWidth: 0, gap: 1 },
   factLabel: { color: colors.stone, fontSize: 11, ...typography.label },
   factValue: { color: colors.ink, fontSize: 15, lineHeight: 20, ...typography.bodyMedium },
   responseLine: { marginTop: spacing.lg, gap: 2 },
   result: { color: colors.ink, fontSize: 20, marginTop: spacing.sm, ...typography.heading },
   block: { marginTop: spacing.lg, gap: spacing.sm },
+  confirm: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.orangeSoft, gap: spacing.xs },
   section: { color: colors.ink, fontSize: 18, ...typography.heading },
   hint: { color: colors.stone, fontSize: 14, lineHeight: 20, ...typography.body },
   summaryCount: { color: colors.ink, fontSize: 28, fontVariant: ['tabular-nums'], ...typography.heading },

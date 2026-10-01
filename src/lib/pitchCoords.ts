@@ -41,6 +41,10 @@ export function venueCenter(name: string) {
   return hit ? { lat: hit.lat, lng: hit.lng } : { ...CHANTILLY };
 }
 
+export function displayVenueName(name: string) {
+  return name.replace(/\bE\.C\.\s+Lawrence\b/gi, 'EC Lawrence');
+}
+
 export function locatePitches(pitches: PitchDay[]): LocatedPitch[] {
   const groups = new Map<string, PitchDay[]>();
   for (const pitch of pitches) {
@@ -58,6 +62,7 @@ export function locatePitches(pitches: PitchDay[]): LocatedPitch[] {
       const angle = size ? (index / size) * Math.PI * 2 : 0;
       located.push({
         ...pitch,
+        name: displayVenueName(pitch.name),
         lat: size > 1 ? center.lat + Math.sin(angle) * FAN : center.lat,
         lng: size > 1 ? center.lng + Math.cos(angle) * FAN : center.lng,
         venueKey,
