@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Href, router, useLocalSearchParams } from 'expo-router';
+import { Href, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 

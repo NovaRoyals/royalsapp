@@ -15,7 +15,7 @@ export function leaveOnboarding(href: Href = '/(tabs)') {
       router.dismissTo(href);
       return;
     } catch {
-      undefined;
+      // dismissTo can throw when the target is already the current history entry.
     }
   }
   router.replace(href);

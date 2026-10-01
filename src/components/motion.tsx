@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from 'expo-router';
 import { useEffect, type ReactNode } from 'react';
-import { Pressable, type PressableProps, View } from 'react-native';
+import { Platform, Pressable, type PressableProps, View } from 'react-native';
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { haptic } from '@/lib/haptics';
@@ -11,10 +11,11 @@ import { motion } from '@/theme/motion';
 
 const easeOut = Easing.bezier(0.16, 1, 0.3, 1);
 
-export function PressableScale({ style, children, ...props }: PressableProps) {
+export function PressableScale({ style, children, accessibilityRole, ...props }: PressableProps) {
   const reduced = useReducedMotion();
   return (
     <Pressable
+      accessibilityRole={accessibilityRole ?? (props.onPress ? 'button' : undefined)}
       {...props}
       style={(state) => [
         typeof style === 'function' ? style(state) : style,
@@ -79,7 +80,10 @@ export function TabScene({ children }: { children: ReactNode }) {
         accessibilityElementsHidden={!focused}
         importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
         // RN-web: Reanimated views do not always forward aria-hidden.
-        {...({ 'aria-hidden': !focused } as object)}
+        {...({
+          'aria-hidden': !focused,
+          ...(Platform.OS === 'web' && !focused ? { inert: true } : {}),
+        } as object)}
         style={{ flex: 1 }}
       >
         {children}

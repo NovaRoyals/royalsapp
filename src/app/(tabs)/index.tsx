@@ -26,7 +26,7 @@ import { homeGreeting } from '@/lib/greeting';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
-import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
+import { colors, layout, radius, typography } from '@/theme/tokens';
 import type { Tint } from '@/components/onboarding/Pieces';
 
 const TILE_TINT: Record<Tint, { bg: string; fg: string }> = {

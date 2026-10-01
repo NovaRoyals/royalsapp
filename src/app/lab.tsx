@@ -12,6 +12,7 @@ import { IllustrationFrame } from '@/components/illustrations/IllustrationFrame'
 import { Screen, StatusPill } from '@/components/ui';
 import { haptic, type HapticKind } from '@/lib/haptics';
 import { safeBack } from '@/lib/nav';
+import { showReviewerLabs } from '@/lib/prototype';
 import { motion } from '@/theme/motion';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { AttendanceMark, AttendanceStatus, Person } from '@/types/domain';
@@ -23,7 +24,7 @@ const labRoster: Person[] = [
 ];
 
 export default function InteractionLabScreen() {
-  const [rsvpVariant, setRsvpVariant] = useState<RsvpVariant>('a');
+  const [rsvpVariant] = useState<RsvpVariant>('a');
   const [rsvp, setRsvp] = useState<AttendanceStatus | undefined>();
   const [goingCount, setGoingCount] = useState(11);
   const [supportVariant, setSupportVariant] = useState<'a' | 'b' | 'c'>('a');
@@ -33,6 +34,17 @@ export default function InteractionLabScreen() {
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [duration, setDuration] = useState<number>(motion.duration.enter);
   const [hapticKind, setHapticKind] = useState<HapticKind>('light');
+
+  if (!showReviewerLabs) {
+    return (
+      <Screen>
+        <Text style={styles.copy}>Interaction Lab is not part of the club app.</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to Profile" onPress={() => safeBack('/(tabs)/profile')}>
+          <Text style={styles.copy}>Back to Profile</Text>
+        </Pressable>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

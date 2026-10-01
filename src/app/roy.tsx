@@ -6,6 +6,7 @@ import { Roy, ROY_STATES, type RoyHandle, type RoyState } from '@/components/mas
 import { Screen, StatusPill } from '@/components/ui';
 import { haptic } from '@/lib/haptics';
 import { safeBack } from '@/lib/nav';
+import { showReviewerLabs } from '@/lib/prototype';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export default function RoyLabScreen() {
@@ -18,6 +19,17 @@ export default function RoyLabScreen() {
     setPlaying(state);
     royRef.current?.play(state);
   };
+
+  if (!showReviewerLabs) {
+    return (
+      <Screen>
+        <Text style={styles.lead}>Roy Lab is not part of the club app.</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to Profile" onPress={() => safeBack('/(tabs)/profile')}>
+          <Text style={styles.lead}>Back to Profile</Text>
+        </Pressable>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

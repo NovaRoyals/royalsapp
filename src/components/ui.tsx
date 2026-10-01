@@ -116,10 +116,11 @@ export function AppHeader({
         {action ?? (
           <Link href={'/notifications' as Href} asChild>
             <Pressable
-              accessibilityLabel="Open notifications"
+              accessibilityRole="button"
+              accessibilityLabel={unread > 0 ? `Open notifications, ${unread} unread` : 'Open notifications'}
               style={({ pressed }) => [styles.iconButton, pressed && !reduced && styles.pressed]}
             >
-              <Ionicons name="notifications-outline" size={22} color={colors.ink} />
+              <Ionicons accessible={false} importantForAccessibility="no" name="notifications-outline" size={22} color={colors.ink} />
               {unread > 0 ? <View style={styles.notificationDot} /> : null}
             </Pressable>
           </Link>
@@ -168,6 +169,8 @@ export function Button({
           <Text style={[styles.buttonLabel, styles[`buttonLabel_${variant}`]]}>{label}</Text>
           {icon ? (
             <Ionicons
+              accessible={false}
+              importantForAccessibility="no"
               name={icon}
               size={18}
               color={variant === 'primary' || variant === 'dark' || variant === 'accent' ? colors.white : colors.ink}
@@ -192,7 +195,7 @@ export function SectionHeading({
     <View style={styles.sectionHeading}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {actionLabel && href ? (
-        <Link href={href} style={styles.sectionAction}>
+        <Link href={href} accessibilityRole="link" style={styles.sectionAction}>
           {actionLabel}
         </Link>
       ) : null}
@@ -215,6 +218,7 @@ export function Chip({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       onPress={() => {
         if (!onPress) return;
@@ -244,6 +248,7 @@ export function Field({
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        accessibilityLabel={props.accessibilityLabel ?? label}
         placeholderTextColor={colors.stone}
         style={[styles.field, Boolean(error) && styles.fieldError]}
         {...props}

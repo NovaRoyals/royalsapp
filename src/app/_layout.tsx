@@ -17,6 +17,18 @@ export default function RootLayout() {
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.title = 'ROYALS · Nova Royals Athletic Club';
+      const styleId = 'royals-focus-visible';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = [
+          'button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible,',
+          '[role="button"]:focus-visible, [role="tab"]:focus-visible, [role="link"]:focus-visible {',
+          'outline: 2px solid #C85A24; outline-offset: 2px;',
+          '}',
+        ].join(' ');
+        document.head.appendChild(style);
+      }
     }
   }, []);
 

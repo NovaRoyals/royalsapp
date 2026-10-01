@@ -89,7 +89,7 @@ export default function ScheduleScreen() {
         if (role === 'guardian' && childFilter !== 'all') {
           const names = childNamesOnEvent(event, household.children);
           const child = household.children.find((item) => item.id === childFilter);
-          if (child && names.length && !names.includes(child.firstName)) return false;
+          if (!child || !names.includes(child.firstName)) return false;
         }
         return true;
       })
@@ -132,6 +132,7 @@ export default function ScheduleScreen() {
               key={id}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
+              aria-selected={selected}
               onPress={() => selectScope(id)}
               style={[styles.switchItem, selected && styles.switchOn]}
             >
@@ -244,7 +245,7 @@ function EventRow({
           </Text>
           <Text numberOfLines={2} style={styles.title}>{event.title}</Text>
           <Text numberOfLines={1} style={styles.sub}>
-            {personal && names.length ? names.join(' · ') : event.ageGroup || event.competitionLabel || event.purpose || event.subtitle}
+            {personal && names.length ? names.join(names.length > 1 ? ' and ' : '') : event.ageGroup || event.competitionLabel || event.purpose || event.subtitle}
           </Text>
           <Text numberOfLines={1} style={styles.place}>{placeLabel(event)}</Text>
           {event.previousVenue ? <Text style={styles.previous}>Previous · {event.previousVenue}</Text> : null}

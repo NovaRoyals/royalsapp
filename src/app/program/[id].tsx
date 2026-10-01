@@ -30,7 +30,8 @@ export default function ProgramDetailScreen() {
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
   const team = program.teamId ? demoTeams.find((item) => item.id === program.teamId) : undefined;
   const requestedPane = paneParam === 'squad' || paneParam === 'matches' || paneParam === 'fixtures' ? paneParam : 'about';
-  const [pane, setPane] = useState<'about' | 'squad' | 'matches' | 'fixtures'>(requestedPane);
+  const [paneChoice, setPaneChoice] = useState<{ key: string; pane: 'about' | 'squad' | 'matches' | 'fixtures' } | null>(null);
+  const pane = paneChoice?.key === (paneParam ?? '') ? paneChoice.pane : requestedPane;
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
   const fxaSide = program.id === 'veterans-soccer' ? '35plus' as const : undefined;
   const authorized = canSeeFullRoster(role, team?.id);
@@ -51,10 +52,6 @@ export default function ProgramDetailScreen() {
   useEffect(() => {
     track('program_viewed', { programId: program.id });
   }, [program.id]);
-
-  useEffect(() => {
-    if (requestedPane !== 'about') setPane(requestedPane);
-  }, [requestedPane]);
 
   return (
     <Screen contentStyle={styles.page}>
@@ -79,10 +76,10 @@ export default function ProgramDetailScreen() {
 
       {team ? (
         <View style={styles.paneRow}>
-          <Chip label="About" active={pane === 'about'} onPress={() => setPane('about')} />
-          {fxaSide ? <Chip label="Fixtures" active={pane === 'fixtures'} onPress={() => setPane('fixtures')} /> : null}
-          <Chip label="Squad" active={pane === 'squad'} onPress={() => setPane('squad')} />
-          {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPane('matches')} /> : null}
+          <Chip label="About" active={pane === 'about'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'about' })} />
+          {fxaSide ? <Chip label="Fixtures" active={pane === 'fixtures'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'fixtures' })} /> : null}
+          <Chip label="Squad" active={pane === 'squad'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'squad' })} />
+          {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'matches' })} /> : null}
         </View>
       ) : null}
 
@@ -98,7 +95,7 @@ export default function ProgramDetailScreen() {
           </View>
           {next ? (
             <Link href={`/event/${next.id}`} asChild>
-              <Pressable style={styles.nextCard}>
+              <Pressable accessibilityRole="link" accessibilityLabel={`${next.title}, ${nextParts?.time ?? ''}`} style={styles.nextCard}>
                 <View style={styles.nextDate}>
                   <Text style={styles.nextDay}>{nextParts?.day}</Text>
                   <Text style={styles.nextMonth}>{nextParts?.month}</Text>

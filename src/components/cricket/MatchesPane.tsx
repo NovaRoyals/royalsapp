@@ -11,21 +11,31 @@ export function CricketMatchesPane() {
   const [matches, setMatches] = useState<CricketMatch[]>([]);
   const [ready, setReady] = useState(false);
 
-  const load = () => {
-    getMatches()
-      .then(setMatches)
-      .finally(() => setReady(true));
-  };
-
   useEffect(() => {
-    load();
+    let cancelled = false;
+    getMatches()
+      .then((next) => {
+        if (!cancelled) setMatches(next);
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const live = ready ? matches.find((item) => isTrustedLive(item)) : undefined;
+  const liveKey = live?.rowId ?? live?.id;
   useEffect(() => {
-    if (!live) return undefined;
-    return subscribeLive(live.rowId ?? live.id, load);
-  }, [live?.rowId, live?.id]);
+    if (!liveKey) return undefined;
+    let cancelled = false;
+    return subscribeLive(liveKey, () => {
+      getMatches().then((next) => {
+        if (!cancelled) setMatches(next);
+      });
+    });
+  }, [liveKey]);
 
   const record = useMemo(() => seasonRecord(matches), [matches]);
   const completed = matches.filter((item) => item.status === "completed" && item.resultType && item.resultType !== "no_result");

@@ -1279,7 +1279,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(SPLASH_SESSION_KEY);
     } catch {
-      undefined;
+      // sessionStorage is unavailable outside a browser session.
     }
     setState({ ...visitorSeed('guest'), schedule: mergeClubSchedule() });
     hapticLight();

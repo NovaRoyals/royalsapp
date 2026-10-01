@@ -102,6 +102,9 @@ export default function RegistrationScreen() {
   const discount = standardPrice - subtotal;
   const activeStepIndex = steps.findIndex((item) => item.id === step);
   const percent = Math.max(20, Math.round(((activeStepIndex + 1) / steps.length) * 100));
+  // react-hook-form stores this outside React. watch() is the supported subscription,
+  // and the React Compiler correctly refuses to rewrite that external store.
+  // eslint-disable-next-line react-hooks/incompatible-library -- external form store
   const formValues = form.watch();
 
   useEffect(() => {
@@ -130,7 +133,7 @@ export default function RegistrationScreen() {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, identityKey, isYouth, program.id]);
+  }, [form, hydrated, identityKey, isYouth, program.id]);
 
   useEffect(() => {
     if (!draftReady || restoring.current || !isYouth || step === 'confirmation') return;

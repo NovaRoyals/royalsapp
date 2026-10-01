@@ -3,6 +3,52 @@ import type { AttendanceStatus, Person, ScheduleEvent } from '@/types/domain';
 
 const SEEDED_AT = '2026-09-24T18:00:00-04:00';
 
+function easternOffset(ymd: string) {
+  return ymd >= '2026-11-01' ? '-05:00' : '-04:00';
+}
+
+function eachSunday(startYmd: string, endYmd: string) {
+  const days: string[] = [];
+  const [year, month, day] = startYmd.split('-').map(Number);
+  const cursor = new Date(Date.UTC(year, month - 1, day));
+  const [endYear, endMonth, endDay] = endYmd.split('-').map(Number);
+  const last = Date.UTC(endYear, endMonth - 1, endDay);
+  while (cursor.getTime() <= last) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return days;
+}
+
+function noahU6Sessions(venue: string, address: string | undefined, parkingNotes: string | undefined): ScheduleEvent[] {
+  return eachSunday('2026-09-27', '2026-11-22').map((ymd, index) => ({
+    id: index === 0 ? 'kids-noah-2026-09-27' : `kids-noah-${ymd}`,
+    type: 'training' as const,
+    sport: 'soccer' as const,
+    title: 'Fall Soccer Training',
+    subtitle: `Session ${index + 3} · Ages 5–6`,
+    startsAt: `${ymd}T09:30:00${easternOffset(ymd)}`,
+    endsAt: `${ymd}T10:30:00${easternOffset(ymd)}`,
+    venue,
+    address,
+    venueId: ARROWHEAD_1B_ID,
+    programId: 'fall-kids-u6-2026',
+    teamId: 'nova-royals-kids-u6',
+    participantIds: ['child-noah'],
+    ageGroup: 'Ages 5–6',
+    sessionNumber: index + 3,
+    sessionTotal: 11,
+    arrivalAt: '9:15 AM',
+    status: ymd < '2026-10-04' ? 'completed' as const : 'scheduled' as const,
+    fieldStatus: 'open' as const,
+    parkingNotes,
+    whatToBring: 'Shin guards, water, labeled jacket',
+    coachName: 'Coach Priya Sharma',
+    rsvpDeadline: index === 0 ? '2026-09-26T18:00:00-04:00' : undefined,
+    demo: true,
+  }));
+}
+
 const GOING = new Set([
   'u8-ap',
   'u8-jl',
@@ -35,33 +81,9 @@ function attachVenue(event: ScheduleEvent): ScheduleEvent {
 export function extraOperationalEvents(): ScheduleEvent[] {
   const field1 = venueById(ARROWHEAD_1B_ID);
   const field3 = venueById(ARROWHEAD_3A_ID);
+  const noahVenue = field1 ? venueTitle(field1) : 'Arrowhead Park · Field 1B';
   return [
-    {
-      id: 'kids-noah-2026-09-27',
-      type: 'training',
-      sport: 'soccer',
-      title: 'Fall Soccer Training',
-      subtitle: 'Session 3 · Ages 5–6',
-      startsAt: '2026-09-27T09:30:00-04:00',
-      endsAt: '2026-09-27T10:30:00-04:00',
-      venue: field1 ? venueTitle(field1) : 'Arrowhead Park · Field 1B',
-      address: field1?.address,
-      venueId: ARROWHEAD_1B_ID,
-      programId: 'fall-kids-u6-2026',
-      teamId: 'nova-royals-kids-u6',
-      participantIds: ['child-noah'],
-      ageGroup: 'Ages 5–6',
-      sessionNumber: 3,
-      sessionTotal: 11,
-      arrivalAt: '9:15 AM',
-      status: 'scheduled',
-      fieldStatus: 'open',
-      parkingNotes: field1?.parkingNotes,
-      whatToBring: 'Shin guards, water, labeled jacket',
-      coachName: 'Coach Priya Sharma',
-      rsvpDeadline: '2026-09-26T18:00:00-04:00',
-      demo: true,
-    },
+    ...noahU6Sessions(noahVenue, field1?.address, field1?.parkingNotes),
     {
       id: 'club-volunteer-2026-09-26',
       type: 'club_event',

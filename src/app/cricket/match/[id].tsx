@@ -35,27 +35,33 @@ export default function CricketMatchScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { role } = useApp();
   const signedIn = role !== "guest";
-  const [match, setMatch] = useState<CricketMatch | undefined>();
-  const [ready, setReady] = useState(false);
+  const [loaded, setLoaded] = useState<{ id: string; match?: CricketMatch } | null>(null);
   const [tab, setTab] = useState<"scorecard" | "balls" | "overs" | "info">("scorecard");
-
-  const load = () => {
-    if (!id) {
-      setReady(true);
-      return;
-    }
-    getMatchDetail(id).then(setMatch).finally(() => setReady(true));
-  };
+  const ready = !id || loaded?.id === id;
+  const match = loaded?.id === id ? loaded.match : undefined;
 
   useEffect(() => {
-    load();
+    if (!id) return;
+    let cancelled = false;
+    getMatchDetail(id).then((next) => {
+      if (!cancelled) setLoaded({ id, match: next });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const trustedLive = match ? isTrustedLive(match) : false;
+  const liveKey = match?.rowId ?? match?.id;
   useEffect(() => {
-    if (!trustedLive) return undefined;
-    return subscribeLive(match?.rowId ?? match?.id ?? "", load);
-  }, [trustedLive, match?.rowId, match?.id]);
+    if (!trustedLive || !id || !liveKey) return undefined;
+    let cancelled = false;
+    return subscribeLive(liveKey, () => {
+      getMatchDetail(id).then((next) => {
+        if (!cancelled) setLoaded({ id, match: next });
+      });
+    });
+  }, [trustedLive, liveKey, id]);
 
   const overGroups = useMemo(() => oversFromBalls(match?.balls ?? []), [match?.balls]);
 

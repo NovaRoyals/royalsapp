@@ -8,6 +8,8 @@ import { demoPrograms, followCatalog } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
 import { mayaAttendanceHistory } from '@/lib/attendance';
 import { can, isStaff } from '@/lib/capabilities';
+import { showReviewerLabs } from '@/lib/prototype';
+import { isDemoMode } from '@/lib/supabase';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { UserRole } from '@/types/domain';
@@ -77,8 +79,8 @@ export default function ProfileScreen() {
           </Text>
           <DemoBadge />
         </View>
-        <Pressable accessibilityLabel="Edit profile" onPress={() => router.push('/account/personal' as never)} style={styles.editButton}>
-          <Ionicons name="pencil-outline" size={17} color={colors.ink} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => router.push('/account/personal' as never)} style={styles.editButton}>
+          <Ionicons accessible={false} importantForAccessibility="no" name="pencil-outline" size={17} color={colors.ink} />
         </Pressable>
       </View>
 
@@ -110,11 +112,10 @@ export default function ProfileScreen() {
                   <Text style={styles.childName}>{child.firstName} {child.lastName}</Text>
                   <Text style={styles.privateText}>Birth date kept private · Managed by you</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.stone} />
               </View>
             ))}
-            <Pressable onPress={() => { if (can(role, 'register_child')) router.push('/registration/fall-kids-2026'); }} style={styles.addChild}>
-              <Ionicons name="add-circle-outline" size={20} color={colors.orangeDark} />
+            <Pressable accessibilityRole="button" accessibilityLabel="Add a child" onPress={() => { if (can(role, 'register_child')) router.push('/registration/fall-kids-2026'); }} style={styles.addChild}>
+              <Ionicons accessible={false} importantForAccessibility="no" name="add-circle-outline" size={20} color={colors.orangeDark} />
               <Text style={styles.addChildText}>Add a child</Text>
             </Pressable>
           </View>
@@ -125,7 +126,7 @@ export default function ProfileScreen() {
               const program = demoPrograms.find((item) => item.id === registration.programId);
               return (
                 <View key={registration.id} style={styles.registration}>
-                  <Pressable onPress={() => router.push(`/season/${registration.id}` as never)}>
+                  <Pressable accessibilityRole="link" accessibilityLabel={`${program?.title ?? 'Program registration'}, ${registration.participantNames.join(', ')}`} onPress={() => router.push(`/season/${registration.id}` as never)}>
                     <View style={styles.registrationTop}>
                       <View style={styles.flex}>
                         <Text style={styles.registrationTitle}>{program?.title ?? 'Program registration'}</Text>
@@ -160,18 +161,18 @@ export default function ProfileScreen() {
           {role === 'coach' || role === 'admin' ? (
             <>
               <SectionHeading title="Session recap" />
-              <Pressable onPress={() => router.push('/event/kids-2026-09-20')} style={styles.registration}>
+              <Pressable accessibilityRole="link" accessibilityLabel="U8 Sunday attendance" onPress={() => router.push('/event/kids-2026-09-20')} style={styles.registration}>
                 <Text style={styles.registrationTitle}>U8 Sunday · attendance</Text>
                 <Text style={styles.registrationPeople}>{presentNow} present · {unrecorded} not recorded</Text>
               </Pressable>
-              <Pressable onPress={() => router.push('/session/kids-2026-09-20/recap' as never)} style={styles.registration}>
+              <Pressable accessibilityRole="link" accessibilityLabel="Record session recap" onPress={() => router.push('/session/kids-2026-09-20/recap' as never)} style={styles.registration}>
                 <Text style={styles.registrationTitle}>Record session recap</Text>
                 <Text style={styles.registrationPeople}>Shared note for attending families</Text>
               </Pressable>
             </>
           ) : null}
           {parentView ? (
-            <Pressable onPress={() => router.push('/updates' as never)} style={styles.registration}>
+            <Pressable accessibilityRole="link" accessibilityLabel="Coach updates" onPress={() => router.push('/updates' as never)} style={styles.registration}>
               <Text style={styles.registrationTitle}>Coach updates</Text>
               <Text style={styles.registrationPeople}>Session recaps and notes about your child</Text>
             </Pressable>
@@ -183,7 +184,7 @@ export default function ProfileScreen() {
           <View style={styles.menu}>
             {documents.map((doc, index) => (
               <View key={doc.id} style={[styles.menuRow, index < documents.length - 1 && styles.menuBorder]}>
-                <Ionicons name={doc.kind === 'waiver' ? 'document-text-outline' : 'card-outline'} size={21} color={colors.orangeDark} />
+                <Ionicons accessible={false} importantForAccessibility="no" name={doc.kind === 'waiver' ? 'document-text-outline' : 'card-outline'} size={21} color={colors.orangeDark} />
                 <View style={styles.flex}>
                   <Text style={styles.menuLabel}>{doc.title}</Text>
                   <Text style={styles.menuDetail}>{doc.status}</Text>
@@ -201,6 +202,9 @@ export default function ProfileScreen() {
               return (
                 <Pressable
                   key={item.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.label}, ${active ? 'following' : 'not following'}`}
+                  accessibilityState={{ selected: active }}
                   onPress={() => setFollowedIds(active ? followedIds.filter((id) => id !== item.id) : [...followedIds, item.id])}
                   style={[styles.roleChip, active && styles.roleActive]}
                 >
@@ -211,13 +215,13 @@ export default function ProfileScreen() {
           </View>
 
           <SectionHeading title="Notification preferences" />
-          <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, team: !notificationPrefs.team })} style={styles.menuRow}>
+          <Pressable accessibilityRole="switch" accessibilityLabel="Team alerts" accessibilityState={{ checked: notificationPrefs.team }} onPress={() => setNotificationPrefs({ ...notificationPrefs, team: !notificationPrefs.team })} style={styles.menuRow}>
             <Text style={styles.menuLabel}>Team alerts {notificationPrefs.team ? 'on' : 'off'}</Text>
           </Pressable>
-          <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, community: !notificationPrefs.community })} style={styles.menuRow}>
+          <Pressable accessibilityRole="switch" accessibilityLabel="Community alerts" accessibilityState={{ checked: notificationPrefs.community }} onPress={() => setNotificationPrefs({ ...notificationPrefs, community: !notificationPrefs.community })} style={styles.menuRow}>
             <Text style={styles.menuLabel}>Community {notificationPrefs.community ? 'on' : 'off'}</Text>
           </Pressable>
-          <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, locationShare: !notificationPrefs.locationShare })} style={styles.menuRow}>
+          <Pressable accessibilityRole="switch" accessibilityLabel="Location for travel" accessibilityState={{ checked: notificationPrefs.locationShare }} onPress={() => setNotificationPrefs({ ...notificationPrefs, locationShare: !notificationPrefs.locationShare })} style={styles.menuRow}>
             <Text style={styles.menuLabel}>Location for travel {notificationPrefs.locationShare ? 'on' : 'off'}</Text>
           </Pressable>
           <Text style={styles.previewNote}>Location stays opt-in. Drive times remain a Fairfax stub until maps are connected. Urgent field closures always appear in-app.</Text>
@@ -227,8 +231,8 @@ export default function ProfileScreen() {
       {staff && (
         <>
           <SectionHeading title={role === 'admin' ? 'Club tools' : 'Staff tools'} />
-          <Pressable onPress={() => router.push('/admin')} style={styles.adminCard}>
-            <View style={styles.adminIcon}><Ionicons name="settings-outline" size={22} color={colors.white} /></View>
+          <Pressable accessibilityRole="link" accessibilityLabel={role === 'coach' ? 'Open team tools' : 'Open management'} onPress={() => router.push('/admin')} style={styles.adminCard}>
+            <View style={styles.adminIcon}><Ionicons accessible={false} importantForAccessibility="no" name="settings-outline" size={22} color={colors.white} /></View>
             <View style={styles.flex}>
               <Text style={styles.adminTitle}>{role === 'coach' ? 'Open team tools' : 'Open management'}</Text>
               <Text style={styles.adminCopy}>
@@ -239,7 +243,7 @@ export default function ProfileScreen() {
                     : 'Registrations, fields, attendance, announcements'}
               </Text>
             </View>
-            <Ionicons name="arrow-forward" size={20} color={colors.orange} />
+            <Ionicons accessible={false} importantForAccessibility="no" name="arrow-forward" size={20} color={colors.orange} />
           </Pressable>
         </>
       )}
@@ -249,56 +253,67 @@ export default function ProfileScreen() {
         {menu.map((item, index) => (
           <Pressable
             key={item.label}
+            accessibilityRole="link"
+            accessibilityLabel={item.label}
             onPress={() => router.push(item.href as never)}
             style={[styles.menuRow, index < menu.length - 1 && styles.menuBorder]}
           >
-            <Ionicons name={item.icon} size={21} color={colors.orangeDark} />
+            <Ionicons accessible={false} importantForAccessibility="no" name={item.icon} size={21} color={colors.orangeDark} />
             <View style={styles.flex}>
               <Text style={styles.menuLabel}>{item.label}</Text>
               <Text style={styles.menuDetail}>{item.detail}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={17} color={colors.stone} />
+            <Ionicons accessible={false} importantForAccessibility="no" name="chevron-forward" size={17} color={colors.stone} />
           </Pressable>
         ))}
       </View>
-      <Pressable onPress={() => router.push('/about')} style={[styles.adminCard, { marginTop: 12 }]}>
+      <Pressable accessibilityRole="link" accessibilityLabel="About ROYALS" onPress={() => router.push('/about')} style={[styles.adminCard, { marginTop: 12 }]}>
         <View style={styles.flex}>
           <Text style={styles.adminTitle}>About ROYALS</Text>
           <Text style={styles.adminCopy}>About, Support Us, Sponsors, Volunteer, Contact</Text>
         </View>
-        <Ionicons name="arrow-forward" size={20} color={colors.orange} />
+        <Ionicons accessible={false} importantForAccessibility="no" name="arrow-forward" size={20} color={colors.orange} />
       </Pressable>
 
-      <SectionHeading title="Preview roles" />
-      <Text style={styles.previewNote}>Board review only. These chips load a seeded household and are not part of a real account.</Text>
-      <Pressable onPress={() => router.push('/lab')} style={[styles.adminCard, { marginBottom: 16 }]}>
-        <View style={styles.flex}>
-          <Text style={styles.adminTitle}>Open Interaction Lab</Text>
-          <Text style={styles.adminCopy}>Compare RSVP, supporter, attendance and calendar variants. Not in tab navigation.</Text>
+      {isDemoMode ? (
+        <View style={styles.reviewBlock}>
+          <SectionHeading title="Preview roles" />
+          <Text style={styles.previewNote}>Board review only. These chips load a seeded household and are separate from account settings.</Text>
+          {showReviewerLabs ? (
+            <>
+              <Pressable accessibilityRole="link" accessibilityLabel="Open Interaction Lab" onPress={() => router.push('/lab')} style={[styles.adminCard, { marginBottom: 16 }]}>
+                <View style={styles.flex}>
+                  <Text style={styles.adminTitle}>Open Interaction Lab</Text>
+                  <Text style={styles.adminCopy}>Compare RSVP, supporter, attendance and calendar variants. Not in tab navigation.</Text>
+                </View>
+                <Ionicons accessible={false} importantForAccessibility="no" name="flask-outline" size={20} color={colors.orange} />
+              </Pressable>
+              <Pressable accessibilityRole="link" accessibilityLabel="Open Roy Lab" onPress={() => router.push('/roy' as never)} style={[styles.adminCard, { marginBottom: 16 }]}>
+                <View style={styles.flex}>
+                  <Text style={styles.adminTitle}>Open Roy Lab</Text>
+                  <Text style={styles.adminCopy}>Preview idle, enter, wave, point, celebrate, bounce, and exit. Not in tab navigation.</Text>
+                </View>
+                <Ionicons accessible={false} importantForAccessibility="no" name="sparkles-outline" size={20} color={colors.orange} />
+              </Pressable>
+            </>
+          ) : null}
+          <View style={styles.roleGrid}>
+            {(['guest', 'guardian', 'adult_player', 'coach', 'competition_manager', 'volunteer', 'admin'] as UserRole[]).map((item) => (
+              <Pressable
+                key={item}
+                accessibilityRole="button"
+                accessibilityLabel={`Preview as ${roleLabels[item]}`}
+                accessibilityState={{ selected: role === item }}
+                onPress={() => setRole(item)}
+                style={[styles.roleChip, role === item && styles.roleActive]}
+              >
+                <Text style={[styles.roleChipText, role === item && styles.roleActiveText]}>{roleLabels[item]}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Button label="Reset demo data" variant="ghost" onPress={resetDemo} style={styles.reset} />
         </View>
-        <Ionicons name="flask-outline" size={20} color={colors.orange} />
-      </Pressable>
-      <Pressable onPress={() => router.push('/roy' as never)} style={[styles.adminCard, { marginBottom: 16 }]}>
-        <View style={styles.flex}>
-          <Text style={styles.adminTitle}>Open Roy Lab</Text>
-          <Text style={styles.adminCopy}>Preview idle, enter, wave, point, celebrate, bounce, and exit. Not in tab navigation.</Text>
-        </View>
-        <Ionicons name="sparkles-outline" size={20} color={colors.orange} />
-      </Pressable>
-      <View style={styles.roleGrid}>
-        {(['guest', 'guardian', 'adult_player', 'coach', 'competition_manager', 'volunteer', 'admin'] as UserRole[]).map((item) => (
-          <Pressable
-            key={item}
-            accessibilityRole="button"
-            accessibilityState={{ selected: role === item }}
-            onPress={() => setRole(item)}
-            style={[styles.roleChip, role === item && styles.roleActive]}
-          >
-            <Text style={[styles.roleChipText, role === item && styles.roleActiveText]}>{roleLabels[item]}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Button label="Reset demo data" variant="ghost" onPress={resetDemo} style={styles.reset} />
+      ) : null}
     </Screen>
   );
 }
@@ -340,6 +355,7 @@ const styles = StyleSheet.create({
   menuBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   menuLabel: { color: colors.ink, fontSize: 14, ...typography.heading },
   menuDetail: { color: colors.stone, fontSize: 11, marginTop: 2, ...typography.body },
+  reviewBlock: { marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
   previewNote: { color: colors.stone, fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md, ...typography.body },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   roleChip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.paper },

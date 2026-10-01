@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/ui';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function AccountPersonalScreen() {
   const { household, role } = useApp();
