@@ -16,7 +16,7 @@ import { InkHold } from '@/components/HydrationGate';
 import { SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import { resetAnalytics, track } from '@/lib/analytics';
 import { can, canSendSessionRecap } from '@/lib/capabilities';
-import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapBody } from '@/lib/coachRecap';
+import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapAudience, recapBody } from '@/lib/coachRecap';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import {
@@ -894,12 +894,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       const schedule = scheduleBase.map((event) => (event.id === eventId ? { ...event, pendingChange: pending } : event));
       const alert = notice({
-        type: 'change',
+        type: 'coach_reminder',
         title: kind === 'relocation' ? 'Relocation requested' : 'Cancellation requested',
-        body: `${target.title}. ${reason} A club admin still needs to publish this.`,
+        body: `${target.title}. ${reason} A club admin still needs to publish this. Families are not notified by this request.`,
         route: `/event/${eventId}`,
         eventId,
-        urgency: 'high',
+        urgency: 'normal',
+        wouldPush: false,
         dedupeKey: `request:${eventId}:${kind}`,
       });
       return {
@@ -1214,32 +1215,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         result = { ok: false, error: 'Session not found.' };
         return current;
       }
-      if (!(event.checkIns ?? []).some((mark) => mark.present)) {
+      const audience = recapAudience(rosterForEvent(event), event.checkIns ?? []);
+      if (audience.unrecordedCount) {
+        result = { ok: false, error: 'Attendance is still open. Not recorded is not the same as absent, and sending stays off until every player is marked.' };
+        return current;
+      }
+      if (!audience.recipients.length) {
         result = { ok: false, error: 'Record attendance first. Recaps go only to families of children marked present.' };
         return current;
       }
-      const sentAt = new Date().toISOString();
-      const notes = recap.notes.map((note) => ({
-        ...note,
-        approvedText: note.approvedText.trim() || note.originalText.trim(),
-      }));
+      const sentAt = recap.scheduledFor ?? new Date().toISOString();
+      const deliveringNow = (recap.delivery ?? 'now') === 'now';
+      const notes = recap.notes
+        .filter((note) => audience.recipients.some((person) => person.id === note.childId))
+        .map((note) => ({
+          ...note,
+          approvedText: note.approvedText.trim() || note.originalText.trim(),
+        }));
       const sentRecap: SessionRecap = {
         ...recap,
+        message: body,
         coachName: ACTIVE_COACH.displayName,
         notes,
+        recipientCount: audience.recipients.length,
         status: 'sent',
-        sentAt,
-        deliveryStatus: 'delivered',
-        updatedAt: sentAt,
+        sentAt: deliveringNow ? sentAt : undefined,
+        scheduledFor: deliveringNow ? undefined : sentAt,
+        deliveryStatus: deliveringNow ? 'delivered' : 'queued',
+        updatedAt: new Date().toISOString(),
       };
-      const updates = parentUpdatesFromRecap(sentRecap, event, sentAt);
+      const updates = deliveringNow ? parentUpdatesFromRecap(sentRecap, event, sentAt) : [];
       const alerts: AppNotification[] = updates
         .filter((item) => item.kind === 'session_recap' || item.childId === 'child-maya')
         .map((item) =>
           notice({
             type: 'coach_update',
             title: item.kind === 'session_recap' ? 'New session recap' : item.title,
-            body: item.kind === 'session_recap' ? `${item.coachName} shared Sunday’s training note.` : item.body,
+            body: item.kind === 'session_recap' ? `${item.coachName} shared a note from ${event.title}.` : item.body,
             route: `/updates/${item.id}`,
             urgency: 'normal',
             wouldPush: true,

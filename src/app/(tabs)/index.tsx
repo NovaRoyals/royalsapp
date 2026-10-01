@@ -13,7 +13,7 @@ import { AppHeader, Button, Screen } from '@/components/ui';
 import { demoPrograms, kidsProgramId } from '@/data/demo';
 import { mayaAttendanceHistory } from '@/lib/attendance';
 import { clubNowIso, formatEventParts, hoursAfterEnd, relativeDayLabel } from '@/lib/datetime';
-import { RECAP_EVENT_ID, recapForEvent } from '@/lib/coachRecap';
+import { RECAP_EVENT_ID, deliveryClockLabel, recapForEvent, sessionIdentity } from '@/lib/coachRecap';
 import {
   gameDayBrief,
   homeStories,
@@ -292,12 +292,23 @@ function RecapNudge({
 }) {
   const session = schedule.find((event) => event.id === RECAP_EVENT_ID);
   const recap = recapForEvent(recaps, RECAP_EVENT_ID);
-  if (!session || recap?.status === 'sent') return null;
+  if (!session) return null;
+  const identity = sessionIdentity(session);
+  if (recap?.status === 'sent') {
+    const scheduled = recap.delivery && recap.delivery !== 'now' && recap.scheduledFor;
+    return (
+      <Brief
+        title={scheduled ? `Scheduled for ${deliveryClockLabel(recap.scheduledFor!)}` : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`}
+        detail={`${identity.kicker} · ${identity.title}`}
+        href={`/session/${RECAP_EVENT_ID}/recap`}
+      />
+    );
+  }
   if (!hoursAfterEnd(session, 2)) return null;
   return (
     <Brief
       title="Send families a quick session recap"
-      detail="U8 Sunday is complete. Nothing sends until you approve it."
+      detail={`${identity.kicker} is complete. Nothing sends until you approve it.`}
       href={`/session/${RECAP_EVENT_ID}/recap`}
     />
   );

@@ -1,4 +1,5 @@
-import type { AppNotification, AttendanceMark, CoachNoteTag, CoachUpdate, IndividualCoachNote, Person, SessionRecap } from '@/types/domain';
+import { addMinutesToWall, formatEventParts, formatEventWhen } from '@/lib/datetime';
+import type { AppNotification, AttendanceMark, CoachNoteTag, CoachUpdate, IndividualCoachNote, Person, RecapDelivery, ScheduleEvent, SessionRecap } from '@/types/domain';
 
 export const RECAP_EVENT_ID = 'kids-2026-09-20';
 
@@ -84,6 +85,8 @@ export function demoDraftRecap(): SessionRecap {
     teamId: 'nova-royals-kids-u8',
     coachName: ACTIVE_COACH.displayName,
     originalText: MOCK_VOICE_TRANSCRIPT,
+    transcript: MOCK_VOICE_TRANSCRIPT,
+    message: DEMO_POLISHED_RECAP,
     polishedText: DEMO_POLISHED_RECAP,
     polishMode: 'warm',
     notes: DEMO_NOTES,
@@ -98,7 +101,7 @@ export function demoCoachReminder(): AppNotification {
     id: 'notification-coach-recap-sep20',
     type: 'coach_reminder',
     title: 'Send families a quick session recap',
-    body: 'U8 Sunday session ended two hours ago. Attendance is in — a shared recap is optional and never sends by itself.',
+    body: 'The session ended two hours ago. Attendance is in — a shared recap is optional and never sends by itself.',
     createdAt: '2026-09-20T12:00:00-04:00',
     read: false,
     route: `/session/${RECAP_EVENT_ID}/recap`,
@@ -107,8 +110,56 @@ export function demoCoachReminder(): AppNotification {
   };
 }
 
+/** The shared message families receive. A stored polish never overrides the editor. */
+export function canonicalRecapText(recap: SessionRecap) {
+  if (recap.message?.trim()) return recap.message.trim();
+  if (recap.polishedText.trim() && recap.polishMode && recap.polishMode !== 'verbatim') return recap.polishedText.trim();
+  return recap.originalText.trim();
+}
+
 export function recapBody(recap: SessionRecap) {
-  return recap.polishedText.trim() || recap.originalText.trim();
+  return canonicalRecapText(recap);
+}
+
+export function recapTranscript(recap: SessionRecap) {
+  return (recap.transcript || recap.originalText).trim();
+}
+
+export function sessionIdentity(event: Pick<ScheduleEvent, 'title' | 'startsAt' | 'ageGroup' | 'subtitle' | 'competitionLabel'>) {
+  const parts = formatEventParts(event.startsAt);
+  const group = event.ageGroup || event.competitionLabel || event.subtitle;
+  return {
+    group,
+    weekday: parts.weekday,
+    when: formatEventWhen(event.startsAt),
+    kicker: [group, parts.weekday].filter(Boolean).join(' · '),
+    title: event.title,
+  };
+}
+
+export function recapAudience(roster: Person[], checkIns: AttendanceMark[]) {
+  const counts = attendanceCounts(roster, checkIns);
+  const missingContact = counts.present.filter((person) => person.familyContact === false);
+  const recipients = counts.present.filter((person) => person.familyContact !== false);
+  return { ...counts, missingContact, recipients };
+}
+
+export function deliveryMoment(event: Pick<ScheduleEvent, 'startsAt' | 'endsAt'>, choice: RecapDelivery, now = new Date()) {
+  if (choice === 'now') return now.toISOString();
+  if (choice === 'after_session') return addMinutesToWall(event.endsAt ?? event.startsAt, 120);
+  const day = event.startsAt.slice(0, 10);
+  const offset = event.startsAt.match(/([+-]\d{2}:\d{2}|Z)$/)?.[1] ?? '-04:00';
+  return `${day}T19:00:00${offset}`;
+}
+
+export function deliveryChoiceLabel(choice: RecapDelivery) {
+  if (choice === 'now') return 'Send now';
+  if (choice === 'after_session') return 'Two hours after session';
+  return 'Tonight';
+}
+
+export function deliveryClockLabel(iso: string) {
+  return formatEventParts(iso).time;
 }
 
 export function parentUpdatesFromRecap(

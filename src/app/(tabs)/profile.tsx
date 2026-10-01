@@ -7,6 +7,7 @@ import { SeasonDots } from '@/components/interactions/SeasonDots';
 import { demoPrograms, followCatalog } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
 import { mayaAttendanceHistory } from '@/lib/attendance';
+import { sessionIdentity } from '@/lib/coachRecap';
 import { can, isStaff } from '@/lib/capabilities';
 import { showReviewerLabs } from '@/lib/prototype';
 import { isDemoMode } from '@/lib/supabase';
@@ -161,8 +162,8 @@ export default function ProfileScreen() {
           {role === 'coach' || role === 'admin' ? (
             <>
               <SectionHeading title="Session recap" />
-              <Pressable accessibilityRole="link" accessibilityLabel="U8 Sunday attendance" onPress={() => router.push('/event/kids-2026-09-20')} style={styles.registration}>
-                <Text style={styles.registrationTitle}>U8 Sunday · attendance</Text>
+              <Pressable accessibilityRole="link" accessibilityLabel={`${kidsEvent ? sessionIdentity(kidsEvent).kicker : 'Session'} attendance`} onPress={() => router.push('/event/kids-2026-09-20')} style={styles.registration}>
+                <Text style={styles.registrationTitle}>{kidsEvent ? sessionIdentity(kidsEvent).kicker : 'Session'} · attendance</Text>
                 <Text style={styles.registrationPeople}>{presentNow} present · {unrecorded} not recorded</Text>
               </Pressable>
               <Pressable accessibilityRole="link" accessibilityLabel="Record session recap" onPress={() => router.push('/session/kids-2026-09-20/recap' as never)} style={styles.registration}>

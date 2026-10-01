@@ -21,18 +21,25 @@ import {
   KIND_LABEL,
   MOCK_VOICE_TRANSCRIPT,
   NOTE_TAGS,
-  attendanceCounts,
+  canonicalRecapText,
+  deliveryChoiceLabel,
+  deliveryClockLabel,
+  deliveryMoment,
   noteDraftFromTags,
   noteKind,
-  recapBody,
+  recapAudience,
   recapForEvent,
+  recapTranscript,
+  sessionIdentity,
 } from '@/lib/coachRecap';
 import { formatEventWhen } from '@/lib/datetime';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import type { CoachNoteTag, IndividualCoachNote, SessionRecap } from '@/types/domain';
+import type { CoachNoteTag, IndividualCoachNote, RecapDelivery, SessionRecap } from '@/types/domain';
+
+type VoicePhase = 'idle' | 'recording' | 'transcribing' | 'ready' | 'failed';
 
 export function generateStaticParams() {
   return demoSchedule.filter((item) => item.teamId === COACH_TEAM_ID).map((item) => ({ eventId: item.id }));
@@ -54,21 +61,24 @@ export default function SessionRecapScreen() {
   const team = demoTeams.find((item) => item.id === event.teamId);
   const roster = team?.roster ?? [];
   const stored = recapForEvent(recaps, event.id);
-  const counts = attendanceCounts(roster, event.checkIns ?? []);
+  const audience = recapAudience(roster, event.checkIns ?? []);
+  const identity = sessionIdentity(event);
   const canDraft = canCreateSessionRecap(role, event.teamId);
   const canSend = canSendSessionRecap(role, managerCanSendRecap);
   const canView = canDraft || can(role, 'view_recap_status');
 
-  const [draft, setDraft] = useState<SessionRecap>(() => stored ?? blankRecap(event.id));
+  const [draft, setDraft] = useState<SessionRecap>(() => normalizeRecap(stored ?? blankRecap(event.id)));
   const [eventKey, setEventKey] = useState(event.id);
   const [phase, setPhase] = useState<Phase>(stored?.status === 'sent' ? 'receipt' : 'compose');
-  const [recording, setRecording] = useState(false);
+  const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle');
   const [polishOpen, setPolishOpen] = useState(false);
   const [polishing, setPolishing] = useState(false);
   const [polishError, setPolishError] = useState('');
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteChildId, setNoteChildId] = useState<string | null>(stored?.notes[0]?.childId ?? null);
-  const [previewChild, setPreviewChild] = useState(counts.present[0]?.id ?? '');
+  const [previewChild, setPreviewChild] = useState(audience.recipients[0]?.id ?? audience.present[0]?.id ?? '');
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [addingNote, setAddingNote] = useState(false);
   const [offline, setOffline] = useState(false);
   const [savedAt, setSavedAt] = useState(stored?.updatedAt ?? '');
   const [sendError, setSendError] = useState('');
@@ -86,7 +96,7 @@ export default function SessionRecapScreen() {
 
   if (eventKey !== event.id) {
     setEventKey(event.id);
-    setDraft(stored ?? blankRecap(event.id));
+    setDraft(normalizeRecap(stored ?? blankRecap(event.id)));
     setPhase(stored?.status === 'sent' ? 'receipt' : 'compose');
   }
   const view: Phase = draft.status === 'sent' ? 'receipt' : phase;
@@ -119,27 +129,53 @@ export default function SessionRecapScreen() {
 
   const recordVoice = () => {
     if (!canDraft || draft.status === 'sent') return;
-    setRecording(true);
+    if (offline) {
+      setVoicePhase('failed');
+      return;
+    }
+    setVoicePhase('recording');
+    const snapshot = draft;
+    setTimeout(() => setVoicePhase('transcribing'), 600);
     setTimeout(() => {
-      persist({ ...draft, originalText: MOCK_VOICE_TRANSCRIPT, polishedText: draft.polishedText && draft.originalText ? draft.polishedText : '' });
-      setRecording(false);
-      toast('Transcription ready — edit anything that sounds off');
-    }, 900);
+      const transcript = MOCK_VOICE_TRANSCRIPT;
+      const editor = canonicalRecapText(snapshot);
+      const previousTranscript = recapTranscript(snapshot);
+      const keepEditor = editor && editor !== previousTranscript;
+      persist({
+        ...snapshot,
+        transcript,
+        originalText: transcript,
+        message: keepEditor ? editor : transcript,
+      });
+      setVoicePhase('ready');
+      toast('Ready for review. Edit anything that should change.');
+    }, 1200);
   };
 
   const polish = async (mode: RecapPolishMode) => {
+    const source = canonicalRecapText(draft);
+    const transcript = recapTranscript(draft);
     setPolishing(true);
     setPolishError('');
     try {
+      if (offline) throw new Error('offline');
       const result = await getCoachPolishProvider().polish({
-        original: draft.originalText,
+        original: source,
         mode,
-        sessionLabel: event.title,
+        sessionLabel: identity.kicker || event.title,
       });
-      persist({ ...draft, polishedText: result.text, polishMode: mode });
-      toast(mode === 'verbatim' ? 'Kept as spoken' : 'Draft polished — restore original anytime');
+      if (!result.text.trim()) throw new Error('empty');
+      persist({
+        ...draft,
+        transcript,
+        originalText: transcript,
+        message: result.text,
+        polishedText: result.text,
+        polishMode: mode,
+      });
+      toast(mode === 'verbatim' ? 'Kept as written' : 'Polished text is now in the editor');
     } catch {
-      setPolishError('Could not polish right now. Your original words are still here.');
+      setPolishError('Could not polish right now. The text in the editor is unchanged.');
     } finally {
       setPolishing(false);
     }
@@ -178,14 +214,27 @@ export default function SessionRecapScreen() {
       setSendError('You’re offline. The draft is saved — send when you’re back.');
       return;
     }
-    if (!counts.presentCount) {
+    if (audience.unrecordedCount) {
+      setSendError('Attendance is still open. Not recorded is not the same as absent, and sending stays off until every player is marked.');
+      return;
+    }
+    if (!audience.recipients.length) {
       setSendError('Record attendance first. Recaps go only to families of children marked present.');
       return;
     }
+    if (!canonicalRecapText(draft)) {
+      setSendError('Write the shared recap before sending.');
+      return;
+    }
+    const delivery = draft.delivery ?? 'now';
+    const scheduledFor = delivery === 'now' ? undefined : deliveryMoment(event, delivery);
     const approved: SessionRecap = {
       ...draft,
+      message: canonicalRecapText(draft),
       coachName: ACTIVE_COACH.displayName,
-      recipientCount: counts.presentCount,
+      delivery,
+      scheduledFor,
+      recipientCount: audience.recipients.length,
       notes: draft.notes.map((note) => ({ ...note, approvedText: noteDraftFromTags(note.tags, note.originalText) })),
     };
     const result = sendSessionRecap(approved);
@@ -193,82 +242,142 @@ export default function SessionRecapScreen() {
       setSendError(result.error ?? 'Could not send.');
       return;
     }
-    setDraft({ ...approved, status: 'sent', sentAt: new Date().toISOString(), deliveryStatus: 'delivered' });
+    const now = new Date().toISOString();
+    setDraft({
+      ...approved,
+      status: 'sent',
+      sentAt: delivery === 'now' ? now : undefined,
+      scheduledFor: delivery === 'now' ? undefined : scheduledFor,
+      deliveryStatus: delivery === 'now' ? 'delivered' : 'queued',
+    });
     setPhase('receipt');
   };
 
-  const display = recapBody(draft);
-  const activeNote = draft.notes.find((note) => note.childId === noteChildId);
+  const display = canonicalRecapText(draft);
+  const delivery = draft.delivery ?? 'now';
+  const deliveryWhen = deliveryMoment(event, delivery);
+  const familyWord = audience.recipients.length === 1 ? 'family' : 'families';
+  const sendLabel = delivery === 'now'
+    ? `Send to ${audience.recipients.length} ${familyWord} now`
+    : `Schedule for ${deliveryClockLabel(deliveryWhen)}`;
+  const canApprove = canSend && Boolean(display) && !audience.unrecordedCount && audience.recipients.length > 0;
+  const notedChildren = audience.present.filter((person) => {
+    const note = draft.notes.find((item) => item.childId === person.id);
+    return Boolean(note && (note.tags.length || note.originalText.trim()));
+  });
+  const unnamedChildren = audience.present.filter((person) => !notedChildren.some((item) => item.id === person.id));
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen contentStyle={styles.screen}>
         <Topbar />
-        <Text style={styles.kicker}>U8 · SUNDAY</Text>
+        <Text style={styles.kicker}>{identity.kicker}</Text>
         <Text style={styles.title}>{event.title}</Text>
-        <Text style={styles.when}>{formatEventWhen(event.startsAt)}</Text>
+        <Text style={styles.when}>{identity.when}</Text>
         <Text style={styles.counts}>
-          {counts.presentCount} present · {counts.absentCount} absent
-          {counts.unrecordedCount ? ` · ${counts.unrecordedCount} not recorded` : ''}
+          Sending to families of {audience.recipients.length} attending {audience.recipients.length === 1 ? 'player' : 'players'}
         </Text>
+        <Text style={styles.hint}>
+          {audience.presentCount} present · {audience.absentCount} absent
+          {audience.unrecordedCount ? ` · ${audience.unrecordedCount} not recorded` : ''}
+        </Text>
+        <Pressable accessibilityRole="link" accessibilityLabel="Review attendance" onPress={() => router.push(`/event/${event.id}` as never)}>
+          <Text style={styles.link}>Review attendance</Text>
+        </Pressable>
+        {audience.unrecordedCount ? (
+          <Text style={styles.error}>Attendance is still open for {audience.unrecordedCount} {audience.unrecordedCount === 1 ? 'player' : 'players'}. Sending stays off until everyone is marked. Not recorded is not the same as absent.</Text>
+        ) : null}
+        {audience.missingContact.length ? (
+          <Text style={styles.error}>
+            No linked parent contact: {audience.missingContact.map((person) => person.firstName).join(', ')}. {audience.missingContact.length === 1 ? 'That family is' : 'Those families are'} not included in the {audience.recipients.length}.
+          </Text>
+        ) : null}
 
         {offline ? <Text style={styles.banner}>Offline — drafts save on this device.</Text> : null}
         {savedAt && draft.status !== 'sent' ? <Text style={styles.saved}>Draft saved</Text> : null}
 
         {view === 'receipt' && draft.status === 'sent' ? (
-          <Receipt recap={draft} />
+          <Receipt recap={draft} identity={identity.kicker} />
         ) : view === 'preview' ? (
           <View style={styles.phase}>
             <Text style={styles.phaseTitle}>Parent view</Text>
-            <Text style={styles.hint}>Families only see the shared recap plus a note if you wrote one for their child.</Text>
+            <Text style={styles.hint}>This is exactly what families will receive, plus a private note only if you wrote one for their child.</Text>
+            <View accessibilityRole="radiogroup" accessibilityLabel="Delivery" style={styles.gap}>
+              {(['now', 'after_session', 'tonight'] as RecapDelivery[]).map((choice) => {
+                const when = deliveryMoment(event, choice);
+                const selected = delivery === choice;
+                return (
+                  <Pressable
+                    key={choice}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${deliveryChoiceLabel(choice)}, ${formatEventWhen(when)}`}
+                    onPress={() => persist({ ...draft, delivery: choice, scheduledFor: choice === 'now' ? undefined : when })}
+                    style={({ pressed }) => [styles.mode, selected && styles.modeOn, pressed && styles.pressed]}
+                  >
+                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? colors.ink : colors.stone} />
+                    <View style={styles.modeCopy}>
+                      <Text style={styles.modeLabel}>{deliveryChoiceLabel(choice)}</Text>
+                      <Text style={styles.modeHint}>{formatEventWhen(when)}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
             <View style={styles.wrap}>
-              {counts.present.slice(0, 8).map((person) => (
+              {audience.recipients.map((person) => (
                 <Chip key={person.id} label={person.firstName} active={previewChild === person.id} onPress={() => setPreviewChild(person.id)} />
               ))}
             </View>
-            <ParentPreview recap={draft} childId={previewChild} sessionTitle={event.title} when={formatEventWhen(event.startsAt)} />
-            {!counts.presentCount ? (
+            <ParentPreview
+              recap={draft}
+              childId={previewChild}
+              identity={identity.kicker}
+              sessionTitle={event.title}
+              when={identity.when}
+              recipients={audience.recipients.length}
+              deliveryWhen={formatEventWhen(deliveryWhen)}
+            />
+            {audience.unrecordedCount || !audience.recipients.length ? (
               <Text style={styles.error}>Record attendance first. Recaps go only to families of children marked present.</Text>
             ) : null}
             {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
-            <Button
-              label={counts.presentCount ? `Approve and send to ${counts.presentCount} ${counts.presentCount === 1 ? 'family' : 'families'}` : 'Approve and send'}
-              onPress={onSend}
-              disabled={!canSend || !display || !counts.presentCount}
-            />
+            <Button label={sendLabel} onPress={onSend} disabled={!canApprove} />
             <Button label="Keep editing" variant="ghost" onPress={() => setPhase('compose')} />
           </View>
         ) : (
           <View style={styles.phase}>
-            {!draft.originalText ? (
+            <Text style={styles.phaseTitle}>Shared recap</Text>
+            <Text style={styles.hint}>Demo only. No microphone audio is captured. {voiceLabel(voicePhase)}</Text>
+            {!display ? (
+              <Button
+                label={voicePhase === 'recording' || voicePhase === 'transcribing' ? voiceLabel(voicePhase) : 'Record session recap'}
+                icon="mic-outline"
+                loading={voicePhase === 'recording' || voicePhase === 'transcribing'}
+                onPress={recordVoice}
+                disabled={!canDraft || voicePhase === 'recording' || voicePhase === 'transcribing'}
+              />
+            ) : null}
+            {voicePhase === 'failed' ? (
+              <Button label="Try transcription again" variant="secondary" onPress={recordVoice} disabled={!canDraft} />
+            ) : null}
+            {display || recapTranscript(draft) ? (
               <>
-                <Text style={styles.phaseTitle}>Shared recap</Text>
-                <Text style={styles.hint}>One note for every attending family. Names stay out of this message.</Text>
-                <Button
-                  label={recording ? 'Listening…' : 'Record session recap'}
-                  icon="mic-outline"
-                  loading={recording}
-                  onPress={recordVoice}
-                  disabled={!canDraft}
-                />
-              </>
-            ) : (
-              <>
-                <Text style={styles.phaseTitle}>Shared recap</Text>
+                <Text style={styles.hint}>This is exactly what families will receive.</Text>
                 <TextInput
                   accessibilityLabel="Session recap"
                   multiline
-                  value={draft.originalText}
+                  value={display}
                   editable={canDraft && draft.status !== 'sent'}
-                  onChangeText={(originalText) => persist({ ...draft, originalText })}
+                  onChangeText={(message) => persist({ ...draft, message })}
                   style={styles.composer}
                   textAlignVertical="top"
                 />
                 <Button
-                  label={recording ? 'Listening…' : 'Re-record (demo)'}
+                  label={voicePhase === 'recording' || voicePhase === 'transcribing' ? voiceLabel(voicePhase) : 'Record again'}
                   variant="ghost"
                   onPress={recordVoice}
-                  disabled={!canDraft}
+                  disabled={!canDraft || voicePhase === 'recording' || voicePhase === 'transcribing'}
                 />
                 <Pressable
                   accessibilityRole="button"
@@ -309,84 +418,79 @@ export default function SessionRecapScreen() {
                     })}
                     {polishing ? <Text style={styles.hint}>Polishing…</Text> : null}
                     {polishError ? <Text style={styles.error}>{polishError}</Text> : null}
-                    <Text style={styles.subkicker}>
-                      {draft.polishedText && draft.polishMode && draft.polishMode !== 'verbatim'
-                        ? 'AI-POLISHED DRAFT'
-                        : 'ORIGINAL TRANSCRIPTION'}
-                    </Text>
-                    <Text selectable style={styles.polished}>
-                      {draft.polishedText && draft.polishMode && draft.polishMode !== 'verbatim'
-                        ? draft.polishedText
-                        : draft.originalText}
-                    </Text>
-                    {draft.polishedText ? (
-                      <Button label="Restore original" variant="ghost" onPress={() => persist({ ...draft, polishedText: '', polishMode: null })} />
-                    ) : null}
                   </View>
-                ) : draft.polishedText ? (
-                  <Text style={styles.sourceLabel}>
-                    {draft.polishMode && draft.polishMode !== 'verbatim' ? 'Using AI-polished draft' : 'Using original transcription'}
-                  </Text>
-                ) : (
-                  <Text style={styles.sourceLabel}>Using original transcription</Text>
-                )}
+                ) : null}
+                {recapTranscript(draft) && recapTranscript(draft) !== display ? (
+                  <>
+                    <Button
+                      label={showTranscript ? 'Hide original transcript' : 'View original transcript'}
+                      variant="ghost"
+                      onPress={() => setShowTranscript((open) => !open)}
+                    />
+                    {showTranscript ? <Text selectable style={styles.polished}>{recapTranscript(draft)}</Text> : null}
+                    <Button
+                      label="Restore original"
+                      variant="ghost"
+                      onPress={() => persist({ ...draft, message: recapTranscript(draft), polishedText: '', polishMode: null })}
+                    />
+                  </>
+                ) : null}
               </>
-            )}
+            ) : null}
 
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: notesOpen }}
-              accessibilityLabel="Optional notes for individual children"
+              accessibilityLabel="Add individual notes, optional"
               onPress={() => setNotesOpen((open) => !open)}
               style={({ pressed }) => [styles.advanced, pressed && styles.pressed]}
             >
-              <Text style={styles.advancedLabel}>Optional notes for individual children</Text>
-              <Ionicons name={notesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
+              <Text style={styles.advancedLabel}>Add individual notes — optional</Text>
+              <Ionicons accessible={false} importantForAccessibility="no" name={notesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
             </Pressable>
             {notesOpen ? (
               <View style={styles.gap}>
-                <Text style={styles.hint}>Tags draft a line from what you pick. Nothing else is invented.</Text>
-                {counts.present.map((person) => {
-                  const note = draft.notes.find((item) => item.childId === person.id);
-                  const open = noteChildId === person.id;
-                  return (
-                    <View key={person.id}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: open }}
-                        accessibilityLabel={`${person.displayName}. ${note ? 'Edit note' : 'Add note'}`}
-                        onPress={() => setNoteChildId(open ? null : person.id)}
-                        style={({ pressed }) => [styles.childRow, pressed && styles.pressed]}
-                      >
-                        <Text style={styles.childName}>{person.displayName}</Text>
-                        <Text style={styles.childMeta}>{note ? noteDraftFromTags(note.tags, note.originalText) || 'Note' : 'Add'}</Text>
-                      </Pressable>
-                      {open ? (
-                        <View style={styles.notePad}>
-                          <View style={styles.wrap}>
-                            {NOTE_TAGS.map((tag) => (
-                              <Chip
-                                key={tag.id}
-                                label={tag.label}
-                                active={activeNote?.tags.includes(tag.id)}
-                                onPress={() => toggleTag(person.id, tag.id)}
-                              />
-                            ))}
-                          </View>
-                          <TextInput
-                            accessibilityLabel={`Note for ${person.firstName}`}
-                            placeholder="Short dictated or typed note"
-                            placeholderTextColor={colors.stone}
-                            value={activeNote?.originalText ?? ''}
-                            onChangeText={(originalText) => upsertNote(person.id, { originalText })}
-                            style={styles.noteInput}
-                            multiline
-                          />
-                        </View>
-                      ) : null}
-                    </View>
-                  );
-                })}
+                <Text style={styles.hint}>Add notes only where something specific is worth sharing. The shared recap goes to everyone who attended.</Text>
+                <Text style={styles.sourceLabel}>
+                  {notedChildren.length} of {audience.present.length} children have notes.
+                </Text>
+                {notedChildren.map((person) => (
+                  <NoteEditorRow
+                    key={person.id}
+                    person={person}
+                    note={draft.notes.find((item) => item.childId === person.id)}
+                    open={noteChildId === person.id}
+                    onToggle={() => setNoteChildId(noteChildId === person.id ? null : person.id)}
+                    onToggleTag={(tag) => toggleTag(person.id, tag)}
+                    onText={(originalText) => upsertNote(person.id, { originalText })}
+                  />
+                ))}
+                <Button label="Add another attendee" variant="ghost" onPress={() => setAddingNote((open) => !open)} />
+                {addingNote ? (
+                  <View style={styles.wrap}>
+                    {unnamedChildren.map((person) => (
+                      <Chip
+                        key={person.id}
+                        label={person.firstName}
+                        onPress={() => {
+                          setNoteChildId(person.id);
+                          setAddingNote(false);
+                          setNotesOpen(true);
+                        }}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+                {noteChildId && !notedChildren.some((person) => person.id === noteChildId) ? (
+                  <NoteEditorRow
+                    person={audience.present.find((person) => person.id === noteChildId)!}
+                    note={draft.notes.find((item) => item.childId === noteChildId)}
+                    open
+                    onToggle={() => setNoteChildId(null)}
+                    onToggleTag={(tag) => toggleTag(noteChildId, tag)}
+                    onText={(originalText) => upsertNote(noteChildId, { originalText })}
+                  />
+                ) : null}
               </View>
             ) : null}
 
@@ -398,7 +502,7 @@ export default function SessionRecapScreen() {
                   return;
                 }
                 setSendError('');
-                persist({ ...draft, recipientCount: counts.presentCount });
+                persist({ ...draft, message: display, recipientCount: audience.recipients.length, delivery });
                 setPhase('preview');
               }}
               disabled={!canDraft && !can(role, 'view_recap_status')}
@@ -425,13 +529,19 @@ function Topbar() {
 function ParentPreview({
   recap,
   childId,
+  identity,
   sessionTitle,
   when,
+  recipients,
+  deliveryWhen,
 }: {
   recap: SessionRecap;
   childId: string;
+  identity: string;
   sessionTitle: string;
   when: string;
+  recipients: number;
+  deliveryWhen: string;
 }) {
   const note = recap.notes.find((item) => item.childId === childId);
   const noteText = note ? noteDraftFromTags(note.tags, note.originalText) : '';
@@ -439,7 +549,7 @@ function ParentPreview({
   return (
     <View style={styles.preview}>
       <Text style={styles.subkicker}>{KIND_LABEL.session_recap.toUpperCase()}</Text>
-      <Text style={styles.previewBody}>{recapBody(recap)}</Text>
+      <Text style={styles.previewBody}>{canonicalRecapText(recap)}</Text>
       {noteText ? (
         <>
           <Text style={styles.subkicker}>{KIND_LABEL[kind ?? 'private_note'].toUpperCase()} · {note?.childFirstName}</Text>
@@ -448,26 +558,99 @@ function ParentPreview({
       ) : (
         <Text style={styles.hint}>No private note for this child.</Text>
       )}
-      <Text style={styles.meta}>Sent by {ACTIVE_COACH.displayName} · {sessionTitle} · {when}</Text>
+      <Text style={styles.meta}>{ACTIVE_COACH.displayName}</Text>
+      <Text style={styles.meta}>{identity} · {sessionTitle} · {when}</Text>
+      <Text style={styles.meta}>{recipients} {recipients === 1 ? 'family' : 'families'} · {deliveryWhen}</Text>
     </View>
   );
 }
 
-function Receipt({ recap }: { recap: SessionRecap }) {
+function Receipt({ recap, identity }: { recap: SessionRecap; identity: string }) {
+  const scheduled = recap.delivery && recap.delivery !== 'now' && recap.scheduledFor;
   return (
     <View style={styles.phase}>
-      <Text style={styles.phaseTitle}>Sent</Text>
-      <Text style={styles.counts}>{recap.recipientCount} families · {recap.deliveryStatus ?? 'delivered'}</Text>
+      <Text style={styles.phaseTitle}>{scheduled ? 'Scheduled' : 'Sent'}</Text>
+      <Text style={styles.counts}>
+        {scheduled
+          ? `Scheduled for ${formatEventWhen(recap.scheduledFor!)}`
+          : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`}
+      </Text>
       <Text style={styles.hint}>
-        {recap.sentAt ? formatEventWhen(recap.sentAt) : ''} · Shared recap
-        {recap.notes.length ? ` plus ${recap.notes.length} individual note${recap.notes.length === 1 ? '' : 's'}` : ''}
+        {identity}
+        {recap.notes.length ? ` · ${recap.notes.length} individual note${recap.notes.length === 1 ? '' : 's'}` : ''}
       </Text>
-      <Text selectable style={styles.polished}>
-        {recapBody(recap)}
-      </Text>
+      <Text selectable style={styles.polished}>{canonicalRecapText(recap)}</Text>
       <Button label="Done" onPress={() => router.replace(`/event/${recap.eventId}`)} />
     </View>
   );
+}
+
+function NoteEditorRow({
+  person,
+  note,
+  open,
+  onToggle,
+  onToggleTag,
+  onText,
+}: {
+  person: { id: string; firstName: string; displayName: string };
+  note?: IndividualCoachNote;
+  open: boolean;
+  onToggle: () => void;
+  onToggleTag: (tag: CoachNoteTag) => void;
+  onText: (value: string) => void;
+}) {
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${person.displayName}. ${note ? 'Edit note' : 'Add note'}`}
+        onPress={onToggle}
+        style={({ pressed }) => [styles.childRow, pressed && styles.pressed]}
+      >
+        <Text style={styles.childName}>{person.displayName}</Text>
+        <Text style={styles.childMeta}>{note ? noteDraftFromTags(note.tags, note.originalText) || 'Note' : 'Add'}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.notePad}>
+          <View style={styles.wrap}>
+            {NOTE_TAGS.map((tag) => (
+              <Chip key={tag.id} label={tag.label} active={note?.tags.includes(tag.id)} onPress={() => onToggleTag(tag.id)} />
+            ))}
+          </View>
+          <TextInput
+            accessibilityLabel={`Note for ${person.firstName}`}
+            placeholder="Short dictated or typed note"
+            placeholderTextColor={colors.stone}
+            value={note?.originalText ?? ''}
+            onChangeText={onText}
+            style={styles.noteInput}
+            multiline
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function voiceLabel(phase: VoicePhase) {
+  if (phase === 'recording') return 'Recording…';
+  if (phase === 'transcribing') return 'Transcribing…';
+  if (phase === 'ready') return 'Ready for review.';
+  if (phase === 'failed') return 'Transcription didn’t complete.';
+  return '';
+}
+
+function normalizeRecap(recap: SessionRecap): SessionRecap {
+  const transcript = recapTranscript(recap);
+  return {
+    ...recap,
+    transcript,
+    originalText: transcript,
+    message: canonicalRecapText(recap),
+    delivery: recap.delivery ?? 'now',
+  };
 }
 
 function blankRecap(eventId: string): SessionRecap {
@@ -477,7 +660,10 @@ function blankRecap(eventId: string): SessionRecap {
     teamId: COACH_TEAM_ID,
     coachName: ACTIVE_COACH.displayName,
     originalText: '',
+    transcript: '',
+    message: '',
     polishedText: '',
+    delivery: 'now',
     polishMode: null,
     notes: [],
     status: 'draft',
@@ -556,4 +742,5 @@ const styles = StyleSheet.create({
   previewBody: { color: colors.ink, fontSize: 16, lineHeight: 24, ...typography.body },
   meta: { color: colors.stone, fontSize: 13, ...typography.body },
   error: { color: colors.danger, fontSize: 14, ...typography.body },
+  link: { color: colors.orangeDark, fontSize: 14, marginTop: spacing.sm, ...typography.label },
 });

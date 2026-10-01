@@ -375,7 +375,7 @@ export const kidsU8Roster: Person[] = [
   { id: 'u8-mp', firstName: 'Mina', lastName: 'Park', displayName: 'Mina P.', isMinor: true },
   { id: 'u8-ls', firstName: 'Leo', lastName: 'Santos', displayName: 'Leo S.', isMinor: true },
   { id: 'u8-qa', firstName: 'Quinn', lastName: 'Adeyemi', displayName: 'Quinn A.', isMinor: true },
-  { id: 'u8-sr', firstName: 'Sage', lastName: 'Rivera', displayName: 'Sage R.', isMinor: true },
+  { id: 'u8-sr', firstName: 'Sage', lastName: 'Rivera', displayName: 'Sage R.', isMinor: true, familyContact: false },
 ];
 
 const U8_ABSENT_SEP20 = new Set(['u8-fn', 'u8-rk', 'u8-ih']);

@@ -101,6 +101,8 @@ export default function EventDetailScreen() {
   const attendanceOpen =
     event.status === 'completed' || recorded.length > 0 || eventPhase(event) !== 'upcoming' || relativeDayLabel(event.startsAt) === 'today';
   const [pendingPublish, setPendingPublish] = useState<PublishAction | null>(null);
+  const [requestKind, setRequestKind] = useState<'relocation' | 'cancellation' | null>(null);
+  const [requestReason, setRequestReason] = useState('');
   const recap = recapForEvent(recaps, event.id);
   const showRecap =
     (event.status === 'completed' || Boolean(recorded.length)) &&
@@ -304,8 +306,54 @@ export default function EventDetailScreen() {
 
         {canRequestOperationalChange(role, event.teamId) ? (
           <View style={styles.block}>
-            <Button label="Request relocation" variant="secondary" onPress={() => requestOperationalChange(event.id, 'relocation', 'Request a move off the current field.')} />
-            <Button label="Request cancellation" variant="ghost" onPress={() => requestOperationalChange(event.id, 'cancellation', 'Request cancellation. Rescheduling is still pending.')} style={styles.action} />
+            <Text style={styles.section}>Ask the club</Text>
+            {requestKind ? (
+              <View style={styles.confirm}>
+                <Text style={styles.bannerTitle}>{requestKind === 'relocation' ? 'Request a relocation' : 'Request a cancellation'}</Text>
+                <Text style={styles.hint}>
+                  This goes to a club administrator. It does not move the field, cancel the session, or message families.
+                </Text>
+                <TextInput
+                  accessibilityLabel="Reason for the request"
+                  value={requestReason}
+                  onChangeText={setRequestReason}
+                  placeholder="Short reason"
+                  placeholderTextColor={colors.stone}
+                  style={styles.noteInput}
+                  multiline
+                />
+                <Button
+                  label="Submit request"
+                  disabled={!requestReason.trim()}
+                  onPress={() => {
+                    requestOperationalChange(event.id, requestKind, requestReason.trim());
+                    setRequestKind(null);
+                    setRequestReason('');
+                  }}
+                />
+                <Button label="Keep as is" variant="ghost" onPress={() => setRequestKind(null)} />
+              </View>
+            ) : (
+              <>
+                <Button
+                  label="Request relocation"
+                  variant="secondary"
+                  onPress={() => {
+                    setRequestKind('relocation');
+                    setRequestReason('Request a move off the current field.');
+                  }}
+                />
+                <Button
+                  label="Request cancellation"
+                  variant="ghost"
+                  onPress={() => {
+                    setRequestKind('cancellation');
+                    setRequestReason('Request cancellation. Rescheduling is still pending.');
+                  }}
+                  style={styles.action}
+                />
+              </>
+            )}
           </View>
         ) : null}
 
@@ -571,6 +619,17 @@ const styles = StyleSheet.create({
   result: { color: colors.ink, fontSize: 20, marginTop: spacing.sm, ...typography.heading },
   block: { marginTop: spacing.lg, gap: spacing.sm },
   confirm: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.orangeSoft, gap: spacing.xs },
+  noteInput: {
+    minHeight: 72,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.paper,
+    padding: spacing.md,
+    color: colors.ink,
+    fontSize: 15,
+    ...typography.body,
+  },
   section: { color: colors.ink, fontSize: 18, ...typography.heading },
   hint: { color: colors.stone, fontSize: 14, lineHeight: 20, ...typography.body },
   summaryCount: { color: colors.ink, fontSize: 28, fontVariant: ['tabular-nums'], ...typography.heading },

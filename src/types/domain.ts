@@ -44,6 +44,8 @@ export interface Person {
   jerseyNumber?: number;
   position?: string;
   isMinor?: boolean;
+  /** False when the club has no parent or guardian linked to this child. */
+  familyContact?: boolean;
 }
 
 export interface Household {
@@ -317,6 +319,7 @@ export type CoachNoteTag =
 
 export type RecapPolishMode = 'cleanup' | 'warm' | 'verbatim';
 export type RecapStatus = 'draft' | 'ready' | 'sent' | 'failed';
+export type RecapDelivery = 'now' | 'after_session' | 'tonight';
 export type CoachUpdateKind = 'session_recap' | 'private_note' | 'practice_suggestion';
 
 export interface IndividualCoachNote {
@@ -333,11 +336,17 @@ export interface SessionRecap {
   teamId: string;
   coachName: string;
   originalText: string;
+  /** Voice transcript, kept so the coach can restore it. Families never receive this unless it is the editor text. */
+  transcript?: string;
+  /** Exactly the shared message families receive. */
+  message?: string;
   polishedText: string;
   polishMode: RecapPolishMode | null;
   notes: IndividualCoachNote[];
   status: RecapStatus;
   recipientCount: number;
+  delivery?: RecapDelivery;
+  scheduledFor?: string;
   sentAt?: string;
   deliveryStatus?: 'queued' | 'delivered' | 'failed';
   updatedAt: string;
