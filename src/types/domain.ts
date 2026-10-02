@@ -169,6 +169,8 @@ export interface ScheduleEvent {
   address?: string;
   teamId?: string;
   programId?: string;
+  /** Set only when a separate season record exists. League identity stays on competitionId. */
+  seasonId?: string;
   competitionId?: string;
   status: 'scheduled' | 'live' | 'completed' | 'cancelled' | 'postponed';
   result?: string;

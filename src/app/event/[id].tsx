@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Href, router, useLocalSearchParams } from 'expo-router';
+import { Href, Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
@@ -11,7 +11,7 @@ import { DirectionsStub } from '@/components/operations/DirectionsStub';
 import { PressableScale } from '@/components/motion';
 import { useToast } from '@/components/Toast';
 import { Button, Screen, StatusPill } from '@/components/ui';
-import { demoSchedule, demoTeams } from '@/data/demo';
+import { demoPrograms, demoSchedule, demoTeams } from '@/data/demo';
 import { ARROWHEAD_2B_ID, venueById } from '@/data/venues';
 import { can, canCreateSessionRecap, canSendSessionRecap } from '@/lib/capabilities';
 import { attendanceCounts, recapForEvent } from '@/lib/coachRecap';
@@ -33,7 +33,6 @@ import {
   fieldStatusTone,
   placeLabel,
   rsvpFor,
-  rsvpLabel,
   rsvpSummary,
   summaryLine,
   type RsvpBucket,
@@ -88,6 +87,8 @@ export default function EventDetailScreen() {
   const weather = weatherForEvent(event);
   const place = venueById(event.venueId);
   const team = demoTeams.find((item) => item.id === event.teamId);
+  const program = demoPrograms.find((item) => item.id === event.programId)
+    ?? demoPrograms.find((item) => Boolean(item.teamId) && item.teamId === event.teamId);
   const roster = event.teamId === COACH_TEAM_ID ? team?.roster ?? [] : [];
   const staffRoster = canViewPrivateRoster(role, event.teamId) && roster.length > 0;
   const summary = rsvpSummary(event, roster);
@@ -155,6 +156,13 @@ export default function EventDetailScreen() {
           </PressableScale>
         </View>
 
+        {program ? (
+          <Link href={`/program/${program.id}` as Href} asChild>
+            <Pressable accessibilityRole="link" style={styles.contextLink}>
+              <Text style={styles.contextText}>{program.title} › {event.ageGroup || sideName(event)}</Text>
+            </Pressable>
+          </Link>
+        ) : null}
         <MatchHeader event={event} />
         <View style={styles.pills}>
           <StatusPill label={fieldStatusLabel(event.fieldStatus)} tone={fieldStatusTone(event.fieldStatus)} />
@@ -182,27 +190,24 @@ export default function EventDetailScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.glanceLabel}>At a glance</Text>
-        <View style={styles.glance}>
-          {glanceRows(event, deadlines).map((row) => (
-            <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && (row.span ? styles.glanceSpan : styles.glanceItemWide)]}>
-              <Ionicons name={row.icon} size={18} color={colors.stone} />
-              <View style={styles.glanceCopy}>
-                <Text style={styles.factLabel}>{row.label}</Text>
-                <Text selectable style={styles.factValue}>{row.value}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
         {showChildRsvp || showPlayerRsvp ? (
-          <View style={styles.responseLine}>
-            <Text style={styles.factLabel}>{showChildRsvp ? 'RSVP' : 'Your response'}</Text>
-            <Text style={styles.factValue}>
-              {showChildRsvp
-                ? kids.map((child) => `${child.firstName} — ${rsvpLabel(rsvpFor(event, child.id))}`).join('   ')
-                : rsvpLabel(event.attendance)}
-            </Text>
+          <View style={styles.block}>
+            {showChildRsvp
+              ? kids.map((child) => (
+                  <View key={child.id} style={styles.childRsvp}>
+                    <Text style={styles.childName}>Respond for {child.firstName}</Text>
+                    <RsvpChoices
+                      value={rsvpFor(event, child.id)}
+                      goingCount={0}
+                      showCount={false}
+                      confirmation={childConfirmation(child.firstName, rsvpFor(event, child.id))}
+                      onChange={(status) => setParticipantRsvp(event.id, child.id, status)}
+                    />
+                  </View>
+                ))
+              : (
+                  <RsvpChoices value={event.attendance} goingCount={0} showCount={false} onChange={(status) => setAttendance(event.id, status)} />
+                )}
           </View>
         ) : null}
 
@@ -220,6 +225,32 @@ export default function EventDetailScreen() {
             <Text style={styles.hint}>Supporting does not add you to the roster. Sign in to respond.</Text>
             <Button label="Sign in to RSVP" onPress={() => router.push('/onboarding?mode=signin' as Href)} />
           </View>
+        ) : null}
+
+        {role === 'guest' ? (
+          <Text style={styles.privacy}>Public details only. Player responses and household schedules stay signed in.</Text>
+        ) : null}
+
+        <Text style={styles.glanceLabel}>Details</Text>
+        <View style={styles.glance}>
+          {glanceRows(event, deadlines).map((row) => (
+            <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && (row.span ? styles.glanceSpan : styles.glanceItemWide)]}>
+              <Ionicons name={row.icon} size={18} color={colors.stone} />
+              <View style={styles.glanceCopy}>
+                <Text style={styles.factLabel}>{row.label}</Text>
+                <Text selectable style={styles.factValue}>{row.value}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {program ? (
+          <Link href={`/program/${program.id}` as Href} asChild>
+            <Pressable accessibilityRole="link" style={styles.programLink}>
+              <Text style={styles.section}>About {sideName(event)}</Text>
+              <Text style={styles.link}>Schedule, squad and team information →</Text>
+            </Pressable>
+          </Link>
         ) : null}
 
         {role === 'guest' ? (
@@ -455,7 +486,7 @@ export default function EventDetailScreen() {
         ) : null}
 
         <View style={styles.block}>
-          <Text style={styles.section}>Game day</Text>
+          <Text style={styles.section}>Plan your visit</Text>
           {event.previousVenue ? <Text style={styles.struck}>Previous · {event.previousVenue}</Text> : null}
           {event.address ? <Text selectable style={styles.factValue}>{event.address}</Text> : null}
           <View style={styles.glance}>
@@ -488,29 +519,6 @@ export default function EventDetailScreen() {
           <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} style={styles.action} />
         ) : null}
       </ScrollView>
-
-      {showChildRsvp || showPlayerRsvp ? (
-        <View style={styles.dockWrap} pointerEvents="box-none">
-        <View style={styles.dock}>
-          {showChildRsvp
-            ? kids.map((child) => (
-                <View key={child.id} style={styles.childRsvp}>
-                  <Text style={styles.childName}>{child.firstName}</Text>
-                  <RsvpChoices
-                    value={rsvpFor(event, child.id)}
-                    goingCount={0}
-                    showCount={false}
-                    confirmation={childConfirmation(child.firstName, rsvpFor(event, child.id))}
-                    onChange={(status) => setParticipantRsvp(event.id, child.id, status)}
-                  />
-                </View>
-              ))
-            : (
-                <RsvpChoices value={event.attendance} goingCount={event.goingCount ?? 0} showCount={false} onChange={(status) => setAttendance(event.id, status)} />
-              )}
-        </View>
-        </View>
-      ) : null}
     </Screen>
   );
 }
@@ -587,12 +595,7 @@ function glanceRows(event: ScheduleEvent, deadlines: string[]) {
   const placeName = event.sport === 'cricket' ? 'Ground' : event.type === 'club_event' ? 'Location' : 'Venue';
 
   if (event.type === 'training') {
-    push('people-outline', 'Age group', event.ageGroup);
-    if (event.sessionNumber) push('list-outline', 'Session', `${event.sessionNumber}${event.sessionTotal ? ` of ${event.sessionTotal}` : ''}`);
-    push('person-outline', 'Coach', event.coachName);
     push('time-outline', timeLabel, when);
-    push('alarm-outline', 'Arrive', event.arrivalAt);
-    push('shirt-outline', 'Kit', event.whatToBring);
     push('location-outline', placeName, place);
   } else if (event.type === 'tournament_match') {
     push('trophy-outline', 'Tournament', event.tournamentName);
@@ -627,6 +630,13 @@ function logisticsRows(
   const push = (icon: GlanceIcon, label: string, value?: string) => {
     if (value) rows.push({ icon, label, value });
   };
+  if (event.type === 'training') {
+    push('people-outline', 'Age group', event.ageGroup);
+    if (event.sessionNumber) push('list-outline', 'Session', `${event.sessionNumber}${event.sessionTotal ? ` of ${event.sessionTotal}` : ''}`);
+    push('person-outline', 'Coach', event.coachName);
+    push('alarm-outline', 'Arrive', event.arrivalAt);
+    push('shirt-outline', 'Kit', event.whatToBring);
+  }
   push('walk-outline', 'Arrival', place?.arrival);
   push('car-outline', 'Parking', place?.parkingNotes ?? event.parkingNotes);
   push('flag-outline', 'Entrance', place?.entrance);
@@ -643,8 +653,11 @@ const styles = StyleSheet.create({
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   topTitle: { color: colors.stone, fontSize: 13, ...typography.label },
   title: { color: colors.ink, fontSize: 28, lineHeight: 32, marginTop: spacing.xs, ...typography.heading },
-  matchup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.sm, marginTop: spacing.xs },
-  side: { color: colors.ink, fontSize: 28, lineHeight: 32, ...typography.heading },
+  matchup: { gap: 2, marginTop: spacing.xs },
+  side: { color: colors.ink, fontSize: 22, lineHeight: 28, ...typography.heading },
+  contextLink: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center', marginBottom: spacing.xs },
+  contextText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
+  programLink: { marginTop: spacing.lg, gap: 2 },
   vs: { color: colors.orangeDark, fontSize: 14, ...typography.label },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   banner: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, gap: 4 },

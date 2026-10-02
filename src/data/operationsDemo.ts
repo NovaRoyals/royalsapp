@@ -129,9 +129,16 @@ export function extraOperationalEvents(): ScheduleEvent[] {
   ];
 }
 
-export function annotateSchedule(events: ScheduleEvent[], roster: Person[]): ScheduleEvent[] {
+export function annotateSchedule(
+  events: ScheduleEvent[],
+  roster: Person[],
+  programByTeam: Record<string, string> = {},
+): ScheduleEvent[] {
   return events.map((raw) => {
-    const event = attachVenue(raw);
+    const linked = !raw.programId && raw.teamId && programByTeam[raw.teamId]
+      ? { ...raw, programId: programByTeam[raw.teamId] }
+      : raw;
+    const event = attachVenue(linked);
     if (event.id === 'kids-2026-09-27') {
       const sessionMatch = event.subtitle.match(/Session\s+(\d+)\s+of\s+(\d+)/i);
       return {

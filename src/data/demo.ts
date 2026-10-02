@@ -895,6 +895,10 @@ const womensPracticeSessions: ScheduleEvent[] = FALL_SUNDAYS_2026.map((ymd) => (
   whatToBring: 'Cleats, water, training kit',
 }));
 
+const programByTeam = Object.fromEntries(
+  demoPrograms.flatMap((program) => (program.teamId ? [[program.teamId, program.id]] : [])),
+);
+
 export const demoSchedule: ScheduleEvent[] = annotateSchedule(
   [
     ...kidsFallSessions,
@@ -905,6 +909,7 @@ export const demoSchedule: ScheduleEvent[] = annotateSchedule(
     ...extraOperationalEvents(),
   ].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
   kidsU8Roster,
+  programByTeam,
 );
 
 export const demoAnnouncements: Announcement[] = [
