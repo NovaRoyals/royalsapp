@@ -1,15 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen } from '@/components/ui';
+import { Button, Screen } from '@/components/ui';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
+export function SignInRequired({ title }: { title: string }) {
+  return (
+    <Screen>
+      <Header title={title} />
+      <Text style={styles.note}>This is part of your account. Create an account or sign in to continue.</Text>
+      <Button label="Create account or sign in" onPress={() => router.push('/onboarding')} />
+    </Screen>
+  );
+}
+
 export default function AccountPersonalScreen() {
   const { household, role } = useApp();
-  const name = role === 'guest' ? 'Not signed in' : household.guardianName.trim() || 'No name yet';
-  const email = role === 'guest' ? '—' : household.email.trim() || 'No email yet';
+  if (role === 'guest') return <SignInRequired title="Personal information" />;
+  const name = household.guardianName.trim() || 'No name yet';
+  const email = household.email.trim() || 'No email yet';
   return (
     <Screen>
       <Header title="Personal information" />

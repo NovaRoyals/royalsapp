@@ -1,10 +1,11 @@
 import { Screen } from '@/components/ui';
 import { useApp } from '@/state/AppProvider';
 
-import { Header, Row } from './personal';
+import { Header, Row, SignInRequired } from './personal';
 
 export default function AccountWaiversScreen() {
-  const { documents } = useApp();
+  const { documents, role } = useApp();
+  if (role === 'guest') return <SignInRequired title="Waivers & consents" />;
   return (
     <Screen>
       <Header title="Waivers & consents" />

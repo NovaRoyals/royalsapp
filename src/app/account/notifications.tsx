@@ -4,10 +4,11 @@ import { Screen } from '@/components/ui';
 import { useApp } from '@/state/AppProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-import { Header } from './personal';
+import { Header, SignInRequired } from './personal';
 
 export default function AccountNotificationsScreen() {
-  const { notificationPrefs, setNotificationPrefs } = useApp();
+  const { notificationPrefs, setNotificationPrefs, role } = useApp();
+  if (role === 'guest') return <SignInRequired title="Notification settings" />;
   return (
     <Screen>
       <Header title="Notification settings" />

@@ -80,9 +80,11 @@ export default function ProfileScreen() {
           </Text>
           <DemoBadge />
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => router.push('/account/personal' as never)} style={styles.editButton}>
-          <Ionicons accessible={false} importantForAccessibility="no" name="pencil-outline" size={17} color={colors.ink} />
-        </Pressable>
+        {role === 'guest' ? null : (
+          <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => router.push('/account/personal' as never)} style={styles.editButton}>
+            <Ionicons accessible={false} importantForAccessibility="no" name="pencil-outline" size={17} color={colors.ink} />
+          </Pressable>
+        )}
       </View>
 
       {pendingStaffRole ? (
@@ -251,13 +253,13 @@ export default function ProfileScreen() {
 
       <SectionHeading title="Account & settings" />
       <View style={styles.menu}>
-        {menu.map((item, index) => (
+        {(role === 'guest' ? menu.filter((item) => item.href === '/about') : menu).map((item, index, items) => (
           <Pressable
             key={item.label}
             accessibilityRole="link"
             accessibilityLabel={item.label}
             onPress={() => router.push(item.href as never)}
-            style={[styles.menuRow, index < menu.length - 1 && styles.menuBorder]}
+            style={[styles.menuRow, index < items.length - 1 && styles.menuBorder]}
           >
             <Ionicons accessible={false} importantForAccessibility="no" name={item.icon} size={21} color={colors.orangeDark} />
             <View style={styles.flex}>

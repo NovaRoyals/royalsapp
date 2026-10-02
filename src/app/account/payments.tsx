@@ -1,10 +1,11 @@
 import { Screen } from '@/components/ui';
 import { useApp } from '@/state/AppProvider';
 
-import { Header, Row } from './personal';
+import { Header, Row, SignInRequired } from './personal';
 
 export default function AccountPaymentsScreen() {
-  const { registrations } = useApp();
+  const { registrations, role } = useApp();
+  if (role === 'guest') return <SignInRequired title="Payments" />;
   const first = registrations[0];
   return (
     <Screen>
