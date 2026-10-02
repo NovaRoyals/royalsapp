@@ -1,50 +1,36 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, Link, router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { FieldChangeBanner, GameDayCard } from '@/components/interactions/ContextCards';
+import { ClubDirectory } from '@/components/home/ClubDirectory';
 import { SeasonDots } from '@/components/interactions/SeasonDots';
-import { KenBurnsImage } from '@/components/media/KenBurnsImage';
 import { PressableScale } from '@/components/motion';
-import { AppHeader, Button, Screen } from '@/components/ui';
-import { demoPrograms, kidsProgramId } from '@/data/demo';
+import { Screen } from '@/components/ui';
+import { kidsProgramId } from '@/data/demo';
 import { mayaAttendanceHistory } from '@/lib/attendance';
 import { RECAP_EVENT_ID, recapForEvent, sessionIdentity } from '@/lib/coachRecap';
 import { clubNowIso, formatEventParts, formatInstantTime, hoursAfterEnd, relativeDayLabel } from '@/lib/datetime';
-import {
-  gameDayBrief,
-  homeStories,
-  householdConflictStub,
-  isGameDayWindow,
-  nextUpcomingEvent,
-  type HomeStory,
-} from '@/lib/intelligence';
+import { conciseSupport, youthRegistrationPrompt } from '@/lib/homeFeed';
+import { getHomeView, setHomeView, subscribeHomeView } from '@/lib/homeView';
+import { homeStories, householdConflictStub, nextUpcomingEvent, type HomeStory } from '@/lib/intelligence';
 import { homeGreeting } from '@/lib/greeting';
 import { contextualStory, storyViewerFor } from '@/lib/matchStory';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
 import { colors, layout, radius, typography } from '@/theme/tokens';
-import type { Tint } from '@/components/onboarding/Pieces';
-
-const TILE_TINT: Record<Tint, { bg: string; fg: string }> = {
-  green: { bg: colors.mint, fg: colors.ink },
-  blue: { bg: colors.blueSoft, fg: colors.blue },
-  teal: { bg: colors.tealSoft, fg: colors.teal },
-  amber: { bg: colors.amberSoft, fg: colors.amber },
-  rose: { bg: colors.roseSoft, fg: colors.rose },
-};
 
 export default function HomeScreen() {
-  const { role, household, registrations, schedule, notifications, hydrated, notificationPrefs, persona, pendingStaffRole, recaps, setSupporter } = useApp();
+  const { role, household, registrations, schedule, notifications, hydrated, persona, pendingStaffRole, recaps, setSupporter } = useApp();
   const reduced = useReducedMotion();
-  const enter = (delay: number, duration = 360) =>
-    Platform.OS === 'web' || reduced ? undefined : FadeInDown.delay(delay).duration(duration);
+  const view = useSyncExternalStore(subscribeHomeView, getHomeView, () => 'you' as const);
   const [childId, setChildId] = useState(household.children[0]?.id);
-  const kidsProgram = demoPrograms.find((item) => item.id === kidsProgramId)!;
+  const choose = (next: 'you' | 'club') => {
+    setHomeView(next);
+    router.setParams({ view: next === 'club' ? 'club' : '' });
+  };
   const unread = notificationsForRole(role, notifications, household.children.map((child) => child.id)).filter((item) => !item.read);
   const urgent = unread.find((item) => item.urgency === 'urgent');
   const [nowIso, setNowIso] = useState('2026-09-25T12:00:00-04:00');
@@ -72,68 +58,33 @@ export default function HomeScreen() {
     () => homeStories(schedule, role, hasChildren, nowIso),
     [schedule, role, hasChildren, nowIso],
   );
-  const gameEvent =
-    role === 'adult_player'
-      ? menEvent
-      : role === 'coach' || (role === 'guardian' && hasChildren)
-        ? kidsEvent
-        : menEvent;
-  const gameDay = gameEvent && isGameDayWindow(gameEvent, nowIso) ? gameDayBrief(gameEvent, role === 'guardian' ? viewingChild?.firstName : undefined, nowIso) : null;
   const conflict = householdConflictStub(role, household.children.map((child) => child.firstName));
-  const showRegister = role === 'guest' || (role === 'guardian' && !hasChildren);
-
-  const tiles: { label: string; detail: string; icon: keyof typeof Ionicons.glyphMap; tint: Tint; href: string }[] = [
-    { label: 'Programs', detail: 'Soccer & cricket', icon: 'grid', tint: 'green', href: '/(tabs)/programs' },
-    { label: 'Schedule', detail: 'View upcoming', icon: 'calendar', tint: 'blue', href: '/(tabs)/schedule' },
-    { label: 'Fields', detail: 'Tonight’s pickup', icon: 'location', tint: 'teal', href: '/(tabs)/fields' },
-    {
-      label: role === 'guardian' && !hasChildren ? 'Register' : role === 'guardian' ? 'Coach updates' : 'Updates',
-      detail: role === 'guardian' && !hasChildren ? 'Add a player' : role === 'guardian' ? 'From training' : 'News & alerts',
-      icon: role === 'guardian' && !hasChildren ? 'person-add' : role === 'guardian' ? 'chatbubble-ellipses-outline' : 'notifications',
-      tint: 'amber',
-      href: role === 'guardian' && !hasChildren ? `/registration/${kidsProgramId}` : role === 'guardian' ? '/updates' : '/notifications',
-    },
-  ];
-
-  if (role === 'guest') {
-    return (
-      <Screen tabScene>
-        <AppHeader />
-        <View style={styles.photoHero}>
-          <KenBurnsImage uri={kidsProgram.heroImage} style={StyleSheet.absoluteFill} />
-          <LinearGradient colors={['rgba(15,61,46,0.08)', 'rgba(15,61,46,0.88)']} style={StyleSheet.absoluteFill} />
-          <Animated.Text entering={enter(40, 320)} style={styles.heroKicker}>
-            REGISTRATION OPEN
-          </Animated.Text>
-          <Animated.Text entering={enter(120)} style={styles.heroTitle}>
-            {kidsProgram.title}
-          </Animated.Text>
-          <Animated.Text entering={enter(180)} style={styles.heroSub}>
-            {kidsProgram.audience} · Sundays · {kidsProgram.priceLabel}
-          </Animated.Text>
-          <Animated.View entering={enter(280)}>
-            <Button label="Register a child" variant="light" onPress={() => router.push(`/registration/${kidsProgramId}`)} />
-          </Animated.View>
-        </View>
-        <Text style={styles.hello}>{hello}</Text>
-        <Text style={styles.introCopy}>See schedule, nearby pitches, and what to bring — no account required.</Text>
-        {stories.map((story) => (
-          <StoryCard key={story.id} story={story} event={schedule.find((item) => item.id === story.eventId)} role={role} onSupport={setSupporter} />
-        ))}
-        <View style={styles.tileGrid}>
-          {tiles.slice(0, 4).map((tile) => (
-            <Tile key={tile.label} {...tile} />
-          ))}
-        </View>
-        <Button label="Create account or sign in" variant="ghost" onPress={() => router.push('/onboarding')} />
-      </Screen>
-    );
-  }
+  const registration = youthRegistrationPrompt(role, household.children, registrations, kidsProgramId);
+  const primary = stories[0];
+  const secondary = stories.find((story) => story.eventId !== primary?.eventId);
+  const primaryEvent = schedule.find((item) => item.id === primary?.eventId);
+  const attention = attentionRows({
+    urgent,
+    closedField,
+    staffPending,
+    pendingStaffRole,
+    conflict,
+    parentReg: role === 'guardian' ? parentReg : undefined,
+    role,
+    kidsEvent,
+    missingRsvps,
+    menEvent,
+    pendingCount: pendingRegs.length,
+    hydrated,
+    coachUpdate: unread.find((item) => item.type === 'coach_update'),
+    recap: recapRow(role, schedule, recaps),
+    primaryEventId: primaryEvent?.id,
+  });
 
   return (
-    <Screen tabScene contentStyle={styles.home}>
+    <Screen scroll={false} tabScene contentStyle={styles.frame}>
       <View style={styles.top}>
-        <View>
+        <View style={styles.flex}>
           <Text style={styles.mark}>NOVA ROYALS</Text>
           <Text style={styles.hello}>{hello}</Text>
         </View>
@@ -144,132 +95,115 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
       </View>
-
-      {role === 'guardian' && hasChildren ? (
-        <View style={styles.childSwitch}>
-          {household.children.map((child) => (
-            <PressableScale key={child.id} onPress={() => setChildId(child.id)} style={[styles.childChip, child.id === viewingChild?.id && styles.childChipOn]}>
-              <Text style={[styles.childChipText, child.id === viewingChild?.id && styles.childChipOnText]}>{child.firstName}</Text>
-            </PressableScale>
-          ))}
-        </View>
-      ) : null}
-
-      {closedField ? <FieldChangeBanner closed venue={closedField.venue} /> : null}
-      {urgent ? (
-        <PressableScale onPress={() => router.push((urgent.route ?? '/notifications') as never)} style={styles.urgent}>
-          <Ionicons name="warning" size={20} color={colors.white} />
-          <View style={styles.flex}>
-            <Text style={styles.urgentTitle}>{urgent.title}</Text>
-            <Text style={styles.urgentBody}>{urgent.body}</Text>
-          </View>
-        </PressableScale>
-      ) : null}
-      {gameDay ? <GameDayCard {...gameDay} locationOptIn={notificationPrefs.locationShare} /> : null}
-
-      {staffPending ? (
-        <Brief
-          title={`${pendingStaffRole === 'coach' ? 'Coach' : 'Manager'} access is pending`}
-          detail="Request received. Staff tools stay locked until an admin assigns this account."
-          href="/(tabs)/profile"
-        />
-      ) : null}
-      {role === 'guardian' && !hasChildren ? (
-        <>
-          <Brief title="Register a child" detail="Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A." href={`/registration/${kidsProgramId}`} />
-          <Brief title="Explore Kids Soccer" detail="See the program, price, and what to bring." href={`/program/${kidsProgramId}`} />
-        </>
-      ) : null}
-      {role === 'adult_player' ? (
-        <>
-          <Brief title="Find my team" detail="Open 8v8, 35+, and CCPL cricket all live under Programs." href="/(tabs)/programs" />
-          <Brief title="Explore adult programs" detail="Men’s Open Sundays · FXA 35+ Thursdays." href="/program/mens-soccer" />
-        </>
-      ) : null}
-      {role === 'volunteer' && !staffPending ? (
-        <Brief
-          title="Next public club event"
-          detail={menEvent ? `${menEvent.title} · ${menEvent.venue}` : 'Open the schedule to follow a side.'}
-          href={menEvent ? `/event/${menEvent.id}` : '/(tabs)/schedule'}
-        />
-      ) : null}
-      {role === 'coach' && kidsEvent ? (
-        <Brief title="Take attendance" detail={`${missingRsvps} families still need RSVP`} href={`/event/${kidsEvent.id}`} />
-      ) : null}
-      {role === 'coach' || role === 'admin' ? <RecapNudge schedule={schedule} recaps={recaps} /> : null}
-      {role === 'adult_player' && menEvent && !menEvent.attendance ? (
-        <Brief title="RSVP for the next match" detail="Going, maybe, or can’t go" href={`/event/${menEvent.id}`} />
-      ) : null}
-      {role === 'admin' && hydrated ? (
-        <Brief title="Pending registrations" detail={`${pendingRegs.length} waiting on club review`} href="/admin" />
-      ) : null}
-      {role === 'guardian' && hasChildren ? (
-        <Brief title="Coach updates" detail="Session recaps and notes about your child" href="/updates" />
-      ) : null}
-      {role === 'guardian' && parentReg && parentReg.paymentStatus !== 'paid' ? (
-        <Brief title="Payment still pending" detail={`${parentReg.participantNames.join(', ')} · $${parentReg.amountDue}`} href={`/season/${parentReg.id}`} />
-      ) : null}
-      {conflict ? <Brief title={conflict.title} detail={conflict.detail} href="/(tabs)/schedule" /> : null}
-
-      {stories.map((story) => (
-        <StoryCard
-          key={story.id}
-          story={story}
-          event={schedule.find((item) => item.id === story.eventId)}
-          role={role}
-          childId={viewingChild?.id}
-          childName={viewingChild?.firstName}
-          onSupport={setSupporter}
-        />
-      ))}
-      {showRegister && stories.length === 0 ? (
-        <Brief title="Fall Soccer Training is open" detail="Sundays 9–10 AM at Arrowhead 3A · $120, sibling rate $60." href={`/registration/${kidsProgramId}`} />
-      ) : null}
-
-      {role === 'guardian' && persona === 'demo' && hydrated ? (
-        <Animated.View key={childId} entering={Platform.OS === 'web' || reduced ? undefined : FadeIn.duration(240)} style={styles.seasonCard}>
-          <SeasonDots history={mayaAttendanceHistory} childName={viewingChild?.firstName ?? 'Maya'} />
-          {mayaCheckedIn ? (
-            <Text style={styles.checkedIn}>
-              {viewingChild?.firstName} checked in · {kidsEvent ? relativeDayLabel(kidsEvent.startsAt) : 'session'}
-            </Text>
+      <HomeSwitch value={view} onChange={choose} />
+      <View
+        style={[styles.pane, view !== 'you' && styles.paneHidden]}
+        accessibilityElementsHidden={view !== 'you'}
+        importantForAccessibility={view === 'you' ? 'auto' : 'no-hide-descendants'}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {role === 'guardian' && hasChildren ? (
+            <View style={styles.childSwitch}>
+              {household.children.map((child) => (
+                <PressableScale key={child.id} onPress={() => setChildId(child.id)} style={[styles.childChip, child.id === viewingChild?.id && styles.childChipOn]}>
+                  <Text style={[styles.childChipText, child.id === viewingChild?.id && styles.childChipOnText]}>{child.firstName}</Text>
+                </PressableScale>
+              ))}
+            </View>
           ) : null}
-        </Animated.View>
-      ) : null}
-
-      <View style={styles.tileGrid}>
-        {tiles.map((tile) => (
-          <Tile key={tile.label} {...tile} />
-        ))}
+          {registration ? (
+            <Brief
+              title={registration.childName ? `Register ${registration.childName}` : 'Register a child'}
+              detail="Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A."
+              href={`/registration/${registration.programId}`}
+            />
+          ) : null}
+          {attention.length ? <Text style={styles.section}>Needs attention</Text> : null}
+          {attention.map((row) => (
+            <Brief key={row.id} title={row.title} detail={row.detail} href={row.href} />
+          ))}
+          {primary ? (
+            <>
+              <Text style={styles.section}>Next up</Text>
+              <StoryCard
+                story={primary}
+                event={primaryEvent}
+                role={role}
+                childId={viewingChild?.id}
+                childName={viewingChild?.firstName}
+                onSupport={setSupporter}
+              />
+            </>
+          ) : null}
+          {secondary ? (
+            <SecondaryStory story={secondary} event={schedule.find((item) => item.id === secondary.eventId)} role={role} childId={viewingChild?.id} childName={viewingChild?.firstName} />
+          ) : null}
+          <Link href="/(tabs)/schedule" asChild>
+            <Pressable accessibilityRole="link" style={styles.scheduleLink}>
+              <Text style={styles.scheduleLinkText}>See schedule</Text>
+            </Pressable>
+          </Link>
+          {role === 'guest' ? (
+            <Pressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={styles.scheduleLink}>
+              <Text style={styles.scheduleLinkText}>Create account or sign in</Text>
+            </Pressable>
+          ) : null}
+          {role === 'guardian' && persona === 'demo' && hydrated ? (
+            <Animated.View key={childId} entering={Platform.OS === 'web' || reduced ? undefined : FadeIn.duration(240)} style={styles.seasonCard}>
+              <SeasonDots history={mayaAttendanceHistory} childName={viewingChild?.firstName ?? 'Maya'} />
+              {mayaCheckedIn ? (
+                <Text style={styles.checkedIn}>
+                  {viewingChild?.firstName} checked in · {kidsEvent ? relativeDayLabel(kidsEvent.startsAt) : 'session'}
+                </Text>
+              ) : null}
+            </Animated.View>
+          ) : null}
+        </ScrollView>
+      </View>
+      <View
+        style={[styles.pane, view !== 'club' && styles.paneHidden]}
+        accessibilityElementsHidden={view !== 'club'}
+        importantForAccessibility={view === 'club' ? 'auto' : 'no-hide-descendants'}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <ClubDirectory nowIso={nowIso} />
+        </ScrollView>
       </View>
     </Screen>
   );
 }
 
-function Tile({
-  label,
-  detail,
-  icon,
-  tint,
-  href,
-}: {
-  label: string;
-  detail: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  tint: Tint;
-  href: string;
-}) {
-  const tone = TILE_TINT[tint];
+function HomeSwitch({ value, onChange }: { value: 'you' | 'club'; onChange: (next: 'you' | 'club') => void }) {
+  const options = [
+    { id: 'you' as const, label: 'For you' },
+    { id: 'club' as const, label: 'Club' },
+  ];
+  const ref = useRef<View>(null);
+  useEffect(() => {
+    const root = ref.current as unknown as { querySelectorAll?: (query: string) => Iterable<HTMLElement> } | null;
+    if (!root?.querySelectorAll) return;
+    for (const node of root.querySelectorAll('[role="tab"]')) {
+      node.setAttribute('aria-selected', node.textContent?.trim() === (value === 'you' ? 'For you' : 'Club') ? 'true' : 'false');
+    }
+  }, [value]);
   return (
-    <Link href={href as never} asChild>
-      <PressableScale style={styles.tile}>
-        <View style={[styles.tileIcon, { backgroundColor: tone.bg }]}>
-          <Ionicons name={icon} size={18} color={tone.fg} />
-        </View>
-        <Text style={styles.tileLabel}>{label}</Text>
-        <Text style={styles.tileDetail}>{detail}</Text>
-      </PressableScale>
-    </Link>
+    <View ref={ref} accessibilityRole="tablist" style={styles.switchRow}>
+      {options.map((option) => {
+        const selected = value === option.id;
+        return (
+          <Pressable
+            key={option.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={option.label}
+            onPress={() => onChange(option.id)}
+            style={[styles.switchOption, selected && styles.switchOptionOn]}
+          >
+            <Text style={[styles.switchText, selected && styles.switchTextOn]}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -298,59 +232,154 @@ function StoryCard({
   };
   return (
     <View style={StyleSheet.flatten([styles.featured, story.kind === 'result' && styles.featuredResult, story.kind === 'live' && styles.featuredLive])}>
-      <Link href={story.href as Href} asChild>
-        <Pressable style={styles.storyLink}>
-          <View style={styles.featuredDate}>
+      <View style={styles.storyRow}>
+        <Link href={story.href as Href} asChild>
+          <Pressable style={styles.featuredDate}>
             <Text style={styles.featuredDow}>{parts.weekday}</Text>
             <Text style={styles.featuredDay}>{parts.day}</Text>
-          </View>
-          <View style={styles.flex}>
-            <Text style={styles.featuredKicker}>{(card?.eyebrow ?? story.kicker).toUpperCase()}</Text>
-            <Text style={styles.featuredTitle}>{card?.headline ?? story.title}</Text>
-            {card ? <Text style={styles.featuredMeta}>{card.supporting}</Text> : null}
-            <Text style={styles.featuredMeta}>{card?.facts ?? story.meta}</Text>
-            {card?.signal ? <Text style={styles.featuredMeta}>{card.signal}</Text> : null}
-          </View>
-        </Pressable>
-      </Link>
-      {card?.action ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={card.action.label} onPress={action} style={styles.storyAction}>
-          <Text style={styles.storyActionText}>{card.action.label}</Text>
-        </Pressable>
-      ) : null}
+          </Pressable>
+        </Link>
+        <View style={styles.flex}>
+          <Link href={story.href as Href} asChild>
+            <Pressable>
+              <Text style={styles.featuredKicker}>{(card?.eyebrow ?? story.kicker).toUpperCase()}</Text>
+              <Text style={styles.featuredTitle}>{card?.headline ?? story.title}</Text>
+              {card ? <SupportLine headline={card.headline} supporting={card.supporting} opponent={event?.opponent} /> : null}
+              <Text style={styles.featuredMeta}>{card?.facts ?? story.meta}</Text>
+              {card?.signal ? <Text style={styles.featuredMeta}>{card.signal}</Text> : null}
+            </Pressable>
+          </Link>
+          {card?.action ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={card.action.label} onPress={action} style={styles.storyAction}>
+              <Text style={styles.storyActionText}>{card.action.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
     </View>
   );
 }
 
-function RecapNudge({
-  schedule,
-  recaps,
+function SupportLine({ headline, supporting, opponent }: { headline: string; supporting: string; opponent?: string }) {
+  const line = conciseSupport(headline, supporting, opponent);
+  if (!line) return null;
+  return <Text style={styles.featuredMeta}>{line}</Text>;
+}
+
+function SecondaryStory({
+  story,
+  event,
+  role,
+  childId,
+  childName,
 }: {
-  schedule: ReturnType<typeof useApp>['schedule'];
-  recaps: ReturnType<typeof useApp>['recaps'];
+  story: HomeStory;
+  event?: ReturnType<typeof useApp>['schedule'][number];
+  role: ReturnType<typeof useApp>['role'];
+  childId?: string;
+  childName?: string;
 }) {
+  const card = event ? contextualStory(event, storyViewerFor({ role, event, childId, childName })) : null;
+  const support = card ? conciseSupport(card.headline, card.supporting, event?.opponent) : undefined;
+  return (
+    <Link href={story.href as Href} asChild>
+      <Pressable style={styles.secondary}>
+        <Text style={styles.featuredKicker}>{(card?.eyebrow ?? story.kicker).toUpperCase()}</Text>
+        <Text style={styles.secondaryTitle}>{card?.headline ?? story.title}</Text>
+        {support ? <Text style={styles.featuredMeta}>{support}</Text> : null}
+      </Pressable>
+    </Link>
+  );
+}
+
+function recapRow(
+  role: ReturnType<typeof useApp>['role'],
+  schedule: ReturnType<typeof useApp>['schedule'],
+  recaps: ReturnType<typeof useApp>['recaps'],
+) {
+  if (role !== 'coach' && role !== 'admin') return null;
   const session = schedule.find((event) => event.id === RECAP_EVENT_ID);
   const recap = recapForEvent(recaps, RECAP_EVENT_ID);
   if (!session) return null;
   const identity = sessionIdentity(session);
   if (recap?.status === 'sent') {
     const scheduled = recap.delivery && recap.delivery !== 'now' && recap.scheduledFor;
-    return (
-      <Brief
-        title={scheduled ? `Scheduled for ${formatInstantTime(new Date(recap.scheduledFor!))}` : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`}
-        detail={`${identity.kicker} · ${identity.title}`}
-        href={`/session/${RECAP_EVENT_ID}/recap`}
-      />
-    );
+    return {
+      id: 'recap',
+      title: scheduled ? `Scheduled for ${formatInstantTime(new Date(recap.scheduledFor!))}` : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`,
+      detail: `${identity.kicker} · ${identity.title}`,
+      href: `/session/${RECAP_EVENT_ID}/recap`,
+    };
   }
   if (!hoursAfterEnd(session, 2)) return null;
-  return (
-    <Brief
-      title="Send families a quick session recap"
-      detail={`${identity.kicker} is complete. Nothing sends until you approve it.`}
-      href={`/session/${RECAP_EVENT_ID}/recap`}
-    />
-  );
+  return {
+    id: 'recap',
+    title: 'Send families a quick session recap',
+    detail: `${identity.kicker} is complete. Nothing sends until you approve it.`,
+    href: `/session/${RECAP_EVENT_ID}/recap`,
+  };
+}
+
+function attentionRows(input: {
+  urgent?: { title: string; body: string; route?: string };
+  closedField?: { id: string; venue: string };
+  staffPending: boolean;
+  pendingStaffRole?: string | null;
+  conflict: { title: string; detail: string } | null;
+  parentReg?: { id: string; participantNames: string[]; amountDue: number; paymentStatus: string };
+  role: ReturnType<typeof useApp>['role'];
+  kidsEvent?: { id: string };
+  missingRsvps: number;
+  menEvent?: { id: string; attendance?: string };
+  pendingCount: number;
+  hydrated: boolean;
+  coachUpdate?: { title: string; body: string; route?: string };
+  recap: { id: string; title: string; detail: string; href: string } | null;
+  primaryEventId?: string;
+}) {
+  const rows: { id: string; title: string; detail: string; href: string }[] = [];
+  const push = (row: { id: string; title: string; detail: string; href: string }) => {
+    if (rows.length >= 2 || rows.some((item) => item.id === row.id)) return;
+    rows.push(row);
+  };
+  if (input.urgent) push({ id: 'urgent', title: input.urgent.title, detail: input.urgent.body, href: input.urgent.route ?? '/notifications' });
+  if (input.closedField) push({ id: 'field', title: 'Field closed', detail: input.closedField.venue, href: `/event/${input.closedField.id}` });
+  if (input.staffPending) {
+    push({
+      id: 'staff',
+      title: `${input.pendingStaffRole === 'coach' ? 'Coach' : 'Manager'} access is pending`,
+      detail: 'Request received. Staff tools stay locked until an admin assigns this account.',
+      href: '/(tabs)/profile',
+    });
+  }
+  if (input.conflict) push({ id: 'conflict', title: input.conflict.title, detail: input.conflict.detail, href: '/(tabs)/schedule' });
+  if (input.parentReg && input.parentReg.paymentStatus !== 'paid') {
+    push({
+      id: 'payment',
+      title: 'Payment still pending',
+      detail: `${input.parentReg.participantNames.join(', ')} · $${input.parentReg.amountDue}`,
+      href: `/season/${input.parentReg.id}`,
+    });
+  }
+  if (input.coachUpdate) {
+    push({
+      id: 'coach-update',
+      title: input.coachUpdate.title,
+      detail: input.coachUpdate.body,
+      href: input.coachUpdate.route ?? '/updates',
+    });
+  }
+  if (input.role === 'coach' && input.kidsEvent && input.kidsEvent.id !== input.primaryEventId) {
+    push({ id: 'attendance', title: 'Take attendance', detail: `${input.missingRsvps} families still need RSVP`, href: `/event/${input.kidsEvent.id}` });
+  }
+  if (input.recap) push(input.recap);
+  if (input.role === 'adult_player' && input.menEvent && !input.menEvent.attendance && input.menEvent.id !== input.primaryEventId) {
+    push({ id: 'player-rsvp', title: 'RSVP for the next match', detail: 'Going, maybe, or can’t go', href: `/event/${input.menEvent.id}` });
+  }
+  if (input.role === 'admin' && input.hydrated) {
+    push({ id: 'regs', title: 'Pending registrations', detail: `${input.pendingCount} waiting on club review`, href: '/admin' });
+  }
+  return rows.slice(0, 2);
 }
 
 function Brief({ title, detail, href }: { title: string; detail: string; href: string }) {
@@ -368,7 +397,20 @@ function Brief({ title, detail, href }: { title: string; detail: string; href: s
 }
 
 const styles = StyleSheet.create({
-  home: { maxWidth: layout.flowWidth, paddingBottom: 28 },
+  frame: { flex: 1, maxWidth: layout.flowWidth, paddingBottom: 0 },
+  pane: { flex: 1 },
+  paneHidden: { display: 'none' },
+  scroll: { paddingBottom: 108 },
+  section: { ...typography.label, color: colors.stone, fontSize: 11, letterSpacing: 1.1, marginTop: 6, marginBottom: 8 },
+  switchRow: { flexDirection: 'row', backgroundColor: colors.sand, borderRadius: 14, padding: 4, marginBottom: 14 },
+  switchOption: { flex: 1, minHeight: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  switchOptionOn: { backgroundColor: colors.ink },
+  switchText: { color: colors.stone, fontSize: 14, ...typography.label },
+  switchTextOn: { color: colors.white },
+  secondary: { paddingVertical: 10, marginBottom: 8 },
+  secondaryTitle: { color: colors.ink, fontSize: 14, marginTop: 2, ...typography.heading },
+  scheduleLink: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', marginBottom: 8 },
+  scheduleLinkText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 8, marginBottom: 18 },
   mark: { color: colors.ink, fontSize: 11, ...typography.label, letterSpacing: 1.8 },
   hello: { color: colors.ink, fontSize: 22, lineHeight: 28, marginTop: 4, marginBottom: 8, ...typography.pageTitle },
@@ -406,11 +448,7 @@ const styles = StyleSheet.create({
   heroSub: { color: 'rgba(255,255,255,0.8)', fontSize: 14, ...typography.body },
   introCopy: { color: colors.stone, fontSize: 14, lineHeight: 20, marginBottom: 16, ...typography.body },
   featured: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     padding: 12,
-    paddingRight: 4,
     borderRadius: 20,
     backgroundColor: colors.paper,
     borderWidth: 1,
@@ -418,6 +456,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     overflow: 'hidden',
   },
+  storyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   featuredLive: { borderColor: colors.orange },
   featuredResult: { backgroundColor: colors.paper },
   featuredDate: {
@@ -433,8 +472,7 @@ const styles = StyleSheet.create({
   featuredKicker: { color: colors.stone, fontSize: 9, ...typography.label, letterSpacing: 1.2 },
   featuredTitle: { color: colors.ink, fontSize: 15, marginTop: 2, ...typography.heading },
   featuredMeta: { color: colors.stone, fontSize: 12, marginTop: 2, ...typography.body },
-  storyLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  storyAction: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 8 },
+  storyAction: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', marginTop: 6 },
   storyActionText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: {

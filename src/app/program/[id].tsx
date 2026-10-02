@@ -58,7 +58,7 @@ export default function ProgramDetailScreen() {
         <View style={styles.hero}>
         <KenBurnsImage uri={program.heroImage} style={StyleSheet.absoluteFill} />
         <LinearGradient colors={['rgba(21,19,16,0.08)', 'rgba(21,19,16,0.9)']} style={StyleSheet.absoluteFill} />
-        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/programs')} style={styles.back}>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/?view=club')} style={styles.back}>
           <Ionicons name="arrow-back" size={21} color={colors.ink} />
         </Pressable>
         <View style={styles.heroCopy}>

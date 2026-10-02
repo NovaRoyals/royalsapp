@@ -29,7 +29,7 @@ export default function TeamDetailScreen() {
   return (
     <Screen>
       <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/programs')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
+        <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/?view=club')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.topTitle}>Team</Text>
         <Pressable accessibilityLabel="Team options" style={styles.back}><Ionicons name="ellipsis-horizontal" size={21} /></Pressable>
       </View>
