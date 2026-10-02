@@ -161,6 +161,7 @@ export function childRegistrationHints(children: Person[]) {
 
 export type HomeStory = {
   id: string;
+  eventId: string;
   kicker: string;
   title: string;
   meta: string;
@@ -191,6 +192,7 @@ function upcomingStory(event: ScheduleEvent, kicker: string): HomeStory {
     rel === 'today' ? (hour >= 17 ? 'Tonight' : 'Today') : rel === 'tomorrow' ? 'Tomorrow' : `${parts.weekday} ${parts.month} ${parts.day}`;
   return {
     id: `up-${event.id}`,
+    eventId: event.id,
     kicker,
     title: event.title,
     meta: `${when} · ${parts.time}${event.venue ? ` · ${event.venue}` : ''}`,
@@ -207,6 +209,7 @@ function cricketTodayStory(event: ScheduleEvent, nowIso: string): HomeStory | nu
   if (phase === 'live') {
     return {
       id: `live-${event.id}`,
+      eventId: event.id,
       kicker: 'In play',
       title: event.title,
       meta: 'Official live score is on CCPL — ROYALS does not guess the score.',
@@ -219,6 +222,7 @@ function cricketTodayStory(event: ScheduleEvent, nowIso: string): HomeStory | nu
     const line = event.result.replace(/^Lost — /, 'Lost today — ').replace(/^Won by /, 'Won today by ').replace(/^Tied — /, 'Tied today — ');
     return {
       id: `done-${event.id}`,
+      eventId: event.id,
       kicker: 'Today',
       title: `Cricket · ${line}`,
       meta: `${parts.time} · ${event.venue}`,
@@ -229,6 +233,7 @@ function cricketTodayStory(event: ScheduleEvent, nowIso: string): HomeStory | nu
   }
   return {
     id: `done-${event.id}`,
+    eventId: event.id,
     kicker: 'Today',
     title: event.title,
     meta: 'Match window is over. Result waits on the official CCPL scorecard.',
@@ -257,6 +262,9 @@ export function homeStories(
     seen.add(card.id);
     cards.push(card);
   };
+
+  const featured = schedule.find((item) => item.storyOverride?.featured && eventPhase(item, nowIso) === 'upcoming');
+  if (featured) push(upcomingStory(featured, featured.competitionLabel || 'Featured'));
 
   const personal =
     role === 'adult_player'

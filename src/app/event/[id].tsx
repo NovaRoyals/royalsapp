@@ -43,6 +43,7 @@ import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 import { useApp } from '@/state/AppProvider';
 import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
 import type { AttendanceMark, ScheduleEvent } from '@/types/domain';
+import { manualStory } from '@/lib/matchStory';
 
 export function generateStaticParams() {
   return demoSchedule.map((item) => ({ id: item.id }));
@@ -63,6 +64,7 @@ export default function EventDetailScreen() {
     setAttendance,
     setParticipantRsvp,
     setSupporter,
+    setMatchStory,
     setFieldStatus,
     relocateEvent,
     cancelEvent,
@@ -103,6 +105,19 @@ export default function EventDetailScreen() {
   const [pendingPublish, setPendingPublish] = useState<PublishAction | null>(null);
   const [requestKind, setRequestKind] = useState<'relocation' | 'cancellation' | null>(null);
   const [requestReason, setRequestReason] = useState('');
+  const canEditStory = role === 'admin' || role === 'competition_manager';
+  const [storyEventId, setStoryEventId] = useState(event.id);
+  const [storyHeadline, setStoryHeadline] = useState(event.storyOverride?.headline ?? '');
+  const [storySupport, setStorySupport] = useState(event.storyOverride?.supporting ?? '');
+  const [storyFeatured, setStoryFeatured] = useState(Boolean(event.storyOverride?.featured));
+  const [storyCta, setStoryCta] = useState(event.storyOverride?.showSupporterCta !== false);
+  if (storyEventId !== event.id) {
+    setStoryEventId(event.id);
+    setStoryHeadline(event.storyOverride?.headline ?? '');
+    setStorySupport(event.storyOverride?.supporting ?? '');
+    setStoryFeatured(Boolean(event.storyOverride?.featured));
+    setStoryCta(event.storyOverride?.showSupporterCta !== false);
+  }
   const recap = recapForEvent(recaps, event.id);
   const showRecap =
     (event.status === 'completed' || Boolean(recorded.length)) &&
@@ -209,6 +224,39 @@ export default function EventDetailScreen() {
 
         {role === 'guest' ? (
           <Text style={styles.privacy}>Public details only. Player responses and household schedules stay signed in.</Text>
+        ) : null}
+
+        {canEditStory ? (
+          <View style={styles.block}>
+            <Text style={styles.section}>Home headline</Text>
+            <Text style={styles.hint}>Manual copy is used as written. Leave the headline blank to use the factual fallback.</Text>
+            <TextInput accessibilityLabel="Home headline" value={storyHeadline} onChangeText={setStoryHeadline} placeholder="Headline" placeholderTextColor={colors.stone} style={styles.noteInput} />
+            <TextInput accessibilityLabel="Home supporting line" value={storySupport} onChangeText={setStorySupport} placeholder="Supporting line" placeholderTextColor={colors.stone} style={styles.noteInput} />
+            <Pressable accessibilityRole="switch" accessibilityLabel="Feature on Home" accessibilityState={{ checked: storyFeatured }} onPress={() => setStoryFeatured((value) => !value)}>
+              <Text style={styles.factValue}>Feature on Home {storyFeatured ? 'on' : 'off'}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="switch" accessibilityLabel="Show supporter action" accessibilityState={{ checked: storyCta }} onPress={() => setStoryCta((value) => !value)}>
+              <Text style={styles.factValue}>Supporter action {storyCta ? 'on' : 'off'}</Text>
+            </Pressable>
+            <Button
+              label="Save Home headline"
+              variant="secondary"
+              onPress={() => {
+                if (!storyHeadline.trim()) {
+                  setMatchStory(event.id, null);
+                  toast('Home will use the factual fallback.');
+                  return;
+                }
+                setMatchStory(event.id, manualStory({
+                  headline: storyHeadline.trim(),
+                  supporting: storySupport.trim(),
+                  featured: storyFeatured,
+                  showSupporterCta: storyCta,
+                }));
+                toast('Home headline saved.');
+              }}
+            />
+          </View>
         ) : null}
 
         {staffRoster ? (

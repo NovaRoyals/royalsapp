@@ -23,6 +23,7 @@ import {
   type HomeStory,
 } from '@/lib/intelligence';
 import { homeGreeting } from '@/lib/greeting';
+import { contextualStory, storyViewerFor } from '@/lib/matchStory';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
@@ -38,7 +39,7 @@ const TILE_TINT: Record<Tint, { bg: string; fg: string }> = {
 };
 
 export default function HomeScreen() {
-  const { role, household, registrations, schedule, notifications, hydrated, notificationPrefs, persona, pendingStaffRole, recaps } = useApp();
+  const { role, household, registrations, schedule, notifications, hydrated, notificationPrefs, persona, pendingStaffRole, recaps, setSupporter } = useApp();
   const reduced = useReducedMotion();
   const enter = (delay: number, duration = 360) =>
     Platform.OS === 'web' || reduced ? undefined : FadeInDown.delay(delay).duration(duration);
@@ -117,7 +118,7 @@ export default function HomeScreen() {
         <Text style={styles.hello}>{hello}</Text>
         <Text style={styles.introCopy}>See schedule, nearby pitches, and what to bring — no account required.</Text>
         {stories.map((story) => (
-          <StoryCard key={story.id} {...story} />
+          <StoryCard key={story.id} story={story} event={schedule.find((item) => item.id === story.eventId)} role={role} onSupport={setSupporter} />
         ))}
         <View style={styles.tileGrid}>
           {tiles.slice(0, 4).map((tile) => (
@@ -211,7 +212,15 @@ export default function HomeScreen() {
       {conflict ? <Brief title={conflict.title} detail={conflict.detail} href="/(tabs)/schedule" /> : null}
 
       {stories.map((story) => (
-        <StoryCard key={story.id} {...story} />
+        <StoryCard
+          key={story.id}
+          story={story}
+          event={schedule.find((item) => item.id === story.eventId)}
+          role={role}
+          childId={viewingChild?.id}
+          childName={viewingChild?.firstName}
+          onSupport={setSupporter}
+        />
       ))}
       {showRegister && stories.length === 0 ? (
         <Brief title="Fall Soccer Training is open" detail="Sundays 9–10 AM at Arrowhead 3A · $120, sibling rate $60." href={`/registration/${kidsProgramId}`} />
@@ -264,22 +273,52 @@ function Tile({
   );
 }
 
-function StoryCard({ kicker, title, meta, href, startsAt, kind }: HomeStory) {
-  const parts = formatEventParts(startsAt);
+function StoryCard({
+  story,
+  event,
+  role,
+  childId,
+  childName,
+  onSupport,
+}: {
+  story: HomeStory;
+  event?: ReturnType<typeof useApp>['schedule'][number];
+  role: ReturnType<typeof useApp>['role'];
+  childId?: string;
+  childName?: string;
+  onSupport: (eventId: string, going: boolean) => void;
+}) {
+  const parts = formatEventParts(story.startsAt);
+  const card = event ? contextualStory(event, storyViewerFor({ role, event, childId, childName })) : null;
+  const action = () => {
+    if (!card?.action || !event) return;
+    if (card.action.kind === 'signin') router.push('/onboarding');
+    else if (card.action.kind === 'support') onSupport(event.id, !event.supporterGoing);
+    else router.push(story.href as never);
+  };
   return (
-    <Link href={href as Href} asChild>
-      <PressableScale style={StyleSheet.flatten([styles.featured, kind === 'result' && styles.featuredResult, kind === 'live' && styles.featuredLive])}>
-        <View style={styles.featuredDate}>
-          <Text style={styles.featuredDow}>{parts.weekday}</Text>
-          <Text style={styles.featuredDay}>{parts.day}</Text>
-        </View>
-        <View style={styles.flex}>
-          <Text style={styles.featuredKicker}>{kicker.toUpperCase()}</Text>
-          <Text style={styles.featuredTitle}>{title}</Text>
-          <Text style={styles.featuredMeta}>{meta}</Text>
-        </View>
-      </PressableScale>
-    </Link>
+    <View style={StyleSheet.flatten([styles.featured, story.kind === 'result' && styles.featuredResult, story.kind === 'live' && styles.featuredLive])}>
+      <Link href={story.href as Href} asChild>
+        <Pressable style={styles.storyLink}>
+          <View style={styles.featuredDate}>
+            <Text style={styles.featuredDow}>{parts.weekday}</Text>
+            <Text style={styles.featuredDay}>{parts.day}</Text>
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.featuredKicker}>{(card?.eyebrow ?? story.kicker).toUpperCase()}</Text>
+            <Text style={styles.featuredTitle}>{card?.headline ?? story.title}</Text>
+            {card ? <Text style={styles.featuredMeta}>{card.supporting}</Text> : null}
+            <Text style={styles.featuredMeta}>{card?.facts ?? story.meta}</Text>
+            {card?.signal ? <Text style={styles.featuredMeta}>{card.signal}</Text> : null}
+          </View>
+        </Pressable>
+      </Link>
+      {card?.action ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={card.action.label} onPress={action} style={styles.storyAction}>
+          <Text style={styles.storyActionText}>{card.action.label}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -394,6 +433,9 @@ const styles = StyleSheet.create({
   featuredKicker: { color: colors.stone, fontSize: 9, ...typography.label, letterSpacing: 1.2 },
   featuredTitle: { color: colors.ink, fontSize: 15, marginTop: 2, ...typography.heading },
   featuredMeta: { color: colors.stone, fontSize: 12, marginTop: 2, ...typography.body },
+  storyLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  storyAction: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 8 },
+  storyActionText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: {
     width: '47.5%',

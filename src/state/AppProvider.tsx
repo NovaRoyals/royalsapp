@@ -53,6 +53,7 @@ import type {
   Person,
   Registration,
   RegistrationStatus,
+  MatchStoryOverride,
   ScheduleEvent,
   SessionRecap,
   UserRole,
@@ -132,6 +133,7 @@ interface AppState extends PersistedState {
   setAttendance: (eventId: string, status: AttendanceStatus) => void;
   setParticipantRsvp: (eventId: string, personId: string, status: AttendanceStatus) => void;
   setSupporter: (eventId: string, going: boolean) => void;
+  setMatchStory: (eventId: string, override: MatchStoryOverride | null) => void;
   setFieldStatus: (eventId: string, status: FieldStatus, reason?: string) => void;
   closeVenue: (venueId: string, reason: string) => void;
   relocateEvent: (eventId: string, venueId: string, reason?: string) => void;
@@ -189,6 +191,8 @@ function mergeClubSchedule(overlays: ScheduleEvent[] = []) {
         changes: overlay.changes ?? event.changes,
         pendingChange: overlay.pendingChange ?? event.pendingChange,
         instructions: overlay.instructions ?? event.instructions,
+        storyOverride: overlay.storyOverride ?? event.storyOverride,
+        storyFacts: overlay.storyFacts ?? event.storyFacts,
         cancellationReason: overlay.cancellationReason ?? event.cancellationReason,
         reschedulePending: overlay.reschedulePending ?? event.reschedulePending,
       };
@@ -626,6 +630,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     });
     hapticLight();
+  }, []);
+
+  const setMatchStory = useCallback((eventId: string, override: MatchStoryOverride | null) => {
+    setState((current) => {
+      if (current.role !== 'admin' && current.role !== 'competition_manager') return current;
+      const schedule = mergeClubSchedule(current.schedule).map((event) =>
+        event.id === eventId ? { ...event, storyOverride: override ?? undefined } : event,
+      );
+      return { ...current, schedule };
+    });
   }, []);
 
   const closeVenue = useCallback((venueId: string, reason: string) => {
@@ -1325,6 +1339,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAttendance,
       setParticipantRsvp,
       setSupporter,
+      setMatchStory,
       setFieldStatus,
       closeVenue,
       relocateEvent,
@@ -1363,6 +1378,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAttendance,
       setParticipantRsvp,
       setSupporter,
+      setMatchStory,
       setFieldStatus,
       closeVenue,
       relocateEvent,

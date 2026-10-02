@@ -208,6 +208,40 @@ export interface ScheduleEvent {
   pendingChange?: EventChange;
   reschedulePending?: boolean;
   cancellationReason?: string;
+  /** Verified competition facts. Missing fields must not be inferred. */
+  storyFacts?: MatchStoryFacts;
+  /** Manager-written Home card. Public viewers are not told which lines were written by hand. */
+  storyOverride?: MatchStoryOverride;
+}
+
+export type MatchStoryAngle =
+  | 'elimination'
+  | 'qualification'
+  | 'final_group'
+  | 'semifinal'
+  | 'final'
+  | 'opener'
+  | 'recent_result'
+  | 'ordinary';
+
+export interface MatchStoryFacts {
+  angle?: MatchStoryAngle;
+  stageLabel?: string;
+  matchNumber?: number;
+  finalGroup?: boolean;
+  /** Set only when a verified rule says a win advances this side. */
+  winAdvances?: boolean;
+  /** Set only when a verified rule says a loss eliminates this side. */
+  lossEliminates?: boolean;
+  previousResult?: string;
+}
+
+export interface MatchStoryOverride {
+  headline: string;
+  supporting?: string;
+  featured?: boolean;
+  showSupporterCta?: boolean;
+  source: 'manual';
 }
 
 export interface StandingRow {
