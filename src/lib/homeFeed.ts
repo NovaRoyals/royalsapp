@@ -81,6 +81,30 @@ export function programStatusLine(program: Program, schedule: ScheduleEvent[], n
   return program.dates;
 }
 
+const CLUB_TEAMS = ['nova-royals-men', 'nova-royals-35plus', 'nova-royals-cricket', 'nova-royals-women'];
+
+/** Up to two upcoming club events that are not the primary Next up card. Prefer a different team than the primary event. */
+export function aroundClubEvents(schedule: ScheduleEvent[], nowIso: string, excludeIds: string[], limit = 2) {
+  const upcoming = schedule
+    .filter((event) => event.status !== 'cancelled' && event.status !== 'completed' && !excludeIds.includes(event.id) && eventPhase(event, nowIso) === 'upcoming')
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const excludedTeams = new Set(
+    schedule.filter((event) => excludeIds.includes(event.id) && event.teamId).map((event) => event.teamId as string),
+  );
+  const picked: ScheduleEvent[] = [];
+  const take = (match: (event: ScheduleEvent) => boolean) => {
+    if (picked.length >= limit) return;
+    const event = upcoming.find((item) => match(item) && !picked.some((chosen) => chosen.id === item.id));
+    if (event) picked.push(event);
+  };
+  for (const teamId of CLUB_TEAMS) {
+    if (excludedTeams.has(teamId)) continue;
+    take((event) => event.teamId === teamId);
+  }
+  for (const teamId of CLUB_TEAMS) take((event) => event.teamId === teamId);
+  return picked;
+}
+
 export function orderedPrograms(programs: Program[], registrations: Registration[]) {
   const connected = (program: Program) => programIsEnrolled(program, registrations);
   return [...programs].sort((a, b) => Number(connected(b)) - Number(connected(a)));

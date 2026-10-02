@@ -47,11 +47,20 @@ function training(event: ScheduleEvent) {
   return event.type === 'training';
 }
 
+function women(event: ScheduleEvent) {
+  return Boolean(event.teamId?.includes('women'));
+}
+
+function openTeam(event: ScheduleEvent) {
+  return Boolean(event.teamId?.includes('men') && !women(event));
+}
+
 function programName(event: ScheduleEvent) {
   if (event.sport === 'cricket') return 'ROYALS Cricket';
   if (event.teamId?.includes('35')) return 'The 35+ side';
   if (youth(event)) return event.ageGroup || 'The group';
-  if (event.teamId?.includes('men')) return 'The Open team';
+  if (women(event)) return 'The women’s team';
+  if (openTeam(event)) return 'The Open team';
   return 'ROYALS';
 }
 
@@ -62,11 +71,13 @@ function eyebrow(event: ScheduleEvent) {
       ? '35+'
       : youth(event)
         ? (event.ageGroup || 'YOUTH').toUpperCase()
-        : event.teamId?.includes('men')
-          ? 'OPEN'
-          : training(event)
-            ? 'TRAINING'
-            : 'ROYALS';
+        : women(event)
+          ? 'WOMEN'
+          : openTeam(event)
+            ? 'OPEN'
+            : training(event)
+              ? 'TRAINING'
+              : 'ROYALS';
   const stage = event.storyFacts?.stageLabel?.trim();
   return stage ? `${base} · ${stage.toUpperCase()}` : base;
 }
@@ -100,7 +111,8 @@ function derivedHeadline(event: ScheduleEvent) {
   if (event.sport === 'cricket') return `ROYALS Cricket play ${when.phrase}.`;
   if (event.teamId?.includes('35')) return `The 35+ side plays ${when.phrase}.`;
   if (youth(event)) return `${name} take the field ${when.phrase}.`;
-  if (event.teamId?.includes('men')) return `The Open team plays ${when.phrase}.`;
+  if (women(event)) return `The women’s team play ${when.phrase}.`;
+  if (openTeam(event)) return `The Open team plays ${when.phrase}.`;
   return `${name} play ${when.phrase}.`;
 }
 

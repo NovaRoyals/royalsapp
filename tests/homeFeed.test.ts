@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { conciseSupport, orderedPrograms, programStatusLine, youthRegistrationPrompt } from '../src/lib/homeFeed.ts';
+import { aroundClubEvents, conciseSupport, orderedPrograms, programStatusLine, youthRegistrationPrompt } from '../src/lib/homeFeed.ts';
 import type { Person, Program, Registration, ScheduleEvent } from '../src/types/domain.ts';
 
 const child = (id: string, firstName: string, dateOfBirth?: string): Person => ({
@@ -95,4 +95,27 @@ test('club cards use one verified status and keep household programs first', () 
   assert.match(programStatusLine(open, [next], '2026-10-02T12:00:00-04:00', false), /^Next match/);
   assert.equal(programStatusLine(idle, [], '2026-10-02T12:00:00-04:00', false), 'No active match season');
   assert.deepEqual(orderedPrograms([open, kids], regs).map((item) => item.id), ['kids', 'open']);
+});
+
+test('around the club skips the primary event and stays at two items', () => {
+  const event = (id: string, teamId: string, startsAt: string): ScheduleEvent => ({
+    id,
+    type: teamId.includes('women') ? 'training' : 'league_match',
+    sport: teamId.includes('cricket') ? 'cricket' : 'soccer',
+    title: id,
+    subtitle: '',
+    startsAt,
+    venue: 'Field',
+    teamId,
+    status: 'scheduled',
+  });
+  const schedule = [
+    event('kids', 'nova-royals-kids-u8', '2026-10-04T09:00:00-04:00'),
+    event('open', 'nova-royals-men', '2026-10-04T22:00:00-04:00'),
+    event('open-later', 'nova-royals-men', '2026-10-11T22:00:00-04:00'),
+    event('plus', 'nova-royals-35plus', '2026-10-08T21:00:00-04:00'),
+    event('women', 'nova-royals-women', '2026-10-04T08:00:00-04:00'),
+  ];
+  assert.deepEqual(aroundClubEvents(schedule, '2026-10-02T12:00:00-04:00', ['kids']).map((item) => item.id), ['open', 'plus']);
+  assert.deepEqual(aroundClubEvents(schedule, '2026-10-02T12:00:00-04:00', ['open']).map((item) => item.id), ['plus', 'women']);
 });
