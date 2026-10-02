@@ -12,8 +12,8 @@ import { PressableScale } from '@/components/motion';
 import { AppHeader, Button, Screen } from '@/components/ui';
 import { demoPrograms, kidsProgramId } from '@/data/demo';
 import { mayaAttendanceHistory } from '@/lib/attendance';
-import { clubNowIso, formatEventParts, hoursAfterEnd, relativeDayLabel } from '@/lib/datetime';
-import { RECAP_EVENT_ID, deliveryClockLabel, recapForEvent, sessionIdentity } from '@/lib/coachRecap';
+import { RECAP_EVENT_ID, recapForEvent, sessionIdentity } from '@/lib/coachRecap';
+import { clubNowIso, formatEventParts, formatInstantTime, hoursAfterEnd, relativeDayLabel } from '@/lib/datetime';
 import {
   gameDayBrief,
   homeStories,
@@ -298,7 +298,7 @@ function RecapNudge({
     const scheduled = recap.delivery && recap.delivery !== 'now' && recap.scheduledFor;
     return (
       <Brief
-        title={scheduled ? `Scheduled for ${deliveryClockLabel(recap.scheduledFor!)}` : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`}
+        title={scheduled ? `Scheduled for ${formatInstantTime(new Date(recap.scheduledFor!))}` : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`}
         detail={`${identity.kicker} · ${identity.title}`}
         href={`/session/${RECAP_EVENT_ID}/recap`}
       />

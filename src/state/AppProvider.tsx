@@ -17,6 +17,7 @@ import { SPLASH_SESSION_KEY } from '@/components/SplashOverlay';
 import { resetAnalytics, track } from '@/lib/analytics';
 import { can, canSendSessionRecap } from '@/lib/capabilities';
 import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapAudience, recapBody } from '@/lib/coachRecap';
+import { PAST_DELIVERY_ERROR } from '@/lib/deliveryTiming';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import {
@@ -1224,8 +1225,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         result = { ok: false, error: 'Record attendance first. Recaps go only to families of children marked present.' };
         return current;
       }
-      const sentAt = recap.scheduledFor ?? new Date().toISOString();
       const deliveringNow = (recap.delivery ?? 'now') === 'now';
+      const approvedAt = new Date();
+      if (!deliveringNow) {
+        const at = recap.scheduledFor ? new Date(recap.scheduledFor).getTime() : Number.NaN;
+        if (!Number.isFinite(at) || at <= approvedAt.getTime()) {
+          result = { ok: false, error: PAST_DELIVERY_ERROR };
+          return current;
+        }
+      }
+      const sentAt = deliveringNow ? approvedAt.toISOString() : recap.scheduledFor!;
       const notes = recap.notes
         .filter((note) => audience.recipients.some((person) => person.id === note.childId))
         .map((note) => ({

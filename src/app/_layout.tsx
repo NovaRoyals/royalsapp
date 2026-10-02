@@ -23,7 +23,7 @@ export default function RootLayout() {
         style.id = styleId;
         style.textContent = [
           'button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible,',
-          '[role="button"]:focus-visible, [role="tab"]:focus-visible, [role="link"]:focus-visible {',
+          '[role="button"]:focus-visible, [role="tab"]:focus-visible, [role="link"]:focus-visible, [role="radio"]:focus-visible {',
           'outline: 2px solid #C85A24; outline-offset: 2px;',
           '}',
         ].join(' ');

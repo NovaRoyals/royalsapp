@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -22,9 +22,6 @@ import {
   MOCK_VOICE_TRANSCRIPT,
   NOTE_TAGS,
   canonicalRecapText,
-  deliveryChoiceLabel,
-  deliveryClockLabel,
-  deliveryMoment,
   noteDraftFromTags,
   noteKind,
   recapAudience,
@@ -32,7 +29,17 @@ import {
   recapTranscript,
   sessionIdentity,
 } from '@/lib/coachRecap';
-import { formatEventWhen } from '@/lib/datetime';
+import { formatInstantWhen } from '@/lib/datetime';
+import {
+  applyPolish,
+  applyTranscript,
+  attendanceApprovalError,
+  deliveryApprovalError,
+  deliveryCta,
+  deliveryOption,
+  deliveryOptions,
+  deliveryPreviewWhen,
+} from '@/lib/deliveryTiming';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
@@ -40,6 +47,17 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { CoachNoteTag, IndividualCoachNote, RecapDelivery, SessionRecap } from '@/types/domain';
 
 type VoicePhase = 'idle' | 'recording' | 'transcribing' | 'ready' | 'failed';
+
+type RadioNode = {
+  focus?: () => void;
+  setAttribute?: (name: string, value: string) => void;
+  addEventListener?: (type: string, listener: () => void) => void;
+  removeEventListener?: (type: string, listener: () => void) => void;
+  style?: {
+    setProperty: (name: string, value: string, priority?: string) => void;
+    removeProperty: (name: string) => void;
+  };
+};
 
 export function generateStaticParams() {
   return demoSchedule.filter((item) => item.teamId === COACH_TEAM_ID).map((item) => ({ eventId: item.id }));
@@ -71,6 +89,40 @@ export default function SessionRecapScreen() {
   const [eventKey, setEventKey] = useState(event.id);
   const [phase, setPhase] = useState<Phase>(stored?.status === 'sent' ? 'receipt' : 'compose');
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle');
+  const radioRefs = useRef<Partial<Record<RecapDelivery, RadioNode | null>>>({});
+  const deliveryChoice = draft.delivery ?? 'now';
+  useEffect(() => {
+    for (const option of deliveryOptions(event)) {
+      const node = radioRefs.current[option.choice];
+      if (!node?.setAttribute) continue;
+      node.setAttribute('aria-checked', option.choice === deliveryChoice ? 'true' : 'false');
+      node.setAttribute('aria-disabled', option.available ? 'false' : 'true');
+    }
+    if (typeof document === 'undefined') return;
+    const hosts = [...document.querySelectorAll('[role="radio"]')] as HTMLElement[];
+    const paintFocus = () => {
+      for (const host of hosts) {
+        if (document.activeElement === host) {
+          host.style.setProperty('outline', '2px solid #C85A24', 'important');
+          host.style.setProperty('outline-offset', '2px', 'important');
+        } else {
+          host.style.removeProperty('outline');
+          host.style.removeProperty('outline-offset');
+        }
+      }
+    };
+    for (const host of hosts) {
+      host.addEventListener('focus', paintFocus);
+      host.addEventListener('blur', paintFocus);
+    }
+    paintFocus();
+    return () => {
+      for (const host of hosts) {
+        host.removeEventListener('focus', paintFocus);
+        host.removeEventListener('blur', paintFocus);
+      }
+    };
+  }, [deliveryChoice, event, phase]);
   const [polishOpen, setPolishOpen] = useState(false);
   const [polishing, setPolishing] = useState(false);
   const [polishError, setPolishError] = useState('');
@@ -130,6 +182,7 @@ export default function SessionRecapScreen() {
   const recordVoice = () => {
     if (!canDraft || draft.status === 'sent') return;
     if (offline) {
+      persist(applyTranscript(draft, 'failed', MOCK_VOICE_TRANSCRIPT));
       setVoicePhase('failed');
       return;
     }
@@ -137,16 +190,7 @@ export default function SessionRecapScreen() {
     const snapshot = draft;
     setTimeout(() => setVoicePhase('transcribing'), 600);
     setTimeout(() => {
-      const transcript = MOCK_VOICE_TRANSCRIPT;
-      const editor = canonicalRecapText(snapshot);
-      const previousTranscript = recapTranscript(snapshot);
-      const keepEditor = editor && editor !== previousTranscript;
-      persist({
-        ...snapshot,
-        transcript,
-        originalText: transcript,
-        message: keepEditor ? editor : transcript,
-      });
+      persist(applyTranscript(snapshot, 'ready', MOCK_VOICE_TRANSCRIPT));
       setVoicePhase('ready');
       toast('Ready for review. Edit anything that should change.');
     }, 1200);
@@ -165,16 +209,10 @@ export default function SessionRecapScreen() {
         sessionLabel: identity.kicker || event.title,
       });
       if (!result.text.trim()) throw new Error('empty');
-      persist({
-        ...draft,
-        transcript,
-        originalText: transcript,
-        message: result.text,
-        polishedText: result.text,
-        polishMode: mode,
-      });
+      persist(applyPolish({ ...draft, transcript, originalText: transcript }, { ok: true, text: result.text, mode }));
       toast(mode === 'verbatim' ? 'Kept as written' : 'Polished text is now in the editor');
     } catch {
+      persist(applyPolish(draft, { ok: false }));
       setPolishError('Could not polish right now. The text in the editor is unchanged.');
     } finally {
       setPolishing(false);
@@ -214,20 +252,21 @@ export default function SessionRecapScreen() {
       setSendError('You’re offline. The draft is saved — send when you’re back.');
       return;
     }
-    if (audience.unrecordedCount) {
-      setSendError('Attendance is still open. Not recorded is not the same as absent, and sending stays off until every player is marked.');
-      return;
-    }
-    if (!audience.recipients.length) {
-      setSendError('Record attendance first. Recaps go only to families of children marked present.');
+    const approvedAt = new Date();
+    const delivery = draft.delivery ?? 'now';
+    const option = deliveryOption(event, delivery, approvedAt);
+    const blocked =
+      attendanceApprovalError({ unrecordedCount: audience.unrecordedCount, recipientCount: audience.recipients.length }) ??
+      deliveryApprovalError(option);
+    if (blocked) {
+      setSendError(blocked);
       return;
     }
     if (!canonicalRecapText(draft)) {
       setSendError('Write the shared recap before sending.');
       return;
     }
-    const delivery = draft.delivery ?? 'now';
-    const scheduledFor = delivery === 'now' ? undefined : deliveryMoment(event, delivery);
+    const scheduledFor = option.choice === 'now' ? undefined : option.at?.toISOString();
     const approved: SessionRecap = {
       ...draft,
       message: canonicalRecapText(draft),
@@ -242,25 +281,43 @@ export default function SessionRecapScreen() {
       setSendError(result.error ?? 'Could not send.');
       return;
     }
-    const now = new Date().toISOString();
     setDraft({
       ...approved,
       status: 'sent',
-      sentAt: delivery === 'now' ? now : undefined,
-      scheduledFor: delivery === 'now' ? undefined : scheduledFor,
-      deliveryStatus: delivery === 'now' ? 'delivered' : 'queued',
+      sentAt: option.choice === 'now' ? approvedAt.toISOString() : undefined,
+      scheduledFor,
+      deliveryStatus: option.choice === 'now' ? 'delivered' : 'queued',
     });
     setPhase('receipt');
   };
 
   const display = canonicalRecapText(draft);
   const delivery = draft.delivery ?? 'now';
-  const deliveryWhen = deliveryMoment(event, delivery);
-  const familyWord = audience.recipients.length === 1 ? 'family' : 'families';
-  const sendLabel = delivery === 'now'
-    ? `Send to ${audience.recipients.length} ${familyWord} now`
-    : `Schedule for ${deliveryClockLabel(deliveryWhen)}`;
-  const canApprove = canSend && Boolean(display) && !audience.unrecordedCount && audience.recipients.length > 0;
+  const options = deliveryOptions(event);
+  const selectedOption = options.find((item) => item.choice === delivery) ?? options[0];
+  const sendLabel = deliveryCta(selectedOption, audience.recipients.length);
+  const canApprove =
+    canSend &&
+    Boolean(display) &&
+    !attendanceApprovalError({ unrecordedCount: audience.unrecordedCount, recipientCount: audience.recipients.length }) &&
+    !deliveryApprovalError(selectedOption);
+  const selectDelivery = (choice: RecapDelivery) => {
+    const option = options.find((item) => item.choice === choice);
+    if (!option?.available) return;
+    persist({
+      ...draft,
+      delivery: choice,
+      scheduledFor: choice === 'now' ? undefined : option.at?.toISOString(),
+    });
+  };
+  const moveDelivery = (from: RecapDelivery, direction: 1 | -1) => {
+    const enabled = options.filter((item) => item.available);
+    const index = enabled.findIndex((item) => item.choice === from);
+    const next = enabled[(index + direction + enabled.length) % enabled.length];
+    if (!next) return;
+    selectDelivery(next.choice);
+    radioRefs.current[next.choice]?.focus?.();
+  };
   const notedChildren = audience.present.filter((person) => {
     const note = draft.notes.find((item) => item.childId === person.id);
     return Boolean(note && (note.tags.length || note.originalText.trim()));
@@ -303,22 +360,55 @@ export default function SessionRecapScreen() {
             <Text style={styles.phaseTitle}>Parent view</Text>
             <Text style={styles.hint}>This is exactly what families will receive, plus a private note only if you wrote one for their child.</Text>
             <View accessibilityRole="radiogroup" accessibilityLabel="Delivery" style={styles.gap}>
-              {(['now', 'after_session', 'tonight'] as RecapDelivery[]).map((choice) => {
-                const when = deliveryMoment(event, choice);
-                const selected = delivery === choice;
+              {options.some((item) => !item.available) ? (
+                <Text style={styles.hint}>The original delivery time has passed.</Text>
+              ) : null}
+              {options.map((option) => {
+                const selected = delivery === option.choice;
                 return (
                   <Pressable
-                    key={choice}
+                    key={option.choice}
+                    ref={(node) => {
+                      radioRefs.current[option.choice] = node as (typeof radioRefs.current)[RecapDelivery];
+                    }}
                     accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${deliveryChoiceLabel(choice)}, ${formatEventWhen(when)}`}
-                    onPress={() => persist({ ...draft, delivery: choice, scheduledFor: choice === 'now' ? undefined : when })}
-                    style={({ pressed }) => [styles.mode, selected && styles.modeOn, pressed && styles.pressed]}
+                    accessibilityState={{ checked: selected, disabled: !option.available }}
+                    accessibilityLabel={`${option.label}, ${option.detail}`}
+                    disabled={!option.available}
+                    onPress={() => selectDelivery(option.choice)}
+                    {...(Platform.OS === 'web'
+                      ? {
+                          onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+                            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+                              event.preventDefault();
+                              moveDelivery(option.choice, 1);
+                            } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+                              event.preventDefault();
+                              moveDelivery(option.choice, -1);
+                            } else if (event.key === ' ' || event.key === 'Enter') {
+                              event.preventDefault();
+                              selectDelivery(option.choice);
+                            }
+                          },
+                        }
+                      : null)}
+                    style={({ pressed }) => [
+                      styles.mode,
+                      selected && styles.modeOn,
+                      !option.available && styles.modeOff,
+                      pressed && option.available && styles.pressed,
+                    ]}
                   >
-                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? colors.ink : colors.stone} />
+                    <Ionicons
+                      accessible={false}
+                      importantForAccessibility="no"
+                      name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={22}
+                      color={selected ? colors.ink : colors.stone}
+                    />
                     <View style={styles.modeCopy}>
-                      <Text style={styles.modeLabel}>{deliveryChoiceLabel(choice)}</Text>
-                      <Text style={styles.modeHint}>{formatEventWhen(when)}</Text>
+                      <Text style={styles.modeLabel}>{option.label}</Text>
+                      <Text style={styles.modeHint}>{option.detail}</Text>
                     </View>
                   </Pressable>
                 );
@@ -336,7 +426,7 @@ export default function SessionRecapScreen() {
               sessionTitle={event.title}
               when={identity.when}
               recipients={audience.recipients.length}
-              deliveryWhen={formatEventWhen(deliveryWhen)}
+              deliveryWhen={deliveryPreviewWhen(selectedOption)}
             />
             {audience.unrecordedCount || !audience.recipients.length ? (
               <Text style={styles.error}>Record attendance first. Recaps go only to families of children marked present.</Text>
@@ -572,7 +662,7 @@ function Receipt({ recap, identity }: { recap: SessionRecap; identity: string })
       <Text style={styles.phaseTitle}>{scheduled ? 'Scheduled' : 'Sent'}</Text>
       <Text style={styles.counts}>
         {scheduled
-          ? `Scheduled for ${formatEventWhen(recap.scheduledFor!)}`
+          ? `Scheduled for ${formatInstantWhen(new Date(recap.scheduledFor!))}`
           : `Sent to ${recap.recipientCount} ${recap.recipientCount === 1 ? 'family' : 'families'}`}
       </Text>
       <Text style={styles.hint}>
@@ -715,6 +805,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
   },
   modeOn: { borderColor: colors.ink, backgroundColor: colors.mint },
+  modeOff: { opacity: 0.45 },
   pressed: { opacity: 0.72 },
   modeCopy: { flex: 1 },
   modeLabel: { color: colors.ink, fontSize: 16, ...typography.heading },

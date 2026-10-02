@@ -1,5 +1,5 @@
-import { addMinutesToWall, formatEventParts, formatEventWhen } from '@/lib/datetime';
-import type { AppNotification, AttendanceMark, CoachNoteTag, CoachUpdate, IndividualCoachNote, Person, RecapDelivery, ScheduleEvent, SessionRecap } from '@/types/domain';
+import { formatEventParts, formatEventWhen } from '@/lib/datetime';
+import type { AppNotification, AttendanceMark, CoachNoteTag, CoachUpdate, IndividualCoachNote, Person, ScheduleEvent, SessionRecap } from '@/types/domain';
 
 export const RECAP_EVENT_ID = 'kids-2026-09-20';
 
@@ -142,24 +142,6 @@ export function recapAudience(roster: Person[], checkIns: AttendanceMark[]) {
   const missingContact = counts.present.filter((person) => person.familyContact === false);
   const recipients = counts.present.filter((person) => person.familyContact !== false);
   return { ...counts, missingContact, recipients };
-}
-
-export function deliveryMoment(event: Pick<ScheduleEvent, 'startsAt' | 'endsAt'>, choice: RecapDelivery, now = new Date()) {
-  if (choice === 'now') return now.toISOString();
-  if (choice === 'after_session') return addMinutesToWall(event.endsAt ?? event.startsAt, 120);
-  const day = event.startsAt.slice(0, 10);
-  const offset = event.startsAt.match(/([+-]\d{2}:\d{2}|Z)$/)?.[1] ?? '-04:00';
-  return `${day}T19:00:00${offset}`;
-}
-
-export function deliveryChoiceLabel(choice: RecapDelivery) {
-  if (choice === 'now') return 'Send now';
-  if (choice === 'after_session') return 'Two hours after session';
-  return 'Tonight';
-}
-
-export function deliveryClockLabel(iso: string) {
-  return formatEventParts(iso).time;
 }
 
 export function parentUpdatesFromRecap(

@@ -170,6 +170,59 @@ export function formatTimeFromIso(iso: string) {
   return formatEventParts(iso).time;
 }
 
+export const CLUB_TIME_ZONE = 'America/New_York';
+
+export function zonedParts(date: Date, timeZone = CLUB_TIME_ZONE) {
+  const bag = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      weekday: 'long',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  );
+  const hour = Number(bag.hour);
+  return {
+    year: Number(bag.year),
+    month: Number(bag.month),
+    day: Number(bag.day),
+    hour: hour === 24 ? 0 : hour,
+    minute: Number(bag.minute),
+    weekday: String(bag.weekday),
+  };
+}
+
+/** Absolute instant for a clock time in the club timezone, including daylight saving. */
+export function zonedDateTime(year: number, month: number, day: number, hour: number, minute: number, timeZone = CLUB_TIME_ZONE) {
+  let date = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const wanted = Date.UTC(year, month - 1, day, hour, minute);
+  for (let pass = 0; pass < 3; pass += 1) {
+    const parts = zonedParts(date, timeZone);
+    const shown = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+    date = new Date(date.getTime() - (shown - wanted));
+  }
+  return date;
+}
+
+export function formatInstantTime(date: Date, timeZone = CLUB_TIME_ZONE) {
+  const parts = zonedParts(date, timeZone);
+  const hour12 = parts.hour % 12 || 12;
+  const meridian = parts.hour >= 12 ? 'PM' : 'AM';
+  return `${hour12}:${String(parts.minute).padStart(2, '0')} ${meridian}`;
+}
+
+export function formatInstantWhen(date: Date, timeZone = CLUB_TIME_ZONE) {
+  const parts = zonedParts(date, timeZone);
+  return `${parts.weekday}, ${MONTHS_LONG[parts.month - 1]} ${parts.day} · ${formatInstantTime(date, timeZone)}`;
+}
+
 /**
  * Leave time in the event’s posted timezone.
  * Returns null when the event is past or the computed departure is not before kickoff.
