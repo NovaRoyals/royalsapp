@@ -41,6 +41,7 @@ import {
   deliveryPreviewWhen,
 } from '@/lib/deliveryTiming';
 import { COACH_TEAM_ID } from '@/lib/membership';
+import { noteTargets } from '@/lib/recapPrivacy';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
@@ -131,6 +132,7 @@ export default function SessionRecapScreen() {
   const [previewChild, setPreviewChild] = useState(audience.recipients[0]?.id ?? audience.present[0]?.id ?? '');
   const [showTranscript, setShowTranscript] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
+  const [noteQuery, setNoteQuery] = useState('');
   const [offline, setOffline] = useState(false);
   const [savedAt, setSavedAt] = useState(stored?.updatedAt ?? '');
   const [sendError, setSendError] = useState('');
@@ -318,11 +320,16 @@ export default function SessionRecapScreen() {
     selectDelivery(next.choice);
     radioRefs.current[next.choice]?.focus?.();
   };
-  const notedChildren = audience.present.filter((person) => {
+  const notePeople = noteTargets(audience.present, audience.absent.map((person) => person.id));
+  const notedChildren = notePeople.filter((person) => {
     const note = draft.notes.find((item) => item.childId === person.id);
     return Boolean(note && (note.tags.length || note.originalText.trim()));
   });
-  const unnamedChildren = audience.present.filter((person) => !notedChildren.some((item) => item.id === person.id));
+  const unnamedChildren = notePeople.filter((person) => !notedChildren.some((item) => item.id === person.id));
+  const contactStatus = (childId: string) =>
+    audience.missingContact.some((person) => person.id === childId)
+      ? 'No linked parent contact. This family is not included when the recap sends.'
+      : 'This family receives the shared recap.';
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -531,54 +538,89 @@ export default function SessionRecapScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: notesOpen }}
-              accessibilityLabel="Add individual notes, optional"
+              accessibilityLabel="Personalize for a child, optional"
               onPress={() => setNotesOpen((open) => !open)}
               style={({ pressed }) => [styles.advanced, pressed && styles.pressed]}
             >
-              <Text style={styles.advancedLabel}>Add individual notes — optional</Text>
+              <Text style={styles.advancedLabel}>Personalize for a child — optional</Text>
               <Ionicons accessible={false} importantForAccessibility="no" name={notesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
             </Pressable>
             {notesOpen ? (
               <View style={styles.gap}>
-                <Text style={styles.hint}>Add notes only where something specific is worth sharing. The shared recap goes to everyone who attended.</Text>
+                <Text style={styles.hint}>The shared recap goes to every attending family. Add something personal only when there is a specific observation worth sharing.</Text>
                 <Text style={styles.sourceLabel}>
-                  {notedChildren.length} of {audience.present.length} children have notes.
+                  {notePeople.length} attending · {notedChildren.length} with a private note
                 </Text>
                 {notedChildren.map((person) => (
                   <NoteEditorRow
                     key={person.id}
                     person={person}
                     note={draft.notes.find((item) => item.childId === person.id)}
+                    shared={display}
+                    contact={contactStatus(person.id)}
+                    identity={identity.kicker}
+                    sessionTitle={event.title}
+                    when={identity.when}
+                    deliveryWhen={delivery === 'now' ? 'Immediately after approval' : 'Chosen on the parent preview'}
                     open={noteChildId === person.id}
                     onToggle={() => setNoteChildId(noteChildId === person.id ? null : person.id)}
                     onToggleTag={(tag) => toggleTag(person.id, tag)}
                     onText={(originalText) => upsertNote(person.id, { originalText })}
+                    onRemove={() => persist({ ...draft, notes: draft.notes.filter((item) => item.childId !== person.id) })}
                   />
                 ))}
-                <Button label="Add another attendee" variant="ghost" onPress={() => setAddingNote((open) => !open)} />
-                {addingNote ? (
+                <Text style={styles.modeLabel}>Add note for another attendee</Text>
+                <TextInput
+                  accessibilityLabel="Search attending children"
+                  placeholder="Search attending children"
+                  placeholderTextColor={colors.stone}
+                  value={noteQuery}
+                  onChangeText={(value) => {
+                    setNoteQuery(value);
+                    setAddingNote(true);
+                  }}
+                  style={styles.search}
+                />
+                {addingNote || noteQuery.trim() ? (
                   <View style={styles.wrap}>
-                    {unnamedChildren.map((person) => (
-                      <Chip
-                        key={person.id}
-                        label={person.firstName}
-                        onPress={() => {
-                          setNoteChildId(person.id);
-                          setAddingNote(false);
-                          setNotesOpen(true);
-                        }}
-                      />
-                    ))}
+                    {unnamedChildren
+                      .filter((person) => {
+                        const query = noteQuery.trim().toLowerCase();
+                        if (!query) return true;
+                        return `${person.firstName} ${person.lastName}`.toLowerCase().includes(query);
+                      })
+                      .map((person) => (
+                        <Chip
+                          key={person.id}
+                          label={person.firstName}
+                          onPress={() => {
+                            setNoteChildId(person.id);
+                            setAddingNote(false);
+                            setNoteQuery('');
+                            setNotesOpen(true);
+                          }}
+                        />
+                      ))}
                   </View>
                 ) : null}
                 {noteChildId && !notedChildren.some((person) => person.id === noteChildId) ? (
                   <NoteEditorRow
-                    person={audience.present.find((person) => person.id === noteChildId)!}
+                    person={notePeople.find((person) => person.id === noteChildId)!}
                     note={draft.notes.find((item) => item.childId === noteChildId)}
+                    shared={display}
+                    contact={contactStatus(noteChildId)}
+                    identity={identity.kicker}
+                    sessionTitle={event.title}
+                    when={identity.when}
+                    deliveryWhen={delivery === 'now' ? 'Immediately after approval' : 'Chosen on the parent preview'}
                     open
                     onToggle={() => setNoteChildId(null)}
                     onToggleTag={(tag) => toggleTag(noteChildId, tag)}
                     onText={(originalText) => upsertNote(noteChildId, { originalText })}
+                    onRemove={() => {
+                      persist({ ...draft, notes: draft.notes.filter((item) => item.childId !== noteChildId) });
+                      setNoteChildId(null);
+                    }}
                   />
                 ) : null}
               </View>
@@ -678,18 +720,33 @@ function Receipt({ recap, identity }: { recap: SessionRecap; identity: string })
 function NoteEditorRow({
   person,
   note,
+  shared,
+  contact,
+  identity,
+  sessionTitle,
+  when,
+  deliveryWhen,
   open,
   onToggle,
   onToggleTag,
   onText,
+  onRemove,
 }: {
   person: { id: string; firstName: string; displayName: string };
   note?: IndividualCoachNote;
+  shared: string;
+  contact: string;
+  identity: string;
+  sessionTitle: string;
+  when: string;
+  deliveryWhen: string;
   open: boolean;
   onToggle: () => void;
   onToggleTag: (tag: CoachNoteTag) => void;
   onText: (value: string) => void;
+  onRemove: () => void;
 }) {
+  const privateNote = note ? noteDraftFromTags(note.tags, note.originalText) : '';
   return (
     <View>
       <Pressable
@@ -700,24 +757,39 @@ function NoteEditorRow({
         style={({ pressed }) => [styles.childRow, pressed && styles.pressed]}
       >
         <Text style={styles.childName}>{person.displayName}</Text>
-        <Text style={styles.childMeta}>{note ? noteDraftFromTags(note.tags, note.originalText) || 'Note' : 'Add'}</Text>
+        <Text style={styles.childMeta}>{privateNote || 'Add'}</Text>
       </Pressable>
       {open ? (
         <View style={styles.notePad}>
+          <Text style={styles.childName}>{person.firstName}</Text>
+          <Text style={styles.hint}>{contact}</Text>
+          <Text style={styles.sourceLabel}>Shared session recap</Text>
+          <Text selectable style={styles.polished}>{shared || 'The shared recap is still empty.'}</Text>
+          <Text style={styles.modeLabel}>Add something specifically for {person.firstName}</Text>
           <View style={styles.wrap}>
             {NOTE_TAGS.map((tag) => (
               <Chip key={tag.id} label={tag.label} active={note?.tags.includes(tag.id)} onPress={() => onToggleTag(tag.id)} />
             ))}
           </View>
           <TextInput
-            accessibilityLabel={`Note for ${person.firstName}`}
-            placeholder="Short dictated or typed note"
+            accessibilityLabel={`Add something specifically for ${person.firstName}`}
+            placeholder="A specific observation, if there is one"
             placeholderTextColor={colors.stone}
             value={note?.originalText ?? ''}
             onChangeText={onText}
             style={styles.noteInput}
             multiline
           />
+          {note ? <Button label={`Remove ${person.firstName}’s note`} variant="ghost" onPress={onRemove} /> : null}
+          <View style={styles.preview}>
+            <Text style={styles.subkicker}>SHARED SESSION RECAP</Text>
+            <Text style={styles.previewBody}>{shared || 'The shared recap is still empty.'}</Text>
+            <Text style={styles.subkicker}>FOR {person.firstName.toUpperCase()}</Text>
+            <Text style={styles.previewBody}>{privateNote || 'No private note yet.'}</Text>
+            <Text style={styles.meta}>{ACTIVE_COACH.displayName}</Text>
+            <Text style={styles.meta}>{identity} · {sessionTitle} · {when}</Text>
+            <Text style={styles.meta}>{deliveryWhen}</Text>
+          </View>
         </View>
       ) : null}
     </View>
@@ -827,6 +899,16 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.ink,
     fontSize: 15,
+    ...typography.body,
+  },
+  search: {
+    minHeight: 44,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.paper,
+    paddingHorizontal: spacing.md,
+    color: colors.ink,
     ...typography.body,
   },
   preview: { gap: spacing.sm, paddingVertical: spacing.md },

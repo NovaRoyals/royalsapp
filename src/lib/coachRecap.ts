@@ -1,4 +1,5 @@
 import { formatEventParts, formatEventWhen } from '@/lib/datetime';
+import { familyCanSee } from '@/lib/recapPrivacy';
 import type { AppNotification, AttendanceMark, CoachNoteTag, CoachUpdate, IndividualCoachNote, Person, ScheduleEvent, SessionRecap } from '@/types/domain';
 
 export const RECAP_EVENT_ID = 'kids-2026-09-20';
@@ -186,7 +187,7 @@ export function parentUpdatesFromRecap(
 }
 
 export function parentUpdatesFor(updates: CoachUpdate[], childIds: string[]) {
-  return updates.filter((item) => item.kind === 'session_recap' || (item.childId && childIds.includes(item.childId)));
+  return updates.filter((item) => familyCanSee(item, childIds));
 }
 
 export const KIND_LABEL: Record<CoachUpdate['kind'], string> = {
