@@ -36,7 +36,7 @@ import {
   withRsvp,
 } from '@/lib/operations';
 import { venueById, venueTitle } from '@/data/venues';
-import { clearRegistrationDraft } from '@/lib/registrationDraft';
+import { REGISTRATION_DRAFT_KEY, clearRegistrationDraft } from '@/lib/registrationDraft';
 import type {
   Announcement,
   AnnouncementReply,
@@ -401,7 +401,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     hapticLight();
     setState((current) => {
       const schedule = mergeClubSchedule(current.schedule);
-      if (role === 'guest') return { ...visitorSeed('guest'), introCompleted: true, schedule };
+      if (role === 'guest') {
+        // Going back to a guest must not leave a family's half-finished form on the device.
+        AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY).catch(() => undefined);
+        return { ...visitorSeed('guest'), introCompleted: true, schedule };
+      }
       return keepClubComms({ ...demoSeed(role), schedule }, current);
     });
   }, []);
@@ -1378,7 +1382,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetDemo = useCallback(async () => {
-    await Promise.all([STORAGE_KEY, ...LEGACY_STORAGE_KEYS].map((key) => AsyncStorage.removeItem(key)));
+    await Promise.all([STORAGE_KEY, REGISTRATION_DRAFT_KEY, ...LEGACY_STORAGE_KEYS].map((key) => AsyncStorage.removeItem(key)));
     await resetAnalytics();
     await clearRegistrationDraft();
     try {

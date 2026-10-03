@@ -7,7 +7,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { z } from 'zod';
 
+import { Image } from 'expo-image';
 import { ConfirmationPeak, shareRegistration } from '@/components/interactions/ConfirmationPeak';
+import { royPoseSource } from '@/components/mascot/poses';
 import { useToast } from '@/components/Toast';
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoHousehold, demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
@@ -310,7 +312,7 @@ export default function RegistrationScreen() {
         </View>
         <Text accessibilityLabel={`Step ${activeStepIndex + 1} of ${steps.length}`} style={styles.stepCount}>{activeStepIndex + 1}/{steps.length}</Text>
       </View>
-      {draftSavedAt ? <Text style={styles.draftSaved}>Draft saved · kept on this device for 7 days</Text> : null}
+      {draftSavedAt ? <Text style={styles.draftSaved}>Draft saved on this device for 7 days · the waiver is never saved</Text> : null}
 
       <View style={styles.progress}>
         <Animated.View style={[styles.progressFill, barStyle]} />
@@ -555,13 +557,14 @@ function AdultRegistration({ programId, title }: { programId: string; title: str
   const [submitted, setSubmitted] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const sent = useRef(false);
 
   if (submitted) {
     return (
       <Screen contentStyle={styles.confirmationPage}>
-        <View style={styles.confirmIcon}><Ionicons name="checkmark" size={44} color={colors.white} /></View>
-        <Text style={styles.confirmTitle}>Interest received.</Text>
-        <Text style={styles.confirmCopy}>We saved your demo player registration for {title}.</Text>
+        <Image source={royPoseSource.thumbsup} style={styles.confirmRoy} contentFit="contain" alt="" />
+        <Text style={styles.confirmTitle}>You’re on the list.</Text>
+        <Text style={styles.confirmCopy}>We saved your interest in {title}. This isn’t a place on a team yet. The club reviews the list and follows up using the email you gave. There is nothing to pay.</Text>
         <Button label="Return to programs" onPress={() => router.replace('/(tabs)/programs')} style={styles.fullButton} />
       </Screen>
     );
@@ -574,18 +577,17 @@ function AdultRegistration({ programId, title }: { programId: string; title: str
         <View style={styles.topCopy}><Text style={styles.topEyebrow}>PLAYER REGISTRATION</Text><Text style={styles.topTitle}>{title}</Text></View>
       </View>
       <View style={styles.step}>
-        <Text style={styles.stepTitle}>Tell us about you.</Text>
-        <Text style={styles.stepBody}>This adult flow only collects information relevant to the player and program.</Text>
+        <Text style={styles.stepTitle}>Join the interest list.</Text>
+        <Text style={styles.stepBody}>Tell us who you are and the club will follow up. Registration, waiver and any fee come later, once there is a place for you.</Text>
         <Field label="Player full name" value={name} onChangeText={setName} autoCapitalize="words" />
-        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Field label="Phone" keyboardType="phone-pad" />
-        <Field label="Date of birth" placeholder="YYYY-MM-DD" />
-        <Field label="Playing experience (optional)" multiline numberOfLines={3} />
-        <Button label="Submit player interest" icon="arrow-forward" disabled={!name || !email} onPress={() => {
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" hint="Only the club sees this." />
+        <Button label="Join the list" icon="arrow-forward" disabled={!name.trim() || !email.includes('@')} onPress={() => {
+          if (sent.current) return;
+          sent.current = true;
           submitRegistration({
             programId,
             participantIds: [],
-            participantNames: [name],
+            participantNames: [name.trim()],
             status: 'submitted',
             amountDue: 0,
             discountAmount: 0,
@@ -726,6 +728,7 @@ const styles = StyleSheet.create({
   footerPrice: { color: colors.ink, fontSize: 19, ...typography.heading },
   continue: { flex: 1 },
   confirmationPage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: spacing.xxxl },
+  confirmRoy: { width: 150, height: 150 },
   confirmIcon: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl },
   confirmTitle: { color: colors.ink, fontSize: 35, lineHeight: 39, textAlign: 'center', marginTop: spacing.lg, ...typography.heading },
   confirmCopy: { maxWidth: 440, color: colors.stone, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: spacing.md, ...typography.body },
