@@ -6,6 +6,7 @@ import { AppHeader, Button, DemoBadge, Screen, SectionHeading, StatusPill } from
 import { SeasonDots } from '@/components/interactions/SeasonDots';
 import { demoPrograms, followCatalog } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
+import { paymentLine, statusWord } from '@/lib/registrationFlow';
 import { mayaAttendanceHistory } from '@/lib/attendance';
 import { sessionIdentity } from '@/lib/coachRecap';
 import { can, isStaff } from '@/lib/capabilities';
@@ -136,13 +137,13 @@ export default function ProfileScreen() {
                         <Text style={styles.registrationPeople}>{registration.participantNames.join(', ')}</Text>
                       </View>
                       <StatusPill
-                        label={registration.status}
+                        label={statusWord(registration.status)}
                         tone={registration.status === 'approved' ? 'success' : 'warning'}
                       />
                     </View>
                     <View style={styles.paymentRow}>
                       <Text style={styles.paymentLabel}>Season hub</Text>
-                      <Text style={styles.paymentValue}>${registration.amountDue} · {registration.paymentStatus}</Text>
+                      <Text style={styles.paymentValue}>{paymentLine(registration)}</Text>
                     </View>
                   </Pressable>
                 </View>

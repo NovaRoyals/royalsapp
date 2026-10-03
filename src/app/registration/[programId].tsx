@@ -74,6 +74,7 @@ export default function RegistrationScreen() {
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const restoring = useRef(true);
+  const submitting = useRef(false);
 
   const form = useForm<YouthForm>({
     resolver: zodResolver(youthSchema),
@@ -224,14 +225,17 @@ export default function RegistrationScreen() {
       return;
     }
     if (step === 'payment') {
+      // A second tap before the screen changes must not file a second registration.
+      if (submitting.current) return;
+      submitting.current = true;
       const registration = submitRegistration({
         programId: program.id,
         participantIds: selectedChildren.map((child) => child.id),
         participantNames: selectedChildren.map((child) => `${child.firstName} ${child.lastName}`),
-        status: 'pending',
+        status: 'submitted',
         amountDue: subtotal,
         discountAmount: discount,
-        paymentStatus: 'pending',
+        paymentStatus: 'not_requested',
       });
       setSubmittedId(registration.id);
       setStep('confirmation');
@@ -473,7 +477,7 @@ export default function RegistrationScreen() {
             <CheckRow label="I authorize emergency treatment" checked={field.value} onPress={() => field.onChange(!field.value)} error={fieldState.error?.message} />
           )} />
           <Controller control={form.control} name="signature" render={({ field, fieldState }) => (
-            <Field label="Typed legal signature" placeholder="Full name" value={field.value} onChangeText={field.onChange} error={fieldState.error?.message} hint="Typed name is the demo electronic signature. No payment is processed." />
+            <Field label="Typed legal signature" placeholder="Full name" value={field.value} onChangeText={field.onChange} error={fieldState.error?.message} hint="Your typed name is your electronic signature. Nothing is charged at this step." />
           )} />
         </View>
       )}
@@ -501,20 +505,20 @@ export default function RegistrationScreen() {
 
       {step === 'payment' && (
         <View style={styles.step}>
-          <StatusPill label="Development checkout" tone="warning" />
+          <StatusPill label="Pay after approval" tone="orange" />
           <Text style={styles.stepTitle}>Ready to submit.</Text>
-          <Text style={styles.stepBody}>Payment credentials are not configured, so this build records a pending payment without charging a card.</Text>
+          <Text style={styles.stepBody}>The club reviews every registration first. Nothing is charged today. Once you’re approved, we’ll ask you to pay.</Text>
           <View style={styles.totalCard}>
-            <Text style={styles.totalLabel}>TOTAL DUE</Text>
+            <Text style={styles.totalLabel}>TOTAL AFTER APPROVAL</Text>
             <Text style={styles.totalValue}>${subtotal}</Text>
             {discount > 0 ? <Text style={styles.saved}>You save {dollars(quote.savingsCents)}{promo ? ` · ${promo.badge}` : ' with sibling pricing'}</Text> : null}
             <Text style={styles.saved}>{offer.midSeason ? `$10 a Sunday · ${offer.sessionsLeft} Sundays left` : 'Full season · $10 a Sunday'}</Text>
           </View>
           <View style={styles.demoCheckout}>
-            <Ionicons name="flask-outline" size={24} color={colors.warning} />
+            <Ionicons name="shield-checkmark-outline" size={24} color={colors.warning} />
             <View style={styles.flex}>
-              <Text style={styles.demoTitle}>Demo payment status</Text>
-              <Text style={styles.demoCopy}>Submission creates a local registration marked “pending.” Production checkout will use the payment-provider abstraction.</Text>
+              <Text style={styles.demoTitle}>What happens next</Text>
+              <Text style={styles.demoCopy}>1. The club reviews your registration. 2. You get a message when it’s approved. 3. You pay to confirm the spot.</Text>
             </View>
           </View>
         </View>
@@ -582,10 +586,10 @@ function AdultRegistration({ programId, title }: { programId: string; title: str
             programId,
             participantIds: [],
             participantNames: [name],
-            status: 'pending',
+            status: 'submitted',
             amountDue: 0,
             discountAmount: 0,
-            paymentStatus: 'unpaid',
+            paymentStatus: 'not_requested',
           });
           setSubmitted(true);
         }} />

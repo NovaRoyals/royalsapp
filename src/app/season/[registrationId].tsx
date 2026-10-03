@@ -1,13 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { RegistrationLadder } from '@/components/interactions/RegistrationLadder';
 import { Button, Screen, StatusPill } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { calendarGateway } from '@/services/calendar';
 import { demoPrograms, demoRegistrations, demoTeams } from '@/data/demo';
 import { formatEventParts } from '@/lib/datetime';
 import { safeBack } from '@/lib/nav';
+import { money, paymentLine, registrationLadder } from '@/lib/registrationFlow';
+import { paymentGateway } from '@/services/payments';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -26,6 +31,20 @@ export default function SeasonHubScreen() {
   const first = schedule.find((event) => event.id === registration?.firstSessionEventId) ?? schedule.find((event) => event.programId === registration?.programId);
   const parts = first ? formatEventParts(first.startsAt) : null;
   const assigned = Boolean(registration?.teamId);
+  const ladder = registration ? registrationLadder(registration) : null;
+  const [paying, setPaying] = useState(false);
+
+  async function startPayment() {
+    if (!registration || paying) return;
+    setPaying(true);
+    try {
+      const result = await paymentGateway.beginCheckout({ registrationId: registration.id });
+      if (result.kind === 'unavailable') toast(result.message);
+      else await WebBrowser.openBrowserAsync(result.url);
+    } finally {
+      setPaying(false);
+    }
+  }
 
   if (!allowed) {
     return (
@@ -39,7 +58,7 @@ export default function SeasonHubScreen() {
     );
   }
 
-  if (!registration) {
+  if (!registration || !ladder) {
     return (
       <Screen contentStyle={styles.empty}>
         <Text style={styles.title}>No season yet</Text>
@@ -56,13 +75,24 @@ export default function SeasonHubScreen() {
       </View>
 
       <View style={styles.hero}>
-        <StatusPill label="Registration confirmed" tone="success" />
+        <StatusPill label={ladder.headline} tone={ladder.tone === 'danger' ? 'danger' : ladder.tone === 'success' ? 'success' : ladder.tone === 'warning' ? 'warning' : 'neutral'} />
         <Text style={styles.heroTitle}>{registration.participantNames.join(' & ')}</Text>
-        <Text style={styles.heroBody}>This is the parent’s next screen after checkout — status, coach, first session, documents.</Text>
+        <Text style={styles.heroBody}>{ladder.detail}</Text>
       </View>
 
-      <HubRow icon="checkmark-circle" label="Registration" value={registration.status} />
-      <HubRow icon="card-outline" label="Payment" value={`${registration.paymentStatus} · $${registration.amountDue} · demo, no charge`} />
+      <RegistrationLadder ladder={ladder} />
+      {ladder.actionable ? (
+        <View style={styles.payBlock}>
+          <Button
+            label={registration.paymentStatus === 'failed' ? `Try again · ${money(registration.amountDue)}` : `Pay ${money(registration.amountDue)}`}
+            icon="card-outline"
+            loading={paying}
+            onPress={startPayment}
+          />
+        </View>
+      ) : null}
+
+      <HubRow icon="card-outline" label="Payment" value={paymentLine(registration)} />
       <HubRow icon="shirt-outline" label="Team assignment" value={assigned ? team?.name ?? 'Assigned' : 'Not assigned yet'} />
       <HubRow icon="person-outline" label="Coach" value={registration.coachName ?? team?.coachName ?? 'Assigned after grouping'} />
       <HubRow
@@ -110,6 +140,7 @@ function HubRow({ icon, label, value, last }: { icon: keyof typeof Ionicons.glyp
 }
 
 const styles = StyleSheet.create({
+  payBlock: { marginTop: spacing.md, marginBottom: spacing.lg },
   empty: { minHeight: 400, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
   topbar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },

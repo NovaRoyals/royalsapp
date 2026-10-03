@@ -19,6 +19,7 @@ import { can, canSendSessionRecap } from '@/lib/capabilities';
 import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapAudience, recapBody } from '@/lib/coachRecap';
 import { PAST_DELIVERY_ERROR } from '@/lib/deliveryTiming';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
+import { applyDecision, canWaive, money, normalizeRegistration, waiveFee, type Decision } from '@/lib/registrationFlow';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import {
   auditEntry,
@@ -52,7 +53,6 @@ import type {
   NotificationPrefs,
   Person,
   Registration,
-  RegistrationStatus,
   MatchStoryOverride,
   ScheduleEvent,
   SessionRecap,
@@ -143,7 +143,8 @@ interface AppState extends PersistedState {
   remindNonResponders: (eventId: string) => number;
   recordCheckIn: (eventId: string, mark: AttendanceMark) => void;
   recordAllPresent: (eventId: string, people: Person[]) => void;
-  updateRegistrationStatus: (registrationId: string, status: RegistrationStatus) => void;
+  decideRegistration: (registrationId: string, decision: Decision, reason?: string) => void;
+  waiveRegistrationFee: (registrationId: string, reason: string) => void;
   assignRegistrationTeam: (registrationId: string, teamId: string, coachName: string) => void;
   updateEventResult: (eventId: string, result: string) => void;
   upsertEvent: (event: ScheduleEvent) => void;
@@ -230,7 +231,7 @@ function visitorNotifications() {
 function mergeRegistrations(saved?: Registration[]) {
   const base = saved ?? [];
   const ids = new Set(base.map((item) => item.id));
-  return [...base, ...demoRegistrations.filter((item) => !ids.has(item.id))];
+  return [...base, ...demoRegistrations.filter((item) => !ids.has(item.id))].map(normalizeRegistration);
 }
 
 function visitorSeed(role: UserRole = 'guest'): PersistedState {
@@ -332,7 +333,7 @@ function readPersistedState(saved: string | null): PersistedState {
     persona: 'visitor',
     role,
     household: demoHouseholdLoaded || !parsed.household ? emptyHousehold : parsed.household,
-    registrations: (parsed.registrations ?? []).filter((item) => !item.demo),
+    registrations: (parsed.registrations ?? []).filter((item) => !item.demo).map(normalizeRegistration),
     documents: parsed.documents ?? [],
     messages: parsed.messages ?? [],
     introCompleted: parsed.introCompleted ?? false,
@@ -496,7 +497,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const alert = notice({
       type: 'registration',
       title: 'Registration received',
-      body: `${registration.participantNames.join(', ')} ${registration.participantNames.length > 1 ? 'are' : 'is'} pending review.`,
+      body: `${registration.participantNames.join(', ')} ${registration.participantNames.length > 1 ? 'are' : 'is'} with the club for review. Nothing has been charged.`,
       route: `/season/${created.id}`,
       urgency: 'normal',
       wouldPush: true,
@@ -1044,23 +1045,92 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     haptic('success');
   }, []);
 
-  const updateRegistrationStatus = useCallback((registrationId: string, status: RegistrationStatus) => {
-    setState((current) => ({
-      ...current,
-      registrations: current.registrations.map((registration) =>
-        registration.id === registrationId ? { ...registration, status } : registration,
-      ),
-    }));
+  const decideRegistration = useCallback((registrationId: string, decision: Decision, reason?: string) => {
+    setState((current) => {
+      if (!can(current.role, 'review_registrations')) return current;
+      const target = current.registrations.find((item) => item.id === registrationId);
+      if (!target) return current;
+      const next = applyDecision(target, decision);
+      const who = target.participantNames.join(', ');
+      const words: Record<Decision, string> = { approve: 'approved', waitlist: 'waitlisted', reject: 'not approved', cancel: 'cancelled' };
+      const owes = next.paymentStatus === 'awaiting_payment';
+      const alert = notice({
+        type: 'registration',
+        title: decision === 'approve' ? 'Registration approved' : decision === 'waitlist' ? 'You’re on the waitlist' : decision === 'reject' ? 'Registration update' : 'Registration cancelled',
+        body:
+          decision === 'approve'
+            ? owes
+              ? `${who} ${target.participantNames.length > 1 ? 'are' : 'is'} approved. ${money(next.amountDue)} is due to confirm the spot.`
+              : `${who} ${target.participantNames.length > 1 ? 'are' : 'is'} approved and confirmed.`
+            : `${who}: ${words[decision]}.${reason ? ` ${reason}` : ''}`,
+        route: `/season/${registrationId}`,
+        urgency: 'normal',
+        wouldPush: true,
+        dedupeKey: `registration:${registrationId}:${decision}`,
+      });
+      return {
+        ...current,
+        registrations: current.registrations.map((item) => (item.id === registrationId ? next : item)),
+        notifications: pushUnique(current.notifications, alert),
+        audit: [
+          auditEntry({
+            action: `registration_${decision}`,
+            targetId: registrationId,
+            actorName: 'Club administrator',
+            actorRole: current.role,
+            detail: `${who}: ${target.status} → ${next.status}; payment ${target.paymentStatus} → ${next.paymentStatus}${reason ? `. Reason: ${reason}` : ''}`,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
+    hapticLight();
+  }, []);
+
+  const waiveRegistrationFee = useCallback((registrationId: string, reason: string) => {
+    setState((current) => {
+      if (!can(current.role, 'review_registrations')) return current;
+      const target = current.registrations.find((item) => item.id === registrationId);
+      if (!target || !canWaive(target) || !reason.trim()) return current;
+      const next = waiveFee(target);
+      return {
+        ...current,
+        registrations: current.registrations.map((item) => (item.id === registrationId ? next : item)),
+        audit: [
+          auditEntry({
+            action: 'registration_fee_waived',
+            targetId: registrationId,
+            actorName: 'Club administrator',
+            actorRole: current.role,
+            detail: `${target.participantNames.join(', ')}: ${money(target.amountDue)} waived. Reason: ${reason.trim()}`,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
     hapticLight();
   }, []);
 
   const assignRegistrationTeam = useCallback((registrationId: string, teamId: string, coachName: string) => {
-    setState((current) => ({
-      ...current,
-      registrations: current.registrations.map((registration) =>
-        registration.id === registrationId ? { ...registration, teamId, coachName, status: 'approved' } : registration,
-      ),
-    }));
+    setState((current) => {
+      if (!can(current.role, 'assign_child_team')) return current;
+      return {
+        ...current,
+        registrations: current.registrations.map((registration) =>
+          registration.id === registrationId ? { ...applyDecision(registration, 'approve'), teamId, coachName } : registration,
+        ),
+        audit: [
+          auditEntry({
+            action: 'registration_team_assigned',
+            targetId: registrationId,
+            actorName: 'Club administrator',
+            actorRole: current.role,
+            detail: `Assigned to ${teamId} with ${coachName}`,
+          }),
+          ...current.audit,
+        ],
+      };
+    });
     hapticLight();
   }, []);
 
@@ -1349,7 +1419,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       remindNonResponders,
       recordCheckIn,
       recordAllPresent,
-      updateRegistrationStatus,
+      decideRegistration,
+      waiveRegistrationFee,
       assignRegistrationTeam,
       updateEventResult,
       upsertEvent,
@@ -1388,7 +1459,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       remindNonResponders,
       recordCheckIn,
       recordAllPresent,
-      updateRegistrationStatus,
+      decideRegistration,
+      waiveRegistrationFee,
       assignRegistrationTeam,
       updateEventResult,
       upsertEvent,

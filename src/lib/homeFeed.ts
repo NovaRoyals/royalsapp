@@ -19,7 +19,7 @@ export function enrolledRegistration(registrations: Registration[], childId: str
       item.participantIds.includes(childId) &&
       item.status !== 'cancelled' &&
       item.status !== 'rejected' &&
-      (ENROLLED.includes(item.status) || item.status === 'draft' || item.paymentStatus === 'pending'),
+      (ENROLLED.includes(item.status) || item.status === 'draft' || item.paymentStatus === 'awaiting_payment'),
   );
 }
 

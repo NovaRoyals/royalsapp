@@ -1,7 +1,9 @@
+import { Image } from 'expo-image';
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
+import { royPoseSource } from '@/components/mascot/poses';
 import { Button } from '@/components/ui';
 import { shareContent } from '@/lib/share';
 import { haptic } from '@/lib/haptics';
@@ -26,20 +28,21 @@ export function ConfirmationPeak({
   onShare: () => void;
 }) {
   const reduced = useReducedMotion();
-  const ring = useSharedValue(0.35);
+  const arrive = useSharedValue(0);
   useEffect(() => {
     haptic('success');
-    ring.value = reduced ? 1 : withTiming(1, { duration: 420 });
-  }, [ring, reduced]);
-  const ringStyle = useAnimatedStyle(() => ({
-    borderColor: `rgba(232, 85, 47, ${ring.value})`,
-    transform: [{ scale: 0.96 + ring.value * 0.04 }],
+    arrive.value = reduced ? 1 : withSpring(1, { damping: 14, stiffness: 190 });
+  }, [arrive, reduced]);
+  // Roy pops up once when the registration lands. Nothing loops.
+  const royStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, arrive.value * 1.6),
+    transform: [{ translateY: (1 - arrive.value) * 40 }, { scale: 0.82 + arrive.value * 0.18 }],
   }));
 
   return (
     <View style={styles.wrap}>
-      <Animated.View style={[styles.shield, ringStyle]}>
-        <Text style={styles.mark}>R</Text>
+      <Animated.View style={[styles.roy, royStyle]}>
+        <Image source={royPoseSource.celebrate} style={styles.royImage} contentFit="contain" alt="" />
       </Animated.View>
       <Text style={styles.kicker}>REGISTRATION SUBMITTED</Text>
       <Text style={styles.title}>WELCOME, {name.toUpperCase()}</Text>
@@ -63,19 +66,9 @@ export async function shareRegistration(name: string) {
 }
 
 const styles = StyleSheet.create({
+  roy: { width: 168, height: 168 },
+  royImage: { width: '100%', height: '100%' },
   wrap: { alignItems: 'center', gap: spacing.md, paddingTop: spacing.xl },
-  shield: {
-    width: 88,
-    height: 88,
-    borderRadius: 22,
-    borderWidth: 3,
-    borderColor: colors.orange,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-4deg' }],
-  },
-  mark: { color: colors.orange, fontSize: 42, ...typography.display },
   kicker: { color: colors.stone, fontSize: 11, ...typography.label },
   title: { color: colors.ink, fontSize: 34, lineHeight: 38, textAlign: 'center', ...typography.display },
   program: { color: colors.charcoal, fontSize: 16, textAlign: 'center', ...typography.heading },

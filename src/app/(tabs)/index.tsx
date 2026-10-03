@@ -24,6 +24,7 @@ import { homeGreeting } from '@/lib/greeting';
 import { contextualStory, storyViewerFor } from '@/lib/matchStory';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { joinOffer, offerHeadline } from '@/lib/pricing';
+import { isInReview } from '@/lib/registrationFlow';
 import { tintFor } from '@/lib/tint';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
@@ -68,7 +69,7 @@ export default function HomeScreen() {
   }, []);
   const kidsEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === COACH_TEAM_ID), nowIso);
   const menEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === PLAYER_TEAM_ID), nowIso);
-  const pendingRegs = registrations.filter((item) => item.status === 'pending' || item.paymentStatus === 'pending');
+  const pendingRegs = registrations.filter((item) => isInReview(item.status));
   const closedField = schedule.find((event) => event.fieldStatus === 'closed');
   const parentReg = role === 'guardian' || role === 'admin' ? registrations[0] : undefined;
   const viewingChild = household.children.find((child) => child.id === childId) ?? household.children[0];
@@ -459,10 +460,10 @@ function attentionRows(input: {
     });
   }
   if (input.conflict) push({ id: 'conflict', title: input.conflict.title, detail: input.conflict.detail, href: '/(tabs)/schedule' });
-  if (input.parentReg && input.parentReg.paymentStatus !== 'paid') {
+  if (input.parentReg && (input.parentReg.paymentStatus === 'awaiting_payment' || input.parentReg.paymentStatus === 'failed')) {
     push({
       id: 'payment',
-      title: 'Payment still pending',
+      title: input.parentReg.paymentStatus === 'failed' ? 'Payment didn’t go through' : 'Payment due',
       detail: `${input.parentReg.participantNames.join(', ')} · $${input.parentReg.amountDue}`,
       href: `/season/${input.parentReg.id}`,
     });

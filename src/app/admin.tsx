@@ -10,6 +10,7 @@ import { funnelCounts, getEvents } from '@/lib/analytics';
 import { formatEventParts } from '@/lib/datetime';
 import { ACTIVE_COACH } from '@/lib/coachRecap';
 import { can } from '@/lib/capabilities';
+import { canWaive, paymentLine, statusWord } from '@/lib/registrationFlow';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
@@ -23,7 +24,8 @@ export default function AdminScreen() {
     registrations,
     schedule,
     announcements,
-    updateRegistrationStatus,
+    decideRegistration,
+    waiveRegistrationFee,
     updateEventResult,
     createAnnouncement,
     assignRegistrationTeam,
@@ -41,6 +43,7 @@ export default function AdminScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newVenue, setNewVenue] = useState('');
   const [funnel, setFunnel] = useState<string>('');
+  const [reasonFor, setReasonFor] = useState<{ id: string; kind: 'reject' | 'waive' } | null>(null);
   const [audience, setAudience] = useState<'team' | 'club'>(can(role, 'send_club_announcement') ? 'team' : 'team');
   const allowed = role === 'admin' || role === 'coach' || role === 'competition_manager';
   const canReview = can(role, 'review_registrations');
@@ -130,25 +133,57 @@ export default function AdminScreen() {
       {tab === 'registrations' && canReview && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Registration review</Text>
-          <Text style={styles.sectionCopy}>Status changes persist locally in demo mode.</Text>
-          {registrations.map((registration) => (
-            <View key={registration.id} style={styles.card}>
-              <View style={styles.cardTop}>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{demoPrograms.find((program) => program.id === registration.programId)?.title}</Text>
-                  <Text style={styles.cardMeta}>{registration.participantNames.join(', ')} · ${registration.amountDue}</Text>
+          <Text style={styles.sectionCopy}>Approving asks the family to pay. Every decision is recorded with who made it. Demo mode keeps changes on this device.</Text>
+          {registrations.map((registration) => {
+            const open = reasonFor?.id === registration.id ? reasonFor : null;
+            return (
+              <View key={registration.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View style={styles.flex}>
+                    <Text style={styles.cardTitle}>{demoPrograms.find((program) => program.id === registration.programId)?.title}</Text>
+                    <Text style={styles.cardMeta}>{registration.participantNames.join(', ')}</Text>
+                    <Text style={styles.cardMeta}>{paymentLine(registration)}</Text>
+                  </View>
+                  <StatusPill label={statusWord(registration.status)} tone={registration.status === 'approved' ? 'success' : registration.status === 'rejected' || registration.status === 'cancelled' ? 'danger' : 'warning'} />
                 </View>
-                <StatusPill label={registration.status} tone={registration.status === 'approved' ? 'success' : 'warning'} />
-              </View>
-              <View style={styles.inline}>
-                <Button label="Approve" variant={registration.status === 'approved' ? 'primary' : 'secondary'} onPress={() => updateRegistrationStatus(registration.id, 'approved')} style={styles.flex} />
-                <Button label="Waitlist" variant="secondary" onPress={() => updateRegistrationStatus(registration.id, 'waitlisted')} style={styles.flex} />
-                {can(role, 'assign_child_team') ? (
-                  <Button label="Assign U8" variant="secondary" onPress={() => assignRegistrationTeam(registration.id, 'nova-royals-kids-u8', ACTIVE_COACH.displayName)} />
+                <View style={styles.inline}>
+                  <Button label="Approve" variant={registration.status === 'approved' ? 'primary' : 'secondary'} onPress={() => { setReasonFor(null); decideRegistration(registration.id, 'approve'); }} style={styles.flex} />
+                  <Button label="Waitlist" variant="secondary" onPress={() => { setReasonFor(null); decideRegistration(registration.id, 'waitlist'); }} style={styles.flex} />
+                  <Button label="Decline" variant="secondary" onPress={() => setReasonFor({ id: registration.id, kind: 'reject' })} style={styles.flex} />
+                </View>
+                <View style={styles.inline}>
+                  {canWaive(registration) ? <Button label="Waive fee" variant="ghost" onPress={() => setReasonFor({ id: registration.id, kind: 'waive' })} /> : null}
+                  {can(role, 'assign_child_team') ? (
+                    <Button label="Assign U8" variant="ghost" onPress={() => assignRegistrationTeam(registration.id, 'nova-royals-kids-u8', ACTIVE_COACH.displayName)} />
+                  ) : null}
+                </View>
+                {open ? (
+                  <View style={styles.reasonBox}>
+                    <Text style={styles.cardMeta}>{open.kind === 'reject' ? 'Why isn’t this registration going ahead?' : 'Why is the fee being waived?'}</Text>
+                    <View style={styles.reasonRow}>
+                      {(open.kind === 'reject' ? ['Program is full', 'Outside the age range', 'Duplicate registration'] : ['Scholarship', 'Volunteer family', 'Club decision']).map((reason) => (
+                        <Pressable
+                          key={reason}
+                          accessibilityRole="button"
+                          onPress={() => {
+                            if (open.kind === 'reject') decideRegistration(registration.id, 'reject', reason);
+                            else waiveRegistrationFee(registration.id, reason);
+                            setReasonFor(null);
+                          }}
+                          style={styles.reasonChip}
+                        >
+                          <Text style={styles.reasonText}>{reason}</Text>
+                        </Pressable>
+                      ))}
+                      <Pressable accessibilityRole="button" onPress={() => setReasonFor(null)} style={styles.reasonChip}>
+                        <Text style={styles.reasonText}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 ) : null}
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -260,6 +295,10 @@ function Metric({ value, label }: { value: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  reasonBox: { marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.sand, gap: spacing.sm },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  reasonChip: { minHeight: 40, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  reasonText: { color: colors.ink, fontSize: 12, ...typography.label },
   denied: { flex: 1, minHeight: 600, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
   deniedTitle: { color: colors.ink, fontSize: 24, ...typography.heading },
   deniedCopy: { maxWidth: 400, color: colors.stone, textAlign: 'center', lineHeight: 21, ...typography.body },

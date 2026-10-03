@@ -5,7 +5,20 @@ export type AuthProvider = 'google' | 'apple' | 'email';
 export type CompetitionType = 'league' | 'tournament' | 'friendly' | 'pickup' | 'training';
 export type EventType = 'league_match' | 'tournament_match' | 'friendly' | 'training' | 'open_play' | 'club_event';
 export type RegistrationStatus = 'draft' | 'submitted' | 'pending' | 'approved' | 'waitlisted' | 'rejected' | 'cancelled';
-export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded';
+/**
+ * Where the money is, separate from whether the club approved. `paid` is only ever set
+ * from a verified server event, never from the app.
+ */
+export type PaymentStatus =
+  | 'not_requested'
+  | 'awaiting_payment'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | 'canceled'
+  | 'waived'
+  | 'partially_refunded'
+  | 'refunded';
 export type AttendanceStatus = 'going' | 'maybe' | 'not_going';
 export type FieldStatus = 'open' | 'delayed' | 'inspection_pending' | 'closed' | 'relocated';
 export type NoticeUrgency = 'urgent' | 'high' | 'normal' | 'low';
