@@ -41,6 +41,16 @@ function addDays(ymd: string, days: number) {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
+const LATER_PAGE = 12;
+
+function monthKey(event: ScheduleEvent) {
+  return new Date(event.startsAt).toLocaleString('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit' });
+}
+
+function monthTitle(event: ScheduleEvent) {
+  return new Date(event.startsAt).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'long' });
+}
+
 function toneFor(event: ScheduleEvent, rsvp?: string) {
   if (event.status === 'cancelled' || event.fieldStatus === 'closed' || rsvp === 'not_going') return 'danger' as const;
   if (event.fieldStatus === 'relocated' || event.previousVenue || rsvp === 'maybe') return 'orange' as const;
@@ -57,6 +67,7 @@ export default function ScheduleScreen() {
   const scope: ScheduleScope = storedScope ?? (role === 'guest' ? 'club' : 'mine');
   const [lane, setLane] = useState<ClubLane>('all');
   const [showPast, setShowPast] = useState(false);
+  const [laterLimit, setLaterLimit] = useState(LATER_PAGE);
   const today = clubNowPostedIso().slice(0, 10);
   const weekEnd = addDays(today, 6);
 
@@ -96,7 +107,7 @@ export default function ScheduleScreen() {
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }, [childFilter, childIds, conflicts, household.children, lane, registrations, role, schedule, scope, showPast]);
 
-  const sections = useMemo(() => {
+  const sectionData = useMemo(() => {
     const urgent = visible.filter((event) => !isEventOver(event) && isUrgentEvent(event));
     const urgentIds = new Set(urgent.map((event) => event.id));
     const rest = visible.filter((event) => !urgentIds.has(event.id) && !isEventOver(event));
@@ -106,17 +117,30 @@ export default function ScheduleScreen() {
     const next = afterToday.find((event) => involvesUser(event, role, childIds, registrations));
     const afterNext = next ? afterToday.filter((event) => event.id !== next.id) : afterToday;
     const week = afterNext.filter((event) => event.startsAt.slice(0, 10) <= weekEnd);
-    const later = afterNext.filter((event) => event.startsAt.slice(0, 10) > weekEnd);
+    const laterAll = afterNext.filter((event) => event.startsAt.slice(0, 10) > weekEnd);
+    const later = laterAll.slice(0, laterLimit);
     const earlier = showPast ? visible.filter((event) => isEventOver(event)) : [];
-    return [
-      { id: 'urgent', title: 'Needs attention', events: urgent },
-      { id: 'today', title: 'Today', events: todayEvents },
-      { id: 'next', title: 'Next for you', events: next ? [next] : [] },
-      { id: 'week', title: 'This week', events: week },
-      { id: 'later', title: 'Later', events: later },
-      { id: 'earlier', title: 'Earlier', events: earlier },
-    ].filter((section) => section.events.length > 0);
-  }, [childIds, registrations, role, showPast, today, visible, weekEnd]);
+    // Later is split by month so "SUN 25, THU 29, SUN 1" never reads as one run of dates.
+    const laterByMonth: { id: string; title: string; events: ScheduleEvent[] }[] = [];
+    for (const event of later) {
+      const key = monthKey(event);
+      const last = laterByMonth[laterByMonth.length - 1];
+      if (last && last.id === `later-${key}`) last.events.push(event);
+      else laterByMonth.push({ id: `later-${key}`, title: monthTitle(event), events: [event] });
+    }
+    return {
+      list: [
+        { id: 'urgent', title: 'Needs attention', events: urgent },
+        { id: 'today', title: 'Today', events: todayEvents },
+        { id: 'next', title: 'Next for you', events: next ? [next] : [] },
+        { id: 'week', title: 'This week', events: week },
+        ...laterByMonth,
+        { id: 'earlier', title: 'Earlier', events: earlier },
+      ].filter((section) => section.events.length > 0),
+      hiddenLater: Math.max(0, laterAll.length - later.length),
+    };
+  }, [childIds, laterLimit, registrations, role, showPast, today, visible, weekEnd]);
+  const sections = sectionData.list;
 
   return (
     <Screen tabScene>
@@ -189,6 +213,12 @@ export default function ScheduleScreen() {
         </View>
       ))}
 
+      {sectionData.hiddenLater > 0 ? (
+        <Pressable accessibilityRole="button" onPress={() => setLaterLimit((value) => value + LATER_PAGE)} style={styles.past}>
+          <Text style={styles.pastText}>Show {Math.min(LATER_PAGE, sectionData.hiddenLater)} more · {sectionData.hiddenLater} left</Text>
+        </Pressable>
+      ) : null}
+
       <Pressable accessibilityRole="button" onPress={() => setShowPast((value) => !value)} style={styles.past}>
         <Text style={styles.pastText}>{showPast ? 'Hide earlier events' : 'Show earlier events'}</Text>
       </Pressable>
@@ -228,8 +258,9 @@ function EventRow({
     .find(Boolean);
   const response = event.attendance ? rsvpLabel(event.attendance) : event.supporterGoing ? 'Supporting' : childResponse ? rsvpLabel(childResponse) : names.length ? 'No response' : undefined;
   const waitingNote = personal ? deadlineCopy(event, 0)[0] : undefined;
+  // "Open" on every card said nothing and collided with the Open division, so say only what differs.
   const statusLabel =
-    event.status === 'cancelled' ? 'Cancelled' : event.fieldStatus && event.fieldStatus !== 'open' ? fieldStatusLabel(event.fieldStatus) : response || fieldStatusLabel(event.fieldStatus);
+    event.status === 'cancelled' ? 'Cancelled' : event.fieldStatus && event.fieldStatus !== 'open' ? fieldStatusLabel(event.fieldStatus) : response;
 
   return (
     <Link href={`/event/${event.id}` as Href} asChild>
@@ -237,6 +268,7 @@ function EventRow({
         <View style={styles.date}>
           <Text style={styles.weekday}>{parts.weekday}</Text>
           <Text style={styles.dayNumber}>{parts.day}</Text>
+          <Text style={styles.monthTag}>{parts.month}</Text>
         </View>
         <View style={styles.copy}>
           <Text style={styles.meta}>
@@ -251,7 +283,7 @@ function EventRow({
           {event.previousVenue ? <Text style={styles.previous}>Previous · {event.previousVenue}</Text> : null}
           {isUrgentEvent(event) ? <Text style={styles.attention}>{needsAttentionCopy(event)}</Text> : null}
           {waitingNote && !event.attendance && !own.length ? <Text style={styles.deadline}>{waitingNote}</Text> : null}
-          <View style={styles.pill}><StatusPill label={statusLabel} tone={toneFor(event, event.attendance ?? childResponse)} /></View>
+          {statusLabel ? <View style={styles.pill}><StatusPill label={statusLabel} tone={toneFor(event, event.attendance ?? childResponse)} /></View> : null}
         </View>
       </Pressable>
     </Link>
@@ -272,12 +304,13 @@ const styles = StyleSheet.create({
   empty: { color: colors.stone, fontSize: 15, lineHeight: 22, marginTop: spacing.lg, ...typography.body },
   section: { marginTop: spacing.lg },
   sectionTitle: { color: colors.stone, fontSize: 12, marginBottom: spacing.sm, ...typography.label },
-  group: { backgroundColor: colors.paper, borderRadius: 16 },
+  group: { backgroundColor: colors.paper, borderRadius: 22, overflow: 'hidden' },
   rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.md },
   date: { width: 44, alignItems: 'center', paddingTop: 2 },
   weekday: { color: colors.orangeDark, fontSize: 10, ...typography.label },
   dayNumber: { color: colors.ink, fontSize: 20, fontVariant: ['tabular-nums'], ...typography.heading },
+  monthTag: { color: colors.stone, fontSize: 10, textTransform: 'uppercase', ...typography.label },
   copy: { flex: 1, minWidth: 0, gap: 2 },
   meta: { color: colors.stone, fontSize: 12, ...typography.body },
   title: { color: colors.ink, fontSize: 16, ...typography.heading },
