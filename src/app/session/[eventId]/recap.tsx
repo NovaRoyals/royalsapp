@@ -332,33 +332,50 @@ export default function SessionRecapScreen() {
       : 'This family receives the shared recap.';
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screenWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen contentStyle={styles.screen}>
         <Topbar />
-        <Text style={styles.kicker}>{identity.kicker}</Text>
+        <View style={styles.headRow}>
+          <Text style={[styles.kicker, styles.grow]}>{identity.kicker}</Text>
+          {savedAt && draft.status !== 'sent' ? (
+            <View style={styles.savedPill}>
+              <Ionicons accessible={false} importantForAccessibility="no" name="checkmark-circle" size={14} color={colors.greenBright} />
+              <Text style={styles.saved}>Draft saved</Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.title}>{event.title}</Text>
         <Text style={styles.when}>{identity.when}</Text>
-        <Text style={styles.counts}>
-          Sending to families of {audience.recipients.length} attending {audience.recipients.length === 1 ? 'player' : 'players'}
-        </Text>
-        <Text style={styles.hint}>
-          {audience.presentCount} present · {audience.absentCount} absent
-          {audience.unrecordedCount ? ` · ${audience.unrecordedCount} not recorded` : ''}
-        </Text>
-        <Pressable accessibilityRole="link" accessibilityLabel="Review attendance" onPress={() => router.push(`/event/${event.id}` as never)}>
-          <Text style={styles.link}>Review attendance</Text>
-        </Pressable>
-        {audience.unrecordedCount ? (
-          <Text style={styles.error}>Attendance is still open for {audience.unrecordedCount} {audience.unrecordedCount === 1 ? 'player' : 'players'}. Sending stays off until everyone is marked. Not recorded is not the same as absent.</Text>
-        ) : null}
-        {audience.missingContact.length ? (
-          <Text style={styles.error}>
-            No linked parent contact: {audience.missingContact.map((person) => person.firstName).join(', ')}. {audience.missingContact.length === 1 ? 'That family is' : 'Those families are'} not included in the {audience.recipients.length}.
-          </Text>
-        ) : null}
+
+        <View style={styles.audience}>
+          <View style={styles.audienceTop}>
+            <View style={styles.audienceIcon}>
+              <Ionicons accessible={false} importantForAccessibility="no" name="people-outline" size={19} color={colors.greenBright} />
+            </View>
+            <View style={styles.grow}>
+              <Text style={styles.counts}>
+                Sending to families of {audience.recipients.length} attending {audience.recipients.length === 1 ? 'player' : 'players'}
+              </Text>
+              <Text style={styles.audienceSub}>
+                {audience.presentCount} present · {audience.absentCount} absent
+                {audience.unrecordedCount ? ` · ${audience.unrecordedCount} not recorded` : ''}
+              </Text>
+            </View>
+            <Pressable accessibilityRole="link" accessibilityLabel="Review attendance" onPress={() => router.push(`/event/${event.id}` as never)} hitSlop={8}>
+              <Text style={styles.link}>Review attendance</Text>
+            </Pressable>
+          </View>
+          {audience.unrecordedCount ? (
+            <Text style={styles.error}>Attendance is still open for {audience.unrecordedCount} {audience.unrecordedCount === 1 ? 'player' : 'players'}. Sending stays off until everyone is marked. Not recorded is not the same as absent.</Text>
+          ) : null}
+          {audience.missingContact.length ? (
+            <Text style={styles.error}>
+              No linked parent contact: {audience.missingContact.map((person) => person.firstName).join(', ')}. {audience.missingContact.length === 1 ? 'That family is' : 'Those families are'} not included in the {audience.recipients.length}.
+            </Text>
+          ) : null}
+        </View>
 
         {offline ? <Text style={styles.banner}>Offline — drafts save on this device.</Text> : null}
-        {savedAt && draft.status !== 'sent' ? <Text style={styles.saved}>Draft saved</Text> : null}
 
         {view === 'receipt' && draft.status === 'sent' ? (
           <Receipt recap={draft} identity={identity.kicker} />
@@ -444,8 +461,11 @@ export default function SessionRecapScreen() {
           </View>
         ) : (
           <View style={styles.phase}>
-            <Text style={styles.phaseTitle}>Shared recap</Text>
-            <Text style={styles.hint}>Demo only. No microphone audio is captured. {voiceLabel(voicePhase)}</Text>
+            <View style={styles.sectionHead}>
+              <Text style={styles.phaseTitle}>Shared recap</Text>
+              {display || recapTranscript(draft) ? <Text style={styles.sectionNote}>Exactly what families receive</Text> : null}
+            </View>
+            <Text style={styles.hintSmall}>Demo only. No microphone audio is captured. {voiceLabel(voicePhase)}</Text>
             {!display ? (
               <Button
                 label={voicePhase === 'recording' || voicePhase === 'transcribing' ? voiceLabel(voicePhase) : 'Record session recap'}
@@ -459,8 +479,7 @@ export default function SessionRecapScreen() {
               <Button label="Try transcription again" variant="secondary" onPress={recordVoice} disabled={!canDraft} />
             ) : null}
             {display || recapTranscript(draft) ? (
-              <>
-                <Text style={styles.hint}>This is exactly what families will receive.</Text>
+              <View style={styles.editor}>
                 <TextInput
                   accessibilityLabel="Session recap"
                   multiline
@@ -470,69 +489,71 @@ export default function SessionRecapScreen() {
                   style={styles.composer}
                   textAlignVertical="top"
                 />
-                <Button
-                  label={voicePhase === 'recording' || voicePhase === 'transcribing' ? voiceLabel(voicePhase) : 'Record again'}
-                  variant="ghost"
-                  onPress={recordVoice}
-                  disabled={!canDraft || voicePhase === 'recording' || voicePhase === 'transcribing'}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: polishOpen }}
-                  accessibilityLabel="Polish with AI"
-                  onPress={() => setPolishOpen((open) => !open)}
-                  style={({ pressed }) => [styles.advanced, pressed && styles.pressed]}
-                >
-                  <Text style={styles.advancedLabel}>Polish with AI</Text>
-                  <Ionicons name={polishOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
-                </Pressable>
+                <View style={styles.actions}>
+                  <Pill
+                    icon="mic-outline"
+                    label={voicePhase === 'recording' || voicePhase === 'transcribing' ? voiceLabel(voicePhase) : 'Record again'}
+                    onPress={recordVoice}
+                    disabled={!canDraft || voicePhase === 'recording' || voicePhase === 'transcribing'}
+                  />
+                  <Pill
+                    icon="sparkles-outline"
+                    label="Polish with AI"
+                    active={polishOpen}
+                    expanded={polishOpen}
+                    onPress={() => setPolishOpen((open) => !open)}
+                  />
+                  {recapTranscript(draft) && recapTranscript(draft) !== display ? (
+                    <Pill
+                      icon="document-text-outline"
+                      label={showTranscript ? 'Hide original transcript' : 'View original transcript'}
+                      onPress={() => setShowTranscript((open) => !open)}
+                    />
+                  ) : null}
+                  {recapTranscript(draft) && recapTranscript(draft) !== display ? (
+                    <Pill
+                      icon="refresh-outline"
+                      label="Restore original"
+                      onPress={() => persist({ ...draft, message: recapTranscript(draft), polishedText: '', polishMode: null })}
+                    />
+                  ) : null}
+                </View>
                 {polishOpen ? (
-                  <View accessibilityRole="radiogroup" accessibilityLabel="AI transformation" style={styles.gap}>
-                    <Text style={styles.hint}>Rewrites your words. It will not add drills, scores, or named children.</Text>
-                    {POLISH_MODES.map((mode) => {
-                      const selected = draft.polishMode === mode.id && Boolean(draft.polishedText);
-                      return (
-                        <Pressable
-                          key={mode.id}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected, disabled: !canDraft || polishing }}
-                          accessibilityLabel={mode.label}
-                          disabled={!canDraft || polishing}
-                          onPress={() => polish(mode.id)}
-                          style={({ pressed }) => [styles.mode, selected && styles.modeOn, pressed && styles.pressed]}
-                        >
-                          <Ionicons
-                            name={selected ? 'checkmark-circle' : 'ellipse-outline'}
-                            size={22}
-                            color={selected ? colors.ink : colors.stone}
+                  <View style={styles.polishBox}>
+                    <View accessibilityRole="radiogroup" accessibilityLabel="AI transformation" style={styles.actions}>
+                      {POLISH_MODES.map((mode) => {
+                        const selected = draft.polishMode === mode.id && Boolean(draft.polishedText);
+                        return (
+                          <Pill
+                            key={mode.id}
+                            role="radio"
+                            label={mode.label}
+                            hint={mode.hint}
+                            active={selected}
+                            disabled={!canDraft || polishing}
+                            onPress={() => polish(mode.id)}
                           />
-                          <View style={styles.modeCopy}>
-                            <Text style={styles.modeLabel}>{mode.label}</Text>
-                            <Text style={styles.modeHint}>{mode.hint}</Text>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                    {polishing ? <Text style={styles.hint}>Polishing…</Text> : null}
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.hintSmall}>
+                      Rewrites your words. It will not add drills, scores, or named children.
+                      {(() => {
+                        const chosen = POLISH_MODES.find((mode) => draft.polishMode === mode.id && Boolean(draft.polishedText));
+                        return chosen ? ` ${chosen.hint}.` : '';
+                      })()}
+                    </Text>
+                    {polishing ? <Text style={styles.hintSmall}>Polishing…</Text> : null}
                     {polishError ? <Text style={styles.error}>{polishError}</Text> : null}
                   </View>
                 ) : null}
-                {recapTranscript(draft) && recapTranscript(draft) !== display ? (
-                  <>
-                    <Button
-                      label={showTranscript ? 'Hide original transcript' : 'View original transcript'}
-                      variant="ghost"
-                      onPress={() => setShowTranscript((open) => !open)}
-                    />
-                    {showTranscript ? <Text selectable style={styles.polished}>{recapTranscript(draft)}</Text> : null}
-                    <Button
-                      label="Restore original"
-                      variant="ghost"
-                      onPress={() => persist({ ...draft, message: recapTranscript(draft), polishedText: '', polishMode: null })}
-                    />
-                  </>
+                {showTranscript && recapTranscript(draft) && recapTranscript(draft) !== display ? (
+                  <View style={styles.polishBox}>
+                    <Text style={styles.sectionNote}>ORIGINAL TRANSCRIPT</Text>
+                    <Text selectable style={styles.polished}>{recapTranscript(draft)}</Text>
+                  </View>
                 ) : null}
-              </>
+              </View>
             ) : null}
 
             <Pressable
@@ -540,9 +561,19 @@ export default function SessionRecapScreen() {
               accessibilityState={{ expanded: notesOpen }}
               accessibilityLabel="Personalize for a child, optional"
               onPress={() => setNotesOpen((open) => !open)}
-              style={({ pressed }) => [styles.advanced, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
             >
-              <Text style={styles.advancedLabel}>Personalize for a child — optional</Text>
+              <View style={styles.audienceIcon}>
+                <Ionicons accessible={false} importantForAccessibility="no" name="person-outline" size={18} color={colors.greenBright} />
+              </View>
+              <View style={styles.grow}>
+                <Text style={styles.advancedLabel}>Personalize for a child</Text>
+                <Text style={styles.audienceSub}>
+                  {notedChildren.length
+                    ? `${notedChildren.length} private ${notedChildren.length === 1 ? 'note' : 'notes'} · optional`
+                    : 'Optional · everyone gets the shared recap'}
+                </Text>
+              </View>
               <Ionicons accessible={false} importantForAccessibility="no" name={notesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
             </Pressable>
             {notesOpen ? (
@@ -761,10 +792,7 @@ function NoteEditorRow({
       </Pressable>
       {open ? (
         <View style={styles.notePad}>
-          <Text style={styles.childName}>{person.firstName}</Text>
-          <Text style={styles.hint}>{contact}</Text>
-          <Text style={styles.sourceLabel}>Shared session recap</Text>
-          <Text selectable style={styles.polished}>{shared || 'The shared recap is still empty.'}</Text>
+          <Text style={styles.hintSmall}>{contact}</Text>
           <Text style={styles.modeLabel}>Add something specifically for {person.firstName}</Text>
           <View style={styles.wrap}>
             {NOTE_TAGS.map((tag) => (
@@ -793,6 +821,45 @@ function NoteEditorRow({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/** A small rounded action: the editor's Record again / Polish with AI row, and the polish modes. */
+function Pill({
+  label,
+  icon,
+  onPress,
+  disabled,
+  active,
+  expanded,
+  role = 'button',
+  hint,
+}: {
+  label: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  expanded?: boolean;
+  role?: 'button' | 'radio';
+  hint?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole={role}
+      accessibilityLabel={hint ? `${label}, ${hint}` : label}
+      accessibilityState={
+        role === 'radio'
+          ? { checked: Boolean(active), selected: Boolean(active), disabled: Boolean(disabled) }
+          : { expanded, selected: expanded ? active : undefined, disabled: Boolean(disabled) }
+      }
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.pill, active && styles.pillOn, disabled && styles.pillOff, pressed && !disabled && styles.pressed]}
+    >
+      {icon ? <Ionicons accessible={false} importantForAccessibility="no" name={icon} size={15} color={active ? colors.white : colors.ink} /> : null}
+      <Text style={[styles.pillText, active && styles.pillTextOn]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -835,32 +902,49 @@ function blankRecap(eventId: string): SessionRecap {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.cream },
+  screenWrap: { flex: 1, backgroundColor: colors.cream },
+  grow: { flex: 1, minWidth: 0 },
   screen: { paddingBottom: 48 },
   topbar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   topTitle: { color: colors.ink, fontSize: 15, ...typography.heading },
-  kicker: { color: colors.inkSoft, fontSize: 11, marginTop: spacing.lg, ...typography.label, letterSpacing: 1.2 },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 36, marginTop: spacing.sm, ...typography.display },
-  when: { color: colors.stone, fontSize: 14, marginTop: spacing.sm, ...typography.body },
-  counts: { color: colors.ink, fontSize: 16, marginTop: spacing.md, ...typography.heading },
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.md },
+  kicker: { color: colors.inkSoft, fontSize: 11, ...typography.label, letterSpacing: 1.2 },
+  title: { color: colors.ink, fontSize: 28, lineHeight: 32, marginTop: 4, ...typography.display },
+  when: { color: colors.stone, fontSize: 14, marginTop: 4, ...typography.body },
+  audience: { marginTop: 14, padding: 14, borderRadius: 22, backgroundColor: colors.paper, gap: 10 },
+  audienceTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  audienceIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
+  audienceSub: { color: colors.stone, fontSize: 12, lineHeight: 17, marginTop: 1, ...typography.body },
+  counts: { color: colors.ink, fontSize: 15, lineHeight: 20, ...typography.heading },
   banner: { marginTop: spacing.md, color: colors.warning, ...typography.body },
-  saved: { marginTop: spacing.sm, color: colors.stone, fontSize: 12, ...typography.body },
-  phase: { marginTop: spacing.xxl, gap: spacing.md },
-  phaseTitle: { color: colors.ink, fontSize: 22, ...typography.heading },
+  savedPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  saved: { color: colors.stone, fontSize: 12, ...typography.body },
+  phase: { marginTop: spacing.lg, gap: 12 },
+  phaseTitle: { color: colors.ink, fontSize: 20, ...typography.heading },
+  sectionHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  sectionNote: { color: colors.stone, fontSize: 12, ...typography.label },
   hint: { color: colors.stone, fontSize: 14, lineHeight: 20, ...typography.body },
+  hintSmall: { color: colors.stone, fontSize: 12, lineHeight: 17, ...typography.body },
+  editor: { borderRadius: 22, backgroundColor: colors.paper, overflow: 'hidden' },
   composer: {
-    minHeight: 160,
-    borderRadius: radius.input,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.paper,
-    padding: spacing.lg,
+    minHeight: 120,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
     color: colors.ink,
     fontSize: 16,
     lineHeight: 24,
     ...typography.body,
   },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingBottom: 12 },
+  polishBox: { gap: 8, paddingHorizontal: 12, paddingBottom: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 12 },
+  pill: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.mint },
+  pillOn: { backgroundColor: colors.ink },
+  pillOff: { opacity: 0.45 },
+  pillText: { color: colors.ink, fontSize: 13, ...typography.label },
+  pillTextOn: { color: colors.white },
+  rowCard: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 22, backgroundColor: colors.paper },
   advanced: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   advancedLabel: { color: colors.ink, fontSize: 15, flex: 1, paddingRight: spacing.md, ...typography.heading },
   gap: { gap: spacing.sm },
@@ -915,5 +999,5 @@ const styles = StyleSheet.create({
   previewBody: { color: colors.ink, fontSize: 16, lineHeight: 24, ...typography.body },
   meta: { color: colors.stone, fontSize: 13, ...typography.body },
   error: { color: colors.danger, fontSize: 14, ...typography.body },
-  link: { color: colors.orangeDark, fontSize: 14, marginTop: spacing.sm, ...typography.label },
+  link: { color: colors.orangeDark, fontSize: 13, ...typography.label },
 });
