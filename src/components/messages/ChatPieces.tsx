@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/motion';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -18,12 +19,19 @@ export function Avatar({ label, tint = 'mint', size = 44, filled = false }: { la
   );
 }
 
+/** Pops once when it appears or the number goes up, so a new message is noticed. Never loops. */
 export function UnreadBadge({ count }: { count: number }) {
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (count > 0 && !reduced) scale.value = withSequence(withTiming(1.3, { duration: 140 }), withTiming(1, { duration: 200 }));
+  }, [count, reduced, scale]);
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   if (count <= 0) return null;
   return (
-    <View accessibilityLabel={`${count} unread`} style={styles.badge}>
+    <Animated.View accessibilityLabel={`${count} unread`} style={[styles.badge, popStyle]}>
       <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
-    </View>
+    </Animated.View>
   );
 }
 
