@@ -47,6 +47,7 @@ Quality has not been measured on real recaps. Once a key exists, run about ten s
 
 ## Status
 
+- **On your hosted Supabase project (2026-10-03):** the database functions are applied and the function is deployed. Called without the secret it answers `503 not_configured`, which is correct. It starts working the moment `OPENROUTER_API_KEY` is set.
 - Built and tested here: the database functions, all the logic, the function running in the real local Edge runtime (signed-out, parent, wrong team's coach, forged token and a real coach all behave correctly), the app's client and its error wording.
 - **Not yet tested: a live answer from OpenRouter.** That needs the key. Until then the app, in demo mode, uses a deterministic tidier that does not call a model.
 - The app must be connected to Supabase (real sign-in, real team ids) before the Polish button reaches this function.
@@ -54,5 +55,5 @@ Quality has not been measured on real recaps. Once a key exists, run about ten s
 ## Switching it on (needs your accounts)
 
 1. Create an OpenRouter key with a monthly spending limit.
-2. In the Supabase dashboard: Edge Functions → Secrets → add `OPENROUTER_API_KEY`. You enter it; it never goes in chat.
-3. Apply the database migrations (`supabase db push`), then deploy the function (`supabase functions deploy coach-polish`).
+2. In the Supabase dashboard: Edge Functions → Secrets → add `OPENROUTER_API_KEY`. You enter it; it never goes in chat. (Or in your own terminal: `npx supabase secrets set OPENROUTER_API_KEY=...`.)
+3. Migrations and the function are already applied and deployed. After a change, `npx supabase db push` and `npx supabase functions deploy coach-polish` redeploy them.

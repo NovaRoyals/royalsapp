@@ -10,7 +10,10 @@ The app looks and behaves like the finished product, but it still runs on **demo
 
 **No.** `src/lib/supabase.ts` only creates a client when `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are set. Neither is set, so the app reports "Demo mode" and every screen reads and writes local state (`AppProvider`, saved in AsyncStorage). A read-only Supabase repository exists for programs, teams, schedule, competitions and the older announcements table, but no screen writes through it.
 
-What Supabase *is* right now: a database running on this computer, used to prove the migrations work.
+What Supabase *is* right now:
+
+- A database running on this computer, used to prove the migrations work.
+- **Your hosted project** (`NovaRoyals's Project`, US East, Free plan, Postgres 17). As of 2026-10-03 it has the schema: all 9 migrations applied with `supabase db push`, row-level security on all 61 tables, signed-out visitors refused by every function, and no errors from Supabase's security advisor. The `coach-polish` function is deployed there. It holds **no data**: `supabase/seed.sql` is invented demo content (marked `demo`) and was deliberately not loaded.
 
 ## What Docker was for, and whether it is finished
 
@@ -48,8 +51,9 @@ Docker runs the local Supabase stack (Postgres plus the API layer). I used it to
 
 ### Needs you (accounts and keys)
 
+0. **OpenRouter key**, entered by you as the Edge Function secret `OPENROUTER_API_KEY`, to switch the AI polish on (see `docs/AI_POLISH.md`).
 1. **Stripe, test mode only.** Create the account, then give me the test publishable key for the app and put the secret key and webhook secret in Supabase secrets (never in the repo). I can then build and test `create-payment`, the webhook, refunds and receipts. A payment is only called working once server, webhook, saved result and screen have all been tested end to end.
-2. **A hosted Supabase project** (free tier is fine to start). Gives the URL and publishable key for the app, and a place to run `supabase db push`.
+2. ~~A hosted Supabase project~~ Done. The CLI is logged in and linked to it.
 3. **An AI provider key** (OpenRouter, as the design says) for the real coach polish, stored as an Edge Function secret.
 4. **Apple Developer and Google Play accounts** and an EAS login, for Apple Pay, a real build, and push notifications.
 
