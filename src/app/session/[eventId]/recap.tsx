@@ -15,6 +15,7 @@ import { Button, Chip, Screen } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { demoSchedule, demoTeams } from '@/data/demo';
 import { getCoachPolishProvider, type RecapPolishMode } from '@/lib/ai/coachPolish';
+import { PolishError } from '@/lib/ai/edgePolish';
 import { can, canCreateSessionRecap, canSendSessionRecap } from '@/lib/capabilities';
 import {
   ACTIVE_COACH,
@@ -209,13 +210,15 @@ export default function SessionRecapScreen() {
         original: source,
         mode,
         sessionLabel: identity.kicker || event.title,
+        teamId: event.teamId,
+        recapId: draft.id,
       });
       if (!result.text.trim()) throw new Error('empty');
       persist(applyPolish({ ...draft, transcript, originalText: transcript }, { ok: true, text: result.text, mode }));
       toast(mode === 'verbatim' ? 'Kept as written' : 'Polished text is now in the editor');
-    } catch {
+    } catch (error) {
       persist(applyPolish(draft, { ok: false }));
-      setPolishError('Could not polish right now. The text in the editor is unchanged.');
+      setPolishError(error instanceof PolishError ? error.message : 'Could not polish right now. The text in the editor is unchanged.');
     } finally {
       setPolishing(false);
     }

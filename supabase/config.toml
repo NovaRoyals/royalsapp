@@ -377,12 +377,17 @@ enabled = true
 # `oneshot` — fallback mode if hot reload causes issues (e.g. in large repos or with symlinks).
 policy = "per_worker"
 # Port to attach the Chrome inspector for debugging edge functions.
-inspector_port = 8083
+inspector_port = 8183
 # The Deno major version to use.
 deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# The function checks the signed-in user itself (see coach-polish/index.ts); the gateway check
+# does not understand the tokens issued under the new API keys.
+[functions.coach-polish]
+verify_jwt = false
 
 [analytics]
 enabled = true

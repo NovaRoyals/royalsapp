@@ -40,7 +40,7 @@ Docker runs the local Supabase stack (Postgres plus the API layer). I used it to
 ## Built only as a stand-in, so it will not work for real until replaced
 
 - **Voice recording.** The button plays a fake "recording" and fills in a sample transcript. No microphone audio is captured. The screen says so.
-- **AI polish.** A deterministic text tidier (`src/lib/ai/coachPolish.ts`). It does not call an AI model. `supabase/functions/coach-polish/index.ts` is a comment-only placeholder describing what it must do (authenticate the coach, strip children's names, call the model, log, rate-limit, never send to families).
+- **AI polish.** In demo mode, a deterministic text tidier (`src/lib/ai/coachPolish.ts`) that does not call a model. The real path is built: the `coach-polish` Edge Function (DeepSeek V4 Flash through OpenRouter), its database functions, rate limit, audit log and 28 tests, and it runs correctly in the local Edge runtime. What has **not** been tested is a live answer from OpenRouter, because that needs your key. See `docs/AI_POLISH.md`.
 - **Push notifications.** The app marks which notifications *would* push and which cannot be muted, but nothing is delivered to a phone. Needs a development build and Apple and Google credentials.
 - **Messages are not live.** They are local; there is no realtime delivery between two phones.
 

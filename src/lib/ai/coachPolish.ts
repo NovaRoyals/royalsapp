@@ -1,28 +1,26 @@
 /**
- * Coach recap polish — client talks to this interface only.
+ * Coach recap polish — the app talks to this interface only.
  *
- * Production path (not wired in this slice):
- *   Expo app → authenticated Supabase Edge Function `coach-polish` → OpenRouter
+ * Connected to a Supabase project, polish goes through the authenticated Edge Function
+ * `coach-polish` (supabase/functions), which hides names, calls the model through OpenRouter,
+ * checks the answer against what the coach wrote, rate-limits, and logs. The OpenRouter key lives
+ * only as an Edge Function secret (`OPENROUTER_API_KEY`), never in the app or in git.
  *
- * TODO(server): store the OpenRouter key as a Supabase Edge Function secret
- * (`OPENROUTER_API_KEY`). Never put it in Expo env, git, or this client.
- *
- * The Edge Function must:
- * - verify the caller is an assigned coach for the session (RLS + membership)
- * - accept only original recap text, polish mode, and session label
- * - replace child names with {player} before the model sees them
- * - request structured JSON { text, rejectedClaims[] }
- * - reject invented claims (new drills, injuries, scores, named kids)
- * - rate-limit per coach
- * - log original, generated, and later coach-approved versions
- * - never send to families; send is a separate coach-approved action
+ * Without a project (demo mode) a deterministic tidier stands in, so the screen still works. It
+ * does not call a model.
  */
+import { supabase } from '../supabase';
+import { createEdgePolish } from './edgePolish';
+
 export type RecapPolishMode = 'cleanup' | 'warm' | 'verbatim';
 
 export type PolishRequest = {
   original: string;
   mode: RecapPolishMode;
   sessionLabel: string;
+  /** The team's database id. Needed by the real function, ignored by the demo stand-in. */
+  teamId?: string;
+  recapId?: string;
 };
 
 export type PolishResult = {
@@ -70,6 +68,15 @@ export const mockCoachPolish: CoachPolishProvider = {
   },
 };
 
+const edgePolish = createEdgePolish(async (body) => {
+  const { data, error } = await supabase!.functions.invoke('coach-polish', { body });
+  if (!error) return { status: 200, data };
+  // A non-2xx answer arrives as an error carrying the HTTP response; the status says what went wrong.
+  const response = (error as { context?: Response }).context;
+  return { status: response?.status ?? 0, data: await response?.json().catch(() => null) };
+});
+
 export function getCoachPolishProvider(): CoachPolishProvider {
-  return mockCoachPolish;
+  if (!supabase) return mockCoachPolish;
+  return { polish: (request) => edgePolish.polish({ ...request, teamId: request.teamId ?? '' }) };
 }
