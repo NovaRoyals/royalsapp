@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen } from '@/components/ui';
+import { EmptyState, Screen } from '@/components/ui';
 import { KIND_LABEL, parentUpdatesFor } from '@/lib/coachRecap';
 import { formatEventWhen } from '@/lib/datetime';
 import { hydrateTrace } from '@/lib/hydrateTrace';
@@ -40,7 +40,7 @@ export default function CoachUpdatesScreen() {
       </View>
       <Text style={styles.lead}>Notes from training — encouraging, specific, and only about your child when a private note is included.</Text>
       {!items.length ? (
-        <Text style={styles.empty}>No coach updates yet. After a session, families receive a recap only when the coach chooses to send it.</Text>
+        <EmptyState pose="lookRight" title="No coach updates yet" message="After a session, families get a recap when the coach chooses to send it." />
       ) : (
         items.map((item) => <UpdateRow key={item.id} item={item} />)
       )}

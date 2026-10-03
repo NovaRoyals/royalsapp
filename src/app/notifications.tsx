@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Screen } from '@/components/ui';
+import { EmptyState, Screen } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { notificationsForRole } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
@@ -49,9 +49,12 @@ export default function NotificationsScreen() {
       </View>
       <View style={styles.preferences}>
         <Ionicons name="notifications-outline" size={21} color={colors.orangeDark} />
-        <View style={styles.flex}><Text style={styles.preferenceTitle}>Reminders are ready</Text><Text style={styles.preferenceCopy}>Expo notification channels are configured without requiring push credentials locally.</Text></View>
+        <View style={styles.flex}><Text style={styles.preferenceTitle}>Reminders</Text><Text style={styles.preferenceCopy}>Game-day changes, field closures and coach updates show up here first.</Text></View>
       </View>
       <Text style={styles.section}>RECENT</Text>
+      {visible.length === 0 ? (
+        <EmptyState pose="thumbsup" title="You’re all caught up" message="New game-day changes and coach updates will land here." />
+      ) : null}
       <View style={styles.list}>
         {visible.map((notice, index) => (
           <Animated.View key={notice.id} entering={reduced || index > 0 ? undefined : FadeInDown.duration(240)}>
@@ -72,7 +75,7 @@ export default function NotificationsScreen() {
                 {!notice.read ? <View style={styles.dot} /> : null}
               </View>
               <Text style={styles.noticeBody}>{notice.body}</Text>
-              <Text style={styles.time}>{formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}{notice.type === 'announcement' ? ' · Club-wide' : ''}{notice.urgency ? ` · ${notice.urgency}` : ''}{notice.wouldPush ? ' · would push' : ''}</Text>
+              <Text style={styles.time}>{formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}{notice.type === 'announcement' ? ' · Club-wide' : ''}{notice.urgency ? ` · ${notice.urgency}` : ''}</Text>
             </View>
           </Pressable>
           </Animated.View>

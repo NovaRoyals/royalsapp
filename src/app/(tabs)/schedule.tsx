@@ -2,7 +2,7 @@ import { Href, Link } from 'expo-router';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppHeader, Screen, StatusPill } from '@/components/ui';
+import { AppHeader, EmptyState, Screen, StatusPill } from '@/components/ui';
 import { clubNowPostedIso, formatEventParts, isEventOver } from '@/lib/datetime';
 import {
   childNamesOnEvent,
@@ -164,7 +164,7 @@ export default function ScheduleScreen() {
       ) : null}
 
       {sections.length === 0 && !(scope === 'mine' && role === 'guest') ? (
-        <Text style={styles.empty}>{showPast ? 'Nothing earlier in this view.' : 'Nothing coming up in this view.'}</Text>
+        <EmptyState pose="lookLeft" title={showPast ? 'Nothing earlier here' : 'Quiet for now'} message={showPast ? 'No earlier events match this view.' : 'Nothing is scheduled in this view yet. Try another filter.'} />
       ) : null}
 
       {sections.map((section) => (

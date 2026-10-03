@@ -21,6 +21,10 @@ export const ROY_POSES = [
   'folded',
   'kick',
   'run',
+  'lookLeft',
+  'lookRight',
+  'pointDown',
+  'ball',
 ] as const;
 
 export type RoyPose = (typeof ROY_POSES)[number];
@@ -46,4 +50,8 @@ export const royPoseSource: Record<RoyPose, ImageSource> = {
   folded: require('@/assets/mascot/roy/folded.png'),
   kick: require('@/assets/mascot/roy/kick.png'),
   run: require('@/assets/mascot/roy/run.png'),
+  lookLeft: require('@/assets/mascot/roy/look-left.png'),
+  lookRight: require('@/assets/mascot/roy/look-right.png'),
+  pointDown: require('@/assets/mascot/roy/point-down.png'),
+  ball: require('@/assets/mascot/roy/soccer-ball.png'),
 };

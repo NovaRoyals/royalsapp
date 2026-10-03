@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Link, type Href, usePathname } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { royPoseSource, type RoyPose } from '@/components/mascot/poses';
 import { TabScene } from '@/components/motion';
 import { haptic } from '@/lib/haptics';
 import { notificationsForRole } from '@/lib/membership';
@@ -281,20 +283,40 @@ export function DemoBadge() {
   );
 }
 
+/**
+ * Roy shows up only where something is genuinely empty or finished: no events, no news,
+ * nothing wrong. He is a still image, never looping, and never on an error that needs
+ * attention (use a banner for those).
+ */
 export function EmptyState({
+  pose,
   icon,
   title,
   message,
+  action,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  pose?: RoyPose;
+  icon?: keyof typeof Ionicons.glyphMap;
   title: string;
-  message: string;
+  message?: string;
+  action?: React.ReactNode;
 }) {
   return (
     <View style={styles.empty}>
-      <Ionicons name={icon} size={28} color={colors.orange} />
+      {pose ? (
+        <Image
+          source={royPoseSource[pose]}
+          style={styles.emptyRoy}
+          contentFit="contain"
+          accessible={false}
+          accessibilityIgnoresInvertColors
+        />
+      ) : icon ? (
+        <Ionicons accessible={false} importantForAccessibility="no" name={icon} size={28} color={colors.orange} />
+      ) : null}
       <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyMessage}>{message}</Text>
+      {message ? <Text style={styles.emptyMessage}>{message}</Text> : null}
+      {action ? <View style={styles.emptyAction}>{action}</View> : null}
     </View>
   );
 }
@@ -444,6 +466,8 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { marginTop: spacing.md, color: colors.ink, fontSize: 17, ...typography.heading },
   emptyMessage: { marginTop: spacing.xs, textAlign: 'center', color: colors.stone, lineHeight: 20, ...typography.body },
+  emptyRoy: { width: 120, height: 120, marginBottom: spacing.xs },
+  emptyAction: { marginTop: spacing.lg, alignSelf: 'stretch' },
 });
 
 export const textStyles = StyleSheet.create({

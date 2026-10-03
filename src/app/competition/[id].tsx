@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Field, Screen, StatusPill } from '@/components/ui';
+import { Button, EmptyState, Field, Screen, StatusPill } from '@/components/ui';
 import { demoCompetitions, demoSchedule } from '@/data/demo';
 import { formatEventParts } from '@/lib/datetime';
 import { safeBack } from '@/lib/nav';
@@ -116,7 +116,7 @@ export default function CompetitionDetailScreen() {
               <Text style={styles.fixtureResult}>{fixture.result ?? formatEventParts(fixture.startsAt).time}</Text>
             </View>
           )) : (
-            <View style={styles.empty}><Ionicons name="calendar-outline" size={26} color={colors.orange} /><Text style={styles.emptyTitle}>Fixtures publish after registration</Text><Text style={styles.emptyText}>Approved teams, groups and field slots will appear here.</Text></View>
+            <EmptyState pose="idea" title="Fixtures publish after registration" message="Approved teams, groups and field slots will appear here." />
           )}
         </View>
       )}
