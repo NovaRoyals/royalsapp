@@ -5,7 +5,6 @@ import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Wordmark } from '@/components/brand/Wordmark';
-import type { RoyState } from '@/components/mascot/types';
 import { FlowShell } from '@/components/onboarding/FlowShell';
 import { ChoiceCard, FlowField, OrRule, ProviderButton, type Tint } from '@/components/onboarding/Pieces';
 import { Button } from '@/components/ui';
@@ -52,9 +51,6 @@ export default function OnboardingScreen() {
 
   const [step, setStep] = useState<Step>(signInIntent || introCompleted ? 'account' : 'welcome');
   const [intent, setIntent] = useState<'create' | 'signin'>(signInIntent ? 'signin' : 'create');
-  // Roy walks in, waves a few times, then stands still. He never loops.
-  const [royState, setRoyState] = useState<RoyState>('enter');
-  const [pickedRoyState, setPickedRoyState] = useState<RoyState | undefined>(undefined);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -176,7 +172,6 @@ export default function OnboardingScreen() {
   const pickRole = (choice: ClubRelationship) => {
     if (advancing) return;
     setRoleChoice(choice);
-    setPickedRoyState('bounce');
     haptic('light');
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
     const delay = reduced ? 80 : 280;
@@ -198,15 +193,7 @@ export default function OnboardingScreen() {
         fill
         above={<Wordmark light />}
         stepKey="welcome"
-        roy={{
-          pose: royState === 'wave' ? 'wave' : 'idle',
-          size: 268,
-          decorative: true,
-          state: royState,
-          onComplete: (done) => {
-            if (done === 'enter') setRoyState('wave');
-          },
-        }}
+        roy={{ pose: 'excited', size: 268, decorative: true }}
         title={'Same Lion.\nBigger Tomorrows.'}
         subtitle="Soccer, cricket, kids and community. Come play, cheer, or help out."
         footer={
@@ -234,7 +221,7 @@ export default function OnboardingScreen() {
         stepKey="account"
         step={progress?.step}
         total={progress?.total}
-        roy={{ pose: 'wave', size: 120, decorative: true }}
+        roy={{ pose: 'smile', size: 120, decorative: true }}
         title={intent === 'signin' ? 'Welcome back' : 'Let’s get you in'}
         subtitle={intent === 'signin' ? 'Sign in the way you did last time.' : 'Use an account you already have, or sign up with email. It takes a minute.'}
       >
@@ -327,7 +314,7 @@ export default function OnboardingScreen() {
         step={progress?.step}
         total={progress?.total}
         stepKey="identity"
-        roy={{ pose: 'smile', size: 140, decorative: true }}
+        roy={{ pose: 'wink', size: 140, decorative: true }}
         title="Nice to meet you. What should we call you?"
         subtitle={email ? `Signed in as ${email}` : 'You can change this later in Profile.'}
         footer={<Button label="Continue" onPress={submitIdentity} />}
@@ -375,7 +362,7 @@ export default function OnboardingScreen() {
       stepKey="role"
       step={progress?.step}
       total={progress?.total}
-      roy={{ pose: 'thumbsup', size: 128, decorative: true, state: pickedRoyState }}
+      roy={{ pose: 'point', size: 128, decorative: true }}
       title="Who’s joining the club?"
       subtitle="This shapes your Home. You can add more roles any time."
     >

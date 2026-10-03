@@ -5,14 +5,14 @@ import { Button } from '@/components/ui';
 import { mapsProvider, type MapDestination } from '@/services/maps';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
-export function DirectionsStub({ destination }: { destination: MapDestination }) {
+export function DirectionsStub({ destination, bare = false }: { destination: MapDestination; bare?: boolean }) {
   const [open, setOpen] = useState(false);
   const preview = mapsProvider.directions(destination);
 
   return (
     <View style={styles.wrap}>
-      <Button label={preview.label} icon="navigate-outline" variant="secondary" onPress={() => setOpen(true)} />
-      {open ? (
+      {bare ? null : <Button label={preview.label} icon="navigate-outline" variant="secondary" onPress={() => setOpen(true)} />}
+      {open || bare ? (
         <View style={styles.preview}>
           <Text selectable style={styles.place}>{preview.destination}</Text>
           <Text selectable style={styles.detail}>{preview.detail}</Text>

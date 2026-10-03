@@ -2,14 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Href, Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CloudBackdrop } from '@/components/brand/CloudBackdrop';
 import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
 import { RsvpChoices } from '@/components/interactions/RsvpChoices';
 import { SupporterButton } from '@/components/interactions/SupporterButton';
 import { CalendarPrep } from '@/components/operations/CalendarPrep';
-import { DirectionsStub } from '@/components/operations/DirectionsStub';
 import { PressableScale } from '@/components/motion';
 import { useToast } from '@/components/Toast';
 import { Button, Screen, StatusPill } from '@/components/ui';
@@ -41,6 +40,7 @@ import {
   type RsvpBucket,
 } from '@/lib/operations';
 import { shareContent } from '@/lib/share';
+import { directionsUrl } from '@/services/maps';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 import { useApp } from '@/state/AppProvider';
 import { colors, gradients, layout, radius, spacing, tints, typography } from '@/theme/tokens';
@@ -85,6 +85,7 @@ export default function EventDetailScreen() {
   const toast = useToast();
   const event = schedule.find((item) => item.id === id) ?? schedule[0];
   const [bucket, setBucket] = useState<RsvpBucket | 'all'>('all');
+  const [sheet, setSheet] = useState<'calendar' | null>(null);
   const weather = weatherForEvent(event);
   const place = venueById(event.venueId);
   const team = demoTeams.find((item) => item.id === event.teamId);
@@ -165,6 +166,33 @@ export default function EventDetailScreen() {
           </Link>
         ) : null}
         <EventHero event={event} />
+
+        <View style={styles.quickRow}>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={`Get directions to ${place?.name ?? event.venue}`}
+            onPress={() => Linking.openURL(directionsUrl({ name: place?.name ?? event.venue, address: event.address ?? place?.address }, Platform.OS)).catch(() => toast('Couldn’t open Maps. The address is under Plan your visit.'))}
+            style={[styles.quick, styles.quickPrimary]}
+          >
+            <Ionicons accessible={false} name="navigate" size={18} color={colors.white} />
+            <Text style={styles.quickPrimaryText}>Directions</Text>
+          </PressableScale>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Add to calendar"
+            accessibilityState={{ expanded: sheet === 'calendar' }}
+            onPress={() => setSheet(sheet === 'calendar' ? null : 'calendar')}
+            style={styles.quick}
+          >
+            <Ionicons accessible={false} name="calendar-outline" size={18} color={colors.ink} />
+            <Text style={styles.quickText}>Calendar</Text>
+          </PressableScale>
+        </View>
+        {sheet === 'calendar' ? (
+          <View style={styles.sheet}>
+            <CalendarPrep event={event} season={season.length ? season : [event]} />
+          </View>
+        ) : null}
 
         {event.fieldStatus === 'closed' || event.status === 'cancelled' || event.previousVenue || event.pendingChange ? (
           <View style={[styles.banner, event.fieldStatus === 'closed' || event.status === 'cancelled' ? styles.bannerDanger : styles.bannerAttention]}>
@@ -486,12 +514,9 @@ export default function EventDetailScreen() {
             ]}
           />
           <Pressable accessibilityRole="link" onPress={() => event.venueId && router.push(`/venue/${event.venueId}` as Href)} style={styles.linkHit}>
-            <Text style={styles.link}>Venue details</Text>
+            <Text style={styles.link}>Venue details →</Text>
           </Pressable>
-          <DirectionsStub destination={{ name: place?.name ?? event.venue, address: event.address, fieldNumber: place?.fieldNumber }} />
         </View>
-
-        <CalendarPrep event={event} season={season.length ? season : [event]} />
 
         {event.coachName && event.type === 'training' && (role === 'guardian' || role === 'adult_player') ? (
           <Button label="Contact coach" variant="ghost" onPress={() => router.push('/message/coach-priya' as never)} style={styles.action} />
@@ -694,7 +719,7 @@ function logisticsRows(
 
 const styles = StyleSheet.create({
   fill: { flex: 1, paddingHorizontal: 0 },
-  scroll: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: spacing.lg, paddingBottom: 220 },
+  scroll: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: spacing.lg, paddingBottom: 120 },
   topbar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   topTitle: { color: colors.stone, fontSize: 13, ...typography.label },
@@ -718,25 +743,32 @@ const styles = StyleSheet.create({
   glanceItem: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   glanceItemWide: { width: '47%', flexGrow: 1 },
   glanceSpan: { width: '100%', flexGrow: 1 },
-  privacy: { color: colors.stone, fontSize: 14, lineHeight: 20, marginTop: spacing.xl, ...typography.body },
+  privacy: { color: colors.stone, fontSize: 13, lineHeight: 18, marginTop: 10, paddingHorizontal: 4, ...typography.body },
   glanceCopy: { flex: 1, minWidth: 0, gap: 1 },
   factLabel: { color: colors.stone, fontSize: 11, ...typography.label },
   factValue: { color: colors.ink, fontSize: 15, lineHeight: 20, ...typography.bodyMedium },
   responseLine: { marginTop: spacing.lg, gap: 2 },
   result: { color: colors.ink, fontSize: 20, marginTop: spacing.sm, ...typography.heading },
-  block: { marginTop: spacing.md, gap: spacing.sm, padding: spacing.lg, borderRadius: 22, backgroundColor: colors.paper },
-  card: { marginTop: spacing.md, padding: spacing.lg, borderRadius: 22, backgroundColor: colors.paper },
-  cardTitle: { color: colors.ink, fontSize: 17, marginBottom: spacing.xs, ...typography.heading },
+  block: { marginTop: 10, gap: spacing.sm, padding: 14, borderRadius: 22, backgroundColor: colors.paper },
+  card: { marginTop: 10, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 4, borderRadius: 22, backgroundColor: colors.paper },
+  cardTitle: { color: colors.ink, fontSize: 16, marginBottom: 2, ...typography.heading },
   flexOne: { flex: 1, minWidth: 0 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 9 },
   detailDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  detailIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
-  aboutCard: { marginTop: spacing.md, padding: spacing.lg, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 72 },
+  detailIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
+  aboutCard: { marginTop: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 64 },
   aboutIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   aboutTitle: { color: colors.ink, fontSize: 16, ...typography.heading },
   aboutBody: { color: colors.charcoal, fontSize: 13, marginTop: 2, ...typography.body },
-  hero: { marginTop: spacing.sm, borderRadius: 26, overflow: 'hidden', backgroundColor: colors.greenDeep },
-  heroBody: { padding: spacing.xl, gap: spacing.md },
+  hero: { marginTop: 4, borderRadius: 26, overflow: 'hidden', backgroundColor: colors.greenDeep },
+  quickRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  quick: { flex: 1, minHeight: 48, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
+  quickPrimary: { backgroundColor: colors.ink, borderColor: colors.ink },
+  quickText: { color: colors.ink, fontSize: 14, ...typography.label },
+  quickPrimaryText: { color: colors.white, fontSize: 14, ...typography.label },
+  sheet: { marginTop: 10, padding: 14, borderRadius: 22, backgroundColor: colors.paper, gap: spacing.sm },
+  sheetNote: { color: colors.charcoal, fontSize: 13, lineHeight: 18, ...typography.body },
+  heroBody: { padding: 18, gap: 10 },
   heroKicker: { color: colors.mint, fontSize: 11, ...typography.label, letterSpacing: 1.6 },
   heroTeams: { gap: 6 },
   heroTeam: { color: colors.white, fontSize: 28, lineHeight: 32, ...typography.heading },

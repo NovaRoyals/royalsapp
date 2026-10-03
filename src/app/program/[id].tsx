@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, Link, router, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -56,6 +56,8 @@ export default function ProgramDetailScreen() {
       ? [{ title: 'Squad', people: team.roster }]
       : [];
 
+  const [faqOpen, setFaqOpen] = useState<number | null>(null);
+
   useEffect(() => {
     track('program_viewed', { programId: program.id });
   }, [program.id]);
@@ -89,6 +91,24 @@ export default function ProgramDetailScreen() {
           {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPane('matches')} /> : null}
         </View>
       ) : null}
+
+      <View style={styles.cta}>
+        <View style={styles.flex}>
+          <Text style={styles.ctaLabel}>{fxaSide ? 'FXA Sports' : program.registrationOpen ? 'Registration open' : 'Interest list'}</Text>
+          <Text style={styles.ctaPrice}>{kidsPromo ? `From ${dollars(kidsOffer!.firstChildCents)} · ${kidsPromo.badge}` : program.priceLabel}</Text>
+        </View>
+        <Button
+          label={fxaSide ? 'Register on FXA Sports' : program.registrationOpen ? 'Register' : 'Join list'}
+          icon="arrow-forward"
+          onPress={() => {
+            if (fxaSide) {
+              Linking.openURL(FXA[fxaSide].detailsUrl);
+              return;
+            }
+            router.push(`/registration/${program.id}`);
+          }}
+        />
+      </View>
 
       {pane === 'matches' && cricket ? (
         <CricketMatchesPane />
@@ -192,7 +212,7 @@ export default function ProgramDetailScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>What’s included</Text>
-        <View style={styles.includes}>
+        <View style={[styles.includes, styles.includesCard]}>
           {program.includes.map((item) => (
             <View key={item} style={styles.includeRow}>
               <View style={styles.check}><Ionicons name="checkmark" size={14} color={colors.white} /></View>
@@ -216,31 +236,28 @@ export default function ProgramDetailScreen() {
 
       <View style={styles.faq}>
         <Text style={styles.sectionTitle}>Good to know</Text>
-        <Text style={styles.faqQuestion}>Can I save my information?</Text>
-        <Text style={styles.body}>Yes. Profiles stay attached to your account so future registrations are much faster.</Text>
-        <Text style={styles.faqQuestion}>When is my place confirmed?</Text>
-        <Text style={styles.body}>You’ll see a live registration status and receive an update after review and payment.</Text>
+        {[
+          { q: 'Can I save my information?', a: 'Yes. Profiles stay attached to your account so future registrations are much faster.' },
+          { q: 'When is my place confirmed?', a: 'The club reviews each registration first, then asks you to pay. You’ll see your status live and get a message at each step.' },
+        ].map((item, index) => (
+          <Pressable
+            key={item.q}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: faqOpen === index }}
+            onPress={() => setFaqOpen(faqOpen === index ? null : index)}
+            style={styles.faqItem}
+          >
+            <View style={styles.faqHead}>
+              <Text style={styles.faqQuestion}>{item.q}</Text>
+              <Ionicons accessible={false} name={faqOpen === index ? 'chevron-up' : 'chevron-down'} size={18} color={colors.stone} />
+            </View>
+            {faqOpen === index ? <Text style={styles.faqAnswer}>{item.a}</Text> : null}
+          </Pressable>
+        ))}
       </View>
         </>
       )}
 
-      <View style={styles.cta}>
-        <View style={styles.flex}>
-          <Text style={styles.ctaLabel}>{fxaSide ? 'FXA Sports' : program.registrationOpen ? 'Registration open' : 'Interest list'}</Text>
-          <Text style={styles.ctaPrice}>{kidsPromo ? `From ${dollars(kidsOffer!.firstChildCents)} · ${kidsPromo.badge}` : program.priceLabel}</Text>
-        </View>
-        <Button
-          label={fxaSide ? 'Register on FXA Sports' : program.registrationOpen ? 'Register' : 'Join list'}
-          icon="arrow-forward"
-          onPress={() => {
-            if (fxaSide) {
-              Linking.openURL(FXA[fxaSide].detailsUrl);
-              return;
-            }
-            router.push(`/registration/${program.id}`);
-          }}
-        />
-      </View>
     </Screen>
   );
 }
@@ -258,7 +275,7 @@ function InfoRow({
 }) {
   return (
     <View style={[styles.infoRow, !last && styles.infoBorder]}>
-      <View style={styles.infoIcon}><Ionicons name={icon} size={19} color={colors.orangeDark} /></View>
+      <View style={styles.infoIcon}><Ionicons accessible={false} name={icon} size={18} color={colors.ink} /></View>
       <View style={styles.flex}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoValue}>{value}</Text>
@@ -269,15 +286,15 @@ function InfoRow({
 
 const styles = StyleSheet.create({
   page: { paddingHorizontal: 0 },
-  hero: { minHeight: 390, justifyContent: 'space-between', overflow: 'hidden' },
+  hero: { minHeight: 300, justifyContent: 'space-between', overflow: 'hidden' },
   back: { marginTop: spacing.md, marginLeft: spacing.lg, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper },
-  heroCopy: { padding: spacing.xl, gap: spacing.sm },
-  title: { color: colors.white, fontSize: 38, lineHeight: 41, ...typography.display },
+  heroCopy: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: 6 },
+  title: { color: colors.white, fontSize: 36, lineHeight: 38, ...typography.display },
   audience: { color: colors.sand, fontSize: 12, ...typography.label, letterSpacing: 0.6 },
-  paneRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xl, marginTop: spacing.lg },
+  paneRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: 12 },
   cricketBadge: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   groupTitle: { color: colors.stone, fontSize: 10, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 4, ...typography.label, textTransform: 'uppercase' },
-  squadWrap: { paddingHorizontal: spacing.xl, marginTop: spacing.lg, gap: spacing.md },
+  squadWrap: { paddingHorizontal: spacing.lg, marginTop: 12, gap: 10 },
   squadMeta: { gap: 4 },
   nextCard: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   nextDate: { width: 54, height: 62, borderRadius: radius.md, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
@@ -293,30 +310,34 @@ const styles = StyleSheet.create({
   position: { color: colors.stone, fontSize: 11, marginTop: 2, ...typography.body },
   privateRoster: { minHeight: 48, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   privateText: { color: colors.stone, fontSize: 10, ...typography.body },
-  facts: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: -20, borderRadius: radius.md, backgroundColor: colors.paper, paddingVertical: spacing.lg },
-  factsAfterTabs: { marginTop: spacing.md },
+  facts: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: 10, borderRadius: 22, backgroundColor: colors.paper, paddingVertical: 14 },
+  factsAfterTabs: { marginTop: 10 },
   fact: { flex: 1, paddingHorizontal: spacing.sm, borderRightWidth: 1, borderRightColor: colors.border },
   factLabel: { color: colors.stone, fontSize: 9, textTransform: 'uppercase', textAlign: 'center', ...typography.label },
   factValue: { color: colors.ink, fontSize: 13, textAlign: 'center', marginTop: 4, ...typography.heading },
-  section: { paddingHorizontal: spacing.xl, marginTop: spacing.xxl },
-  sectionTitle: { color: colors.ink, fontSize: 21, marginBottom: spacing.md, ...typography.heading },
-  body: { color: colors.stone, fontSize: 15, lineHeight: 23, ...typography.body },
-  infoCard: { marginHorizontal: spacing.xl, marginTop: spacing.xxl, borderRadius: radius.md, backgroundColor: colors.paper, overflow: 'hidden' },
-  infoRow: { padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  infoBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  infoIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.orangeSoft, alignItems: 'center', justifyContent: 'center' },
+  section: { paddingHorizontal: spacing.lg, marginTop: 18 },
+  sectionTitle: { color: colors.ink, fontSize: 18, marginBottom: 8, ...typography.heading },
+  body: { color: colors.stone, fontSize: 14, lineHeight: 21, ...typography.body },
+  infoCard: { marginHorizontal: spacing.lg, marginTop: 18, borderRadius: 22, backgroundColor: colors.paper, overflow: 'hidden' },
+  infoRow: { paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  infoBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  infoIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
   infoLabel: { color: colors.stone, fontSize: 10, textTransform: 'uppercase', ...typography.label },
   infoValue: { color: colors.ink, fontSize: 14, marginTop: 2, ...typography.heading },
-  includes: { gap: spacing.md },
-  includeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  check: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success },
+  includes: { gap: 10 },
+  includesCard: { padding: 14, borderRadius: 22, backgroundColor: colors.paper },
+  includeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  check: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success },
   includeText: { color: colors.charcoal, fontSize: 14, ...typography.body },
-  safetyCard: { marginHorizontal: spacing.xl, marginTop: spacing.xxl, padding: spacing.lg, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, backgroundColor: colors.orangeSoft },
+  safetyCard: { marginHorizontal: spacing.lg, marginTop: 18, padding: 14, borderRadius: 22, flexDirection: 'row', gap: spacing.md, backgroundColor: colors.goldSoft },
   safetyTitle: { color: colors.orangeDark, fontSize: 15, ...typography.heading },
   safetyText: { color: colors.charcoal, fontSize: 12, lineHeight: 18, marginTop: 3, ...typography.body },
-  faq: { marginHorizontal: spacing.xl, marginTop: spacing.xxl },
-  faqQuestion: { color: colors.ink, fontSize: 15, marginTop: spacing.lg, marginBottom: spacing.xs, ...typography.heading },
-  cta: { margin: spacing.xl, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  faq: { marginHorizontal: spacing.lg, marginTop: 18, marginBottom: spacing.xl },
+  faqItem: { paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8, borderRadius: 18, backgroundColor: colors.paper },
+  faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  faqAnswer: { color: colors.stone, fontSize: 14, lineHeight: 20, marginTop: 8, ...typography.body },
+  faqQuestion: { flex: 1, color: colors.ink, fontSize: 15, ...typography.heading },
+  cta: { marginHorizontal: spacing.lg, marginTop: 12, paddingVertical: 12, paddingLeft: 16, paddingRight: 12, borderRadius: 26, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   ctaLabel: { color: colors.orange, fontSize: 11, textTransform: 'uppercase', ...typography.label },
   ctaPrice: { color: colors.white, fontSize: 12, marginTop: 4, ...typography.body },
   flex: { flex: 1 },

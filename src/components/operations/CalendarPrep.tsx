@@ -40,7 +40,7 @@ export function CalendarPrep({ event, season }: { event: ScheduleEvent; season: 
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: spacing.lg, gap: spacing.sm },
+  wrap: { gap: spacing.sm },
   second: { marginTop: spacing.xs },
   preview: { marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.sand, gap: 6 },
   kicker: { color: colors.stone, fontSize: 11, ...typography.label },
