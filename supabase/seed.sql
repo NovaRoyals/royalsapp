@@ -77,6 +77,30 @@ insert into public.program_pricing (
   ('20000000-0000-0000-0000-000000000001', 'First child', 12000, 'standard', 1),
   ('20000000-0000-0000-0000-000000000001', 'Additional sibling', 6000, 'sibling', 2);
 
+-- Joining after the first session costs $10 for each Sunday still to come, never less than
+-- $60 for the first child. The app shows this as a percentage off. See private.quote_registration.
+insert into public.program_pricing (
+  program_id, label, amount_cents, pricing_type
+) values
+  ('20000000-0000-0000-0000-000000000001', 'Per remaining session', 1000, 'per_session'),
+  ('20000000-0000-0000-0000-000000000001', 'Lowest first-child price', 6000, 'floor');
+
+-- Placeholder consent language, identical to what the app shows. It is product copy, not
+-- legal advice, and needs club and counsel approval before real families sign it.
+insert into public.waivers (program_id, title, body, version, waiver_type, required) values
+  (
+    '20000000-0000-0000-0000-000000000001',
+    'Participation consent',
+    'I am the parent or authorized guardian of the listed participant(s). I understand that athletic activities involve risk of injury and consent to their participation in this Nova Royals program.',
+    'placeholder-2026.1', 'participation', true
+  ),
+  (
+    '20000000-0000-0000-0000-000000000001',
+    'Emergency treatment authorization',
+    'If I cannot be reached, I authorize Nova Royals representatives to obtain reasonable emergency medical treatment for the listed participant(s). I understand that I remain responsible for resulting costs.',
+    'placeholder-2026.1', 'emergency_treatment', true
+  );
+
 insert into public.competitions (
   id, sport_id, season_id, title, competition_type, organizer_name,
   is_external, description, format, starts_on, ends_on, location_name,
