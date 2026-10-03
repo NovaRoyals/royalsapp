@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Wordmark } from '@/components/brand/Wordmark';
+import type { RoyState } from '@/components/mascot/types';
 import { FlowShell } from '@/components/onboarding/FlowShell';
 import { ChoiceCard, FlowField, OrRule, ProviderButton, type Tint } from '@/components/onboarding/Pieces';
 import { Button } from '@/components/ui';
@@ -25,11 +27,11 @@ const ROLE_CHOICES: {
   title: string;
   detail: string;
 }[] = [
-  { id: 'parent', icon: 'people-outline', tint: 'green', title: 'Parent / guardian', detail: 'Register a child and follow Kids Soccer.' },
-  { id: 'player', icon: 'football-outline', tint: 'green', title: 'Adult player', detail: 'Find Open, 35+, women’s, or cricket sides.' },
-  { id: 'supporter', icon: 'heart-outline', tint: 'green', title: 'Supporter / volunteer', detail: 'Follow matches and help around the club.' },
-  { id: 'coach', icon: 'clipboard-outline', tint: 'green', title: 'Coach', detail: 'Request staff access. Tools stay locked until assigned.' },
-  { id: 'manager', icon: 'briefcase-outline', tint: 'green', title: 'Team manager', detail: 'Request operations access. Assignment is required.' },
+  { id: 'parent', icon: 'people-outline', tint: 'amber', title: 'Parent or guardian', detail: 'Sign up your kids and keep track of their Sundays.' },
+  { id: 'player', icon: 'football-outline', tint: 'green', title: 'Adult player', detail: 'Find your Open, 35+, women’s or cricket side.' },
+  { id: 'supporter', icon: 'heart-outline', tint: 'rose', title: 'Supporter or volunteer', detail: 'Cheer on the matches and lend a hand around the club.' },
+  { id: 'coach', icon: 'clipboard-outline', tint: 'blue', title: 'Coach', detail: 'Request staff access. Tools unlock once an admin assigns you.' },
+  { id: 'manager', icon: 'briefcase-outline', tint: 'teal', title: 'Team manager', detail: 'Request operations access. An admin assigns it.' },
 ];
 
 const PROVIDER_IDENTITY: Record<Exclude<AuthProvider, 'email'>, { firstName: string; lastName: string; email: string }> = {
@@ -49,6 +51,10 @@ export default function OnboardingScreen() {
   const returnTo = (params.returnTo as Href | undefined) ?? '/(tabs)';
 
   const [step, setStep] = useState<Step>(signInIntent || introCompleted ? 'account' : 'welcome');
+  const [intent, setIntent] = useState<'create' | 'signin'>(signInIntent ? 'signin' : 'create');
+  // Roy walks in, waves a few times, then stands still. He never loops.
+  const [royState, setRoyState] = useState<RoyState>('enter');
+  const [pickedRoyState, setPickedRoyState] = useState<RoyState | undefined>(undefined);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -170,6 +176,7 @@ export default function OnboardingScreen() {
   const pickRole = (choice: ClubRelationship) => {
     if (advancing) return;
     setRoleChoice(choice);
+    setPickedRoyState('bounce');
     haptic('light');
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
     const delay = reduced ? 80 : 280;
@@ -190,16 +197,25 @@ export default function OnboardingScreen() {
         tone="dark"
         fill
         above={<Wordmark light />}
-        roy={{ pose: 'wave', size: 268, decorative: true }}
+        stepKey="welcome"
+        roy={{
+          pose: royState === 'wave' ? 'wave' : 'idle',
+          size: 268,
+          decorative: true,
+          state: royState,
+          onComplete: (done) => {
+            if (done === 'enter') setRoyState('wave');
+          },
+        }}
         title={'Same Lion.\nBigger Tomorrows.'}
-        subtitle="Soccer, cricket, kids, and community — all in one place."
+        subtitle="Soccer, cricket, kids and community. Come play, cheer, or help out."
         footer={
           <>
-            <Button label="Get started" variant="light" onPress={() => setStep('account')} />
+            <Button label="Get started" variant="light" onPress={() => { setIntent('create'); setStep('account'); }} />
             <Pressable accessibilityRole="button" onPress={guest} style={styles.secondaryDark}>
               <Text style={styles.secondaryDarkText}>Explore the club</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => setStep('account')} style={styles.quiet}>
+            <Pressable accessibilityRole="button" onPress={() => { setIntent('signin'); setStep('account'); }} style={styles.quiet}>
               <Text style={styles.quietText}>
                 Already have an account? <Text style={styles.quietStrong}>Sign in</Text>
               </Text>
@@ -215,10 +231,12 @@ export default function OnboardingScreen() {
       <FlowShell
         onBack={back}
         onSkip={introCompleted ? undefined : guest}
+        stepKey="account"
         step={progress?.step}
         total={progress?.total}
-        title={signInIntent ? 'Sign in' : 'Create or connect an account'}
-        subtitle="Use a provider you already have, or continue with email."
+        roy={{ pose: 'wave', size: 120, decorative: true }}
+        title={intent === 'signin' ? 'Welcome back' : 'Let’s get you in'}
+        subtitle={intent === 'signin' ? 'Sign in the way you did last time.' : 'Use an account you already have, or sign up with email. It takes a minute.'}
       >
         <ProviderButton
           icon="logo-google"
@@ -247,11 +265,12 @@ export default function OnboardingScreen() {
         ) : null}
         <OrRule />
         <Pressable accessibilityRole="button" onPress={() => setStep('email')} style={styles.quiet}>
-          <Text style={styles.inlineLink}>Continue with email</Text>
+          <Text style={styles.inlineLink}>{intent === 'signin' ? 'Sign in with email' : 'Sign up with email'}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => setStep('account')} style={styles.quiet}>
+        <Pressable accessibilityRole="button" onPress={() => setIntent(intent === 'signin' ? 'create' : 'signin')} style={styles.quiet}>
           <Text style={styles.inlineMuted}>
-            Already have an account? <Text style={styles.inlineStrong}>Sign in</Text>
+            {intent === 'signin' ? 'New here? ' : 'Already have an account? '}
+            <Text style={styles.inlineStrong}>{intent === 'signin' ? 'Create one' : 'Sign in'}</Text>
           </Text>
         </Pressable>
       </FlowShell>
@@ -265,7 +284,8 @@ export default function OnboardingScreen() {
         onSkip={introCompleted ? undefined : guest}
         step={progress?.step}
         total={progress?.total}
-        title="Continue with email"
+        stepKey="email"
+        title={intent === 'signin' ? 'Sign in with email' : 'Sign up with email'}
         subtitle="Use an email you check. You can change it later."
         footer={<Button label="Continue" onPress={submitEmail} />}
       >
@@ -306,9 +326,10 @@ export default function OnboardingScreen() {
         onBack={back}
         step={progress?.step}
         total={progress?.total}
+        stepKey="identity"
         roy={{ pose: 'smile', size: 140, decorative: true }}
-        title="What should we call you?"
-        subtitle={email ? `Connected as ${email}` : 'You can change this later in Profile.'}
+        title="Nice to meet you. What should we call you?"
+        subtitle={email ? `Signed in as ${email}` : 'You can change this later in Profile.'}
         footer={<Button label="Continue" onPress={submitIdentity} />}
       >
         <View style={styles.photoRow}>
@@ -351,21 +372,27 @@ export default function OnboardingScreen() {
   return (
     <FlowShell
       onBack={back}
+      stepKey="role"
       step={progress?.step}
       total={progress?.total}
-      title="What brings you to ROYALS?"
-      subtitle="This sets your Home. You can add more roles later."
+      roy={{ pose: 'thumbsup', size: 128, decorative: true, state: pickedRoyState }}
+      title="Who’s joining the club?"
+      subtitle="This shapes your Home. You can add more roles any time."
     >
-      {ROLE_CHOICES.map((choice) => (
-        <ChoiceCard
+      {ROLE_CHOICES.map((choice, index) => (
+        <Animated.View
           key={choice.id}
-          icon={choice.icon}
-          tint={choice.tint}
-          title={choice.title}
-          detail={choice.detail}
-          selected={roleChoice === choice.id}
-          onPress={() => pickRole(choice.id)}
-        />
+          entering={reduced ? undefined : FadeInDown.delay(120 + index * 55).duration(260).easing(Easing.out(Easing.cubic))}
+        >
+          <ChoiceCard
+            icon={choice.icon}
+            tint={choice.tint}
+            title={choice.title}
+            detail={choice.detail}
+            selected={roleChoice === choice.id}
+            onPress={() => pickRole(choice.id)}
+          />
+        </Animated.View>
       ))}
     </FlowShell>
   );

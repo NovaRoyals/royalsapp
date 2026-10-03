@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { CricketMark } from '@/components/icons/CricketMark';
 import { PressableScale } from '@/components/motion';
+import { useReducedMotion } from '@/lib/reducedMotion';
 import { colors, radius, typography } from '@/theme/tokens';
 
 export type Tint = 'green' | 'blue' | 'teal' | 'amber' | 'rose';
@@ -20,16 +23,19 @@ function IconTile({
   tint,
   size = 40,
   cricket = false,
+  filled = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   tint: Tint;
   size?: number;
   cricket?: boolean;
+  filled?: boolean;
 }) {
   const scheme = tints[tint];
+  const fg = filled ? colors.white : scheme.fg;
   return (
-    <View style={[styles.tile, { width: size, height: size, borderRadius: size / 2, backgroundColor: scheme.bg }]}>
-      {cricket ? <CricketMark size={size * 0.5} color={scheme.fg} /> : <Ionicons name={icon} size={size * 0.46} color={scheme.fg} />}
+    <View style={[styles.tile, { width: size, height: size, borderRadius: size / 2, backgroundColor: filled ? scheme.fg : scheme.bg }]}>
+      {cricket ? <CricketMark size={size * 0.5} color={fg} /> : <Ionicons accessible={false} name={icon} size={size * 0.46} color={fg} />}
     </View>
   );
 }
@@ -53,21 +59,30 @@ export function ChoiceCard({
   cricket?: boolean;
   onPress?: () => void;
 }) {
+  const reduced = useReducedMotion();
+  const pop = useSharedValue(1);
+  useEffect(() => {
+    if (selected && !reduced) pop.value = withSequence(withTiming(1.04, { duration: 110 }), withTiming(1, { duration: 170 }));
+  }, [pop, reduced, selected]);
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const scheme = tints[tint];
+  // Picking one tints the whole card in its own color; the rest stay quiet.
   return (
+    <Animated.View style={popStyle}>
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={detail ? `${title}. ${detail}` : title}
       accessibilityState={{ selected: Boolean(selected) }}
       onPress={onPress}
-      style={[styles.card, selected && styles.cardSelected]}
+      style={[styles.card, selected && { backgroundColor: scheme.bg, borderColor: scheme.fg }]}
     >
-      <IconTile icon={icon} tint={selected ? 'green' : tint} cricket={cricket} />
+      <IconTile icon={selected ? 'checkmark' : icon} tint={tint} cricket={selected ? false : cricket} filled={selected} />
       <View style={styles.flex}>
         <Text style={styles.cardTitle}>{title}</Text>
         {detail ? <Text style={styles.cardDetail}>{detail}</Text> : null}
       </View>
       {trailing === 'chevron' ? (
-        <Ionicons name={selected ? 'checkmark-circle' : 'chevron-forward'} size={18} color={selected ? colors.ink : colors.stone} />
+        <Ionicons accessible={false} name="chevron-forward" size={18} color={selected ? scheme.fg : colors.stone} />
       ) : null}
       {trailing === 'checkbox' ? (
         <View style={[styles.box, selected && styles.boxOn]}>
@@ -75,6 +90,7 @@ export function ChoiceCard({
         </View>
       ) : null}
     </PressableScale>
+    </Animated.View>
   );
 }
 

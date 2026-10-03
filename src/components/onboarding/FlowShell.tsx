@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FlowBackdrop } from '@/components/onboarding/Decor';
+import { FlowBackdrop, RoyGlow } from '@/components/onboarding/Decor';
 import { Roy } from '@/components/mascot';
 import type { RoyPose } from '@/components/mascot/poses';
+import type { RoyState } from '@/components/mascot/types';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { colors, layout, spacing, typography } from '@/theme/tokens';
 
@@ -44,6 +45,7 @@ export function FlowShell({
   footer,
   footnote,
   fill = false,
+  stepKey,
 }: {
   tone?: 'dark' | 'light';
   step?: number;
@@ -52,7 +54,8 @@ export function FlowShell({
   onSkip?: () => void;
   skipLabel?: string;
   above?: ReactNode;
-  roy?: { pose: RoyPose; size?: number; decorative?: boolean };
+  /** `state` plays Roy's motion once (he rests afterwards). Leave it out for a still Roy. */
+  roy?: { pose: RoyPose; size?: number; decorative?: boolean; state?: RoyState; onComplete?: (state: RoyState) => void };
   eyebrow?: string;
   title?: string;
   subtitle?: string;
@@ -60,7 +63,10 @@ export function FlowShell({
   footer?: ReactNode;
   footnote?: ReactNode;
   fill?: boolean;
+  /** Changes when the step changes, so the content can slide in. */
+  stepKey?: string;
 }) {
+  const reduced = useReducedMotion();
   const dark = tone === 'dark';
   const showHeader = Boolean(onBack || onSkip || (step && total));
 
@@ -111,12 +117,30 @@ export function FlowShell({
               <View style={[styles.inner, fill && styles.flex]}>
                 {above}
                 {roy ? (
-                  <View style={[styles.royStage, { height: roy.size ?? 220 }]}>
-                    <Roy pose={roy.pose} still size={roy.size ?? 220} scene={dark ? 'dark' : 'light'} decorative={roy.decorative !== false} />
+                  <View style={[styles.royStage, { height: roy.size ?? 220 }, !fill && styles.royStageTight]}>
+                    {dark ? (
+                      <Animated.View entering={reduced ? undefined : FadeIn.duration(700)} style={styles.glow}>
+                        <RoyGlow size={(roy.size ?? 220) * 1.5} />
+                      </Animated.View>
+                    ) : null}
+                    <Roy
+                      pose={roy.pose}
+                      still={!roy.state}
+                      autoIdle={false}
+                      state={roy.state}
+                      onComplete={roy.onComplete}
+                      size={roy.size ?? 220}
+                      scene={dark ? 'dark' : 'light'}
+                      decorative={roy.decorative !== false}
+                    />
                   </View>
                 ) : null}
                 {fill ? <View style={styles.flex} /> : null}
-                <View style={fill ? styles.copyBlock : undefined}>
+                <Animated.View
+                  key={stepKey}
+                  entering={reduced || !stepKey ? undefined : FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
+                  style={fill ? styles.copyBlock : undefined}
+                >
                   {eyebrow ? <Text style={[styles.eyebrow, dark && styles.eyebrowDark]}>{eyebrow}</Text> : null}
                   {title ? (
                     <Text maxFontSizeMultiplier={1.35} style={[styles.title, dark && styles.titleDark]}>
@@ -128,8 +152,16 @@ export function FlowShell({
                       {subtitle}
                     </Text>
                   ) : null}
-                </View>
-                {children ? <View style={styles.body}>{children}</View> : null}
+                </Animated.View>
+                {children ? (
+                  <Animated.View
+                    key={`body-${stepKey}`}
+                    entering={reduced || !stepKey ? undefined : FadeInDown.delay(70).duration(280).easing(Easing.out(Easing.cubic))}
+                    style={styles.body}
+                  >
+                    {children}
+                  </Animated.View>
+                ) : null}
               </View>
             </View>
           </ScrollView>
@@ -185,6 +217,8 @@ const styles = StyleSheet.create({
   body: { marginTop: 18, gap: 0 },
   inner: { width: '100%', maxWidth: layout.flowWidth, alignSelf: 'center', paddingHorizontal: 22 },
   royStage: { alignItems: 'center', justifyContent: 'flex-end', marginTop: 4, marginBottom: -8 },
+  royStageTight: { marginBottom: 10 },
+  glow: { position: 'absolute', alignSelf: 'center', bottom: -20 },
   copyBlock: { paddingBottom: 8 },
   eyebrow: { color: colors.greenBright, fontSize: 11, marginBottom: 6, ...typography.label, letterSpacing: 1.6 },
   eyebrowDark: { color: colors.mintDeep },

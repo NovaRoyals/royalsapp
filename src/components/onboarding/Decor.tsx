@@ -1,7 +1,9 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 
-import { colors } from '@/theme/tokens';
+import { CloudBackdrop } from '@/components/brand/CloudBackdrop';
+import { colors, gradients } from '@/theme/tokens';
 
 function HillLayer({ d, fill }: { d: string; fill: string }) {
   return <Path d={d} fill={fill} />;
@@ -23,11 +25,39 @@ export function FlowBackdrop({ tone }: { tone: 'dark' | 'light' }) {
   if (tone === 'dark') {
     return (
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <LinearGradient colors={gradients.night} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
+        <CloudBackdrop />
         <Hills />
       </View>
     );
   }
-  return null;
+  // Light steps get a soft mint wash that fades into the page, so they are not a flat sheet.
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <LinearGradient colors={[colors.mint, colors.cream]} style={styles.wash} />
+    </View>
+  );
+}
+
+/**
+ * A soft pool of light behind Roy. It lifts him off the green so the edge of the artwork is
+ * never what you notice, and it is still: it fades in once with the screen.
+ */
+export function RoyGlow({ size = 320, style }: { size?: number; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View pointerEvents="none" style={[{ width: size, height: size }, style]}>
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        <Defs>
+          <RadialGradient id="royGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+            <Stop offset="0" stopColor="#7FD1A8" stopOpacity="0.5" />
+            <Stop offset="0.55" stopColor="#4FB98A" stopOpacity="0.16" />
+            <Stop offset="1" stopColor="#4FB98A" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx="50" cy="50" r="50" fill="url(#royGlow)" />
+      </Svg>
+    </View>
+  );
 }
 
 export function CrownMark({ size = 26, color = colors.white }: { size?: number; color?: string }) {
@@ -74,5 +104,6 @@ export function Confetti() {
 }
 
 const styles = StyleSheet.create({
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: 280 },
   hills: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 240 },
 });
