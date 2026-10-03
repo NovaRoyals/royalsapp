@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, Link, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -34,9 +34,11 @@ export default function ProgramDetailScreen() {
   const kidsOffer = program.id === 'fall-kids-2026' ? joinOffer(nowIso) : null;
   const kidsPromo = kidsOffer ? offerHeadline(kidsOffer) : null;
   const team = program.teamId ? demoTeams.find((item) => item.id === program.teamId) : undefined;
-  const requestedPane = paneParam === 'squad' || paneParam === 'matches' || paneParam === 'fixtures' ? paneParam : 'about';
-  const [paneChoice, setPaneChoice] = useState<{ key: string; pane: 'about' | 'squad' | 'matches' | 'fixtures' } | null>(null);
-  const pane = paneChoice?.key === (paneParam ?? '') ? paneChoice.pane : requestedPane;
+  // The address is the single source of truth for the tab. A link that asks for About always
+  // gets About, even when this screen is already open on Squad.
+  const pane: 'about' | 'squad' | 'matches' | 'fixtures' =
+    paneParam === 'squad' || paneParam === 'matches' || paneParam === 'fixtures' ? paneParam : 'about';
+  const setPane = (next: 'about' | 'squad' | 'matches' | 'fixtures') => router.setParams({ pane: next });
   const isYouth = program.id === 'fall-kids-2026' || program.id === 'travel-soccer';
   const fxaSide = program.id === 'veterans-soccer' ? '35plus' as const : undefined;
   const authorized = canSeeFullRoster(role, team?.id);
@@ -81,10 +83,10 @@ export default function ProgramDetailScreen() {
 
       {team ? (
         <View style={styles.paneRow}>
-          <Chip label="About" active={pane === 'about'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'about' })} />
-          {fxaSide ? <Chip label="Fixtures" active={pane === 'fixtures'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'fixtures' })} /> : null}
-          <Chip label="Squad" active={pane === 'squad'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'squad' })} />
-          {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPaneChoice({ key: paneParam ?? '', pane: 'matches' })} /> : null}
+          <Chip label="About" active={pane === 'about'} onPress={() => setPane('about')} />
+          {fxaSide ? <Chip label="Fixtures" active={pane === 'fixtures'} onPress={() => setPane('fixtures')} /> : null}
+          <Chip label="Squad" active={pane === 'squad'} onPress={() => setPane('squad')} />
+          {cricket ? <Chip label="Matches" active={pane === 'matches'} onPress={() => setPane('matches')} /> : null}
         </View>
       ) : null}
 

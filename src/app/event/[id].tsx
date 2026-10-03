@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { CloudBackdrop } from '@/components/brand/CloudBackdrop';
 import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
 import { RsvpChoices } from '@/components/interactions/RsvpChoices';
 import { SupporterButton } from '@/components/interactions/SupporterButton';
@@ -15,7 +17,8 @@ import { demoPrograms, demoSchedule, demoTeams } from '@/data/demo';
 import { ARROWHEAD_2B_ID, venueById } from '@/data/venues';
 import { can, canCreateSessionRecap, canSendSessionRecap } from '@/lib/capabilities';
 import { attendanceCounts, recapForEvent } from '@/lib/coachRecap';
-import { eventPhase, formatEventWhen, relativeDayLabel } from '@/lib/datetime';
+import { eventPhase, formatEventParts, formatEventWhen, relativeDayLabel } from '@/lib/datetime';
+import { tintFor } from '@/lib/tint';
 import { canPlayerRsvp, canSeeFullRoster, COACH_TEAM_ID } from '@/lib/membership';
 import { safeBack } from '@/lib/nav';
 import {
@@ -40,7 +43,7 @@ import {
 import { shareContent } from '@/lib/share';
 import { fieldStatusLabel, weatherForEvent } from '@/services/weather';
 import { useApp } from '@/state/AppProvider';
-import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
+import { colors, gradients, layout, radius, spacing, tints, typography } from '@/theme/tokens';
 import type { AttendanceMark, ScheduleEvent } from '@/types/domain';
 import { manualStory } from '@/lib/matchStory';
 
@@ -80,8 +83,6 @@ export default function EventDetailScreen() {
     venueUpdates,
   } = useApp();
   const toast = useToast();
-  const { width } = useWindowDimensions();
-  const wide = width >= 720;
   const event = schedule.find((item) => item.id === id) ?? schedule[0];
   const [bucket, setBucket] = useState<RsvpBucket | 'all'>('all');
   const weather = weatherForEvent(event);
@@ -157,19 +158,13 @@ export default function EventDetailScreen() {
         </View>
 
         {program ? (
-          <Link href={`/program/${program.id}` as Href} asChild>
-            <Pressable accessibilityRole="link" style={styles.contextLink}>
-              <Text style={styles.contextText}>{program.title} › {event.ageGroup || sideName(event)}</Text>
+          <Link href={aboutHref(program.id)} asChild>
+            <Pressable accessibilityRole="link" accessibilityLabel={`About ${sideName(event)}`} style={styles.contextLink}>
+              <Text style={styles.contextText}>{program.title} › {sideName(event)}</Text>
             </Pressable>
           </Link>
         ) : null}
-        <MatchHeader event={event} />
-        <View style={styles.pills}>
-          <StatusPill label={fieldStatusLabel(event.fieldStatus)} tone={fieldStatusTone(event.fieldStatus)} />
-          {event.status === 'cancelled' ? <StatusPill label="Cancelled" tone="danger" /> : null}
-          {event.status === 'completed' && event.result ? <StatusPill label="Final" tone="neutral" /> : null}
-        </View>
-        {event.result && event.status === 'completed' ? <Text style={styles.result}>{event.result}</Text> : null}
+        <EventHero event={event} />
 
         {event.fieldStatus === 'closed' || event.status === 'cancelled' || event.previousVenue || event.pendingChange ? (
           <View style={[styles.banner, event.fieldStatus === 'closed' || event.status === 'cancelled' ? styles.bannerDanger : styles.bannerAttention]}>
@@ -231,30 +226,24 @@ export default function EventDetailScreen() {
           <Text style={styles.privacy}>Public details only. Player responses and household schedules stay signed in.</Text>
         ) : null}
 
-        <Text style={styles.glanceLabel}>Details</Text>
-        <View style={styles.glance}>
-          {glanceRows(event, deadlines).map((row) => (
-            <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && (row.span ? styles.glanceSpan : styles.glanceItemWide)]}>
-              <Ionicons name={row.icon} size={18} color={colors.stone} />
-              <View style={styles.glanceCopy}>
-                <Text style={styles.factLabel}>{row.label}</Text>
-                <Text selectable style={styles.factValue}>{row.value}</Text>
-              </View>
-            </View>
-          ))}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Details</Text>
+          <DetailRows rows={glanceRows(event, deadlines)} />
         </View>
 
         {program ? (
-          <Link href={`/program/${program.id}` as Href} asChild>
-            <Pressable accessibilityRole="link" style={styles.programLink}>
-              <Text style={styles.section}>About {sideName(event)}</Text>
-              <Text style={styles.link}>Schedule, squad and team information →</Text>
-            </Pressable>
+          <Link href={aboutHref(program.id)} asChild>
+            <PressableScale accessibilityLabel={`About ${sideName(event)}`} style={StyleSheet.flatten([styles.aboutCard, { backgroundColor: tints[tintFor(event)].bg }])}>
+              <View style={styles.aboutIcon}>
+                <Ionicons accessible={false} name="information-circle-outline" size={22} color={tints[tintFor(event)].accent} />
+              </View>
+              <View style={styles.flexOne}>
+                <Text style={styles.aboutTitle}>About {sideName(event)}</Text>
+                <Text style={styles.aboutBody}>Squad, schedule and team information</Text>
+              </View>
+              <Ionicons accessible={false} name="arrow-forward" size={18} color={tints[tintFor(event)].accent} />
+            </PressableScale>
           </Link>
-        ) : null}
-
-        {role === 'guest' ? (
-          <Text style={styles.privacy}>Public details only. Player responses and household schedules stay signed in.</Text>
         ) : null}
 
         {canEditStory ? (
@@ -489,24 +478,13 @@ export default function EventDetailScreen() {
           <Text style={styles.section}>Plan your visit</Text>
           {event.previousVenue ? <Text style={styles.struck}>Previous · {event.previousVenue}</Text> : null}
           {event.address ? <Text selectable style={styles.factValue}>{event.address}</Text> : null}
-          <View style={styles.glance}>
-            {logisticsRows(event, place, venueUpdate?.updatedBy, venueUpdate ? formatEventWhen(venueUpdate.updatedAt) : undefined, venueUpdate?.reason).map((row) => (
-              <View key={`${row.label}-${row.value}`} style={[styles.glanceItem, wide && styles.glanceItemWide]}>
-                <Ionicons name={row.icon} size={18} color={colors.stone} />
-                <View style={styles.glanceCopy}>
-                  <Text style={styles.factLabel}>{row.label}</Text>
-                  <Text selectable style={styles.factValue}>{row.value}</Text>
-                </View>
-              </View>
-            ))}
-            <View style={[styles.glanceItem, wide && styles.glanceItemWide]}>
-              <Ionicons name="cloud-outline" size={18} color={colors.stone} />
-              <View style={styles.glanceCopy}>
-                <Text style={styles.factLabel}>{weather.summary}</Text>
-                <Text style={styles.factValue}>{weather.detail}</Text>
-              </View>
-            </View>
-          </View>
+          <DetailRows
+            rows={[
+              ...logisticsRows(event, place, venueUpdate?.updatedBy, venueUpdate ? formatEventWhen(venueUpdate.updatedAt) : undefined, venueUpdate?.reason),
+              // No placeholder row: until live weather is connected there is nothing true to say.
+              ...(weather.source === 'unconfigured' ? [] : [{ icon: 'cloud-outline' as const, label: weather.summary, value: weather.detail }]),
+            ]}
+          />
           <Pressable accessibilityRole="link" onPress={() => event.venueId && router.push(`/venue/${event.venueId}` as Href)} style={styles.linkHit}>
             <Text style={styles.link}>Venue details</Text>
           </Pressable>
@@ -567,17 +545,85 @@ function sideName(event: ScheduleEvent) {
   return 'ROYALS';
 }
 
-function MatchHeader({ event }: { event: ScheduleEvent }) {
+/** Always lands on the About tab, even if the program screen is already open on another one. */
+function aboutHref(programId: string) {
+  return `/program/${programId}?pane=about` as Href;
+}
+
+/**
+ * The top of the page, in one dark card: who is playing, when, where, and anything that
+ * changed. Everything below is secondary to this, so it carries the hierarchy.
+ */
+function EventHero({ event }: { event: ScheduleEvent }) {
+  const parts = formatEventParts(event.startsAt);
   const opponent = event.opponent?.trim();
   const competitive = Boolean(opponent) && event.type !== 'training' && event.type !== 'club_event';
-  if (!competitive || !opponent) {
-    return <Text style={styles.title}>{event.type === 'club_event' ? event.purpose ?? event.title : event.title}</Text>;
-  }
+  const kicker = [sideName(event), event.competitionLabel ?? eventTypeLabel(event)].filter(Boolean).join(' · ');
+  const field = event.fieldStatus && event.fieldStatus !== 'open' ? fieldStatusLabel(event.fieldStatus) : null;
+  const done = event.status === 'completed' && Boolean(event.result);
   return (
-    <View style={styles.matchup} accessibilityRole="header">
-      <Text style={styles.side}>{sideName(event)}</Text>
-      <Text style={styles.vs}>vs</Text>
-      <Text style={styles.side}>{opponent}</Text>
+    <View style={styles.hero}>
+      <LinearGradient colors={gradients.night} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <CloudBackdrop />
+      <View style={styles.heroBody}>
+        <Text style={styles.heroKicker}>{kicker.toUpperCase()}</Text>
+        {competitive && opponent ? (
+          <View accessibilityRole="header" style={styles.heroTeams}>
+            <Text style={styles.heroTeam}>{sideName(event)}</Text>
+            <View style={styles.vsRow}>
+              <View style={styles.vsLine} />
+              <Text style={styles.vsText}>VS</Text>
+              <View style={styles.vsLine} />
+            </View>
+            <Text style={styles.heroTeam}>{opponent}</Text>
+          </View>
+        ) : (
+          <Text accessibilityRole="header" style={styles.heroTitle}>{event.type === 'club_event' ? event.purpose ?? event.title : event.title}</Text>
+        )}
+        {done ? (
+          <Text style={styles.heroResult}>{event.result}</Text>
+        ) : (
+          <View style={styles.heroWhen}>
+            <View style={styles.heroDate}>
+              <Text style={styles.heroDow}>{parts.weekday}</Text>
+              <Text style={styles.heroDay}>{parts.day}</Text>
+              <Text style={styles.heroMonth}>{parts.month}</Text>
+            </View>
+            <View style={styles.flexOne}>
+              <Text style={styles.heroTime}>{parts.time}</Text>
+              <View style={styles.heroPlace}>
+                <Ionicons accessible={false} name="location-outline" size={15} color={colors.mint} />
+                <Text numberOfLines={2} style={styles.heroPlaceText}>{placeLabel(event)}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+        {field || event.status === 'cancelled' || done ? (
+          <View style={styles.heroChips}>
+            {field ? <StatusPill label={field} tone={fieldStatusTone(event.fieldStatus)} /> : null}
+            {event.status === 'cancelled' ? <StatusPill label="Cancelled" tone="danger" /> : null}
+            {done ? <StatusPill label="Final" tone="neutral" /> : null}
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function DetailRows({ rows }: { rows: { icon: GlanceIcon; label: string; value: string }[] }) {
+  return (
+    <View>
+      {rows.map((row, index) => (
+        <View key={`${row.label}-${row.value}`} style={[styles.detailRow, index > 0 && styles.detailDivider]}>
+          <View style={styles.detailIcon}>
+            <Ionicons accessible={false} name={row.icon} size={17} color={colors.ink} />
+          </View>
+          <View style={styles.flexOne}>
+            <Text style={styles.factLabel}>{row.label.toUpperCase()}</Text>
+            <Text selectable style={styles.factValue}>{row.value}</Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -648,7 +694,7 @@ function logisticsRows(
 
 const styles = StyleSheet.create({
   fill: { flex: 1, paddingHorizontal: 0 },
-  scroll: { paddingHorizontal: spacing.xl, paddingBottom: 220 },
+  scroll: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: spacing.lg, paddingBottom: 220 },
   topbar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   topTitle: { color: colors.stone, fontSize: 13, ...typography.label },
@@ -678,7 +724,36 @@ const styles = StyleSheet.create({
   factValue: { color: colors.ink, fontSize: 15, lineHeight: 20, ...typography.bodyMedium },
   responseLine: { marginTop: spacing.lg, gap: 2 },
   result: { color: colors.ink, fontSize: 20, marginTop: spacing.sm, ...typography.heading },
-  block: { marginTop: spacing.lg, gap: spacing.sm },
+  block: { marginTop: spacing.md, gap: spacing.sm, padding: spacing.lg, borderRadius: 22, backgroundColor: colors.paper },
+  card: { marginTop: spacing.md, padding: spacing.lg, borderRadius: 22, backgroundColor: colors.paper },
+  cardTitle: { color: colors.ink, fontSize: 17, marginBottom: spacing.xs, ...typography.heading },
+  flexOne: { flex: 1, minWidth: 0 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  detailDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  detailIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
+  aboutCard: { marginTop: spacing.md, padding: spacing.lg, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 72 },
+  aboutIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  aboutTitle: { color: colors.ink, fontSize: 16, ...typography.heading },
+  aboutBody: { color: colors.charcoal, fontSize: 13, marginTop: 2, ...typography.body },
+  hero: { marginTop: spacing.sm, borderRadius: 26, overflow: 'hidden', backgroundColor: colors.greenDeep },
+  heroBody: { padding: spacing.xl, gap: spacing.md },
+  heroKicker: { color: colors.mint, fontSize: 11, ...typography.label, letterSpacing: 1.6 },
+  heroTeams: { gap: 6 },
+  heroTeam: { color: colors.white, fontSize: 28, lineHeight: 32, ...typography.heading },
+  heroTitle: { color: colors.white, fontSize: 30, lineHeight: 34, ...typography.heading },
+  vsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  vsLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' },
+  vsText: { color: colors.gold, fontSize: 13, ...typography.label, letterSpacing: 2 },
+  heroWhen: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.xs },
+  heroDate: { minWidth: 84, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center' },
+  heroDow: { color: colors.gold, fontSize: 11, ...typography.label, letterSpacing: 1.4 },
+  heroDay: { color: colors.white, fontSize: 40, lineHeight: 42, ...typography.display },
+  heroMonth: { color: colors.mint, fontSize: 11, ...typography.label, letterSpacing: 1.2 },
+  heroTime: { color: colors.white, fontSize: 24, ...typography.heading },
+  heroPlace: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 },
+  heroPlaceText: { flex: 1, color: 'rgba(255,255,255,0.82)', fontSize: 14, lineHeight: 19, ...typography.body },
+  heroResult: { color: colors.white, fontSize: 24, ...typography.heading },
+  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   confirm: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.orangeSoft, gap: spacing.xs },
   noteInput: {
     minHeight: 72,

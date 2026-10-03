@@ -28,8 +28,9 @@ export function cricketEventHref(event: { id: string; sport?: string }) {
   return slug ? `/cricket/match/${slug}` : `/event/${event.id}`;
 }
 
-export function cricketProgramHref(pane?: "about" | "squad" | "matches") {
-  return pane && pane !== "about" ? `/program/ccpl-cricket?pane=${pane}` : "/program/ccpl-cricket";
+/** Always names the tab, so the program screen opens on it even if it is already open elsewhere. */
+export function cricketProgramHref(pane: "about" | "squad" | "matches" = "about") {
+  return `/program/ccpl-cricket?pane=${pane}`;
 }
 
 type NameParts = { firstName: string; lastName: string; displayName: string; isMinor?: boolean };
