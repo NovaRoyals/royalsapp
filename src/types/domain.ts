@@ -321,13 +321,23 @@ export interface DirectMessage {
   threadId: string;
   fromRole: UserRole;
   fromName: string;
+  /** Who sent it, e.g. `guardian:household-demo` or `coach:priya`. Older saved messages lack it. */
+  fromId?: string;
   body: string;
+  createdAt: string;
+}
+
+/** A parent reporting a conversation. Admins see the report, not the whole inbox. */
+export interface MessageReport {
+  id: string;
+  threadId: string;
+  reason: string;
   createdAt: string;
 }
 
 export interface AppNotification {
   id: string;
-  type: 'registration' | 'reminder' | 'change' | 'weather' | 'announcement' | 'result' | 'coach_update' | 'coach_reminder' | 'rsvp' | 'supporter' | 'field';
+  type: 'registration' | 'reminder' | 'change' | 'weather' | 'announcement' | 'result' | 'coach_update' | 'coach_reminder' | 'rsvp' | 'supporter' | 'field' | 'message';
   title: string;
   body: string;
   createdAt: string;
@@ -337,6 +347,9 @@ export interface AppNotification {
   wouldPush?: boolean;
   childId?: string;
   eventId?: string;
+  /** Set on message alerts: only this role sees it, so a coach's alert never reaches a parent. */
+  forRole?: UserRole;
+  threadId?: string;
   /** Skip an identical unread alert. Demo stand-in for a server uniqueness key. */
   dedupeKey?: string;
 }

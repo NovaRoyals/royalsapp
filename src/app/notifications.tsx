@@ -24,6 +24,7 @@ const icons = {
   rsvp: 'checkmark-circle-outline',
   supporter: 'heart-outline',
   field: 'warning-outline',
+  message: 'chatbubble-ellipses-outline',
 } as const;
 
 export default function NotificationsScreen() {

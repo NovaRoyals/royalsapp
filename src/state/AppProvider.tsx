@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptic } from '@/lib/haptics';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   demoAnnouncements,
@@ -19,6 +19,7 @@ import { can, canSendSessionRecap } from '@/lib/capabilities';
 import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapAudience, recapBody } from '@/lib/coachRecap';
 import { PAST_DELIVERY_ERROR } from '@/lib/deliveryTiming';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
+import { checkSend, readKey, senderIdFor, viewerFor } from '@/lib/messaging';
 import { applyDecision, canWaive, money, normalizeRegistration, waiveFee, type Decision } from '@/lib/registrationFlow';
 import { COACH_TEAM_ID } from '@/lib/membership';
 import {
@@ -46,6 +47,7 @@ import type {
   AuditRecord,
   CoachUpdate,
   DirectMessage,
+  MessageReport,
   FieldStatus,
   Household,
   HouseholdDocument,
@@ -107,6 +109,12 @@ type PersistedState = {
   managerCanSendRecap: boolean;
   venueUpdates: VenueStatusUpdate[];
   audit: AuditRecord[];
+  /** Last time each person opened each thread, keyed `viewerId|threadId`. */
+  threadReads: Record<string, string>;
+  /** Parent-to-parent chat is off until a parent turns it on. */
+  parentChatOn: boolean;
+  blockedThreads: string[];
+  reports: MessageReport[];
 };
 
 type NewRegistration = Omit<Registration, 'id' | 'submittedAt' | 'demo'>;
@@ -155,7 +163,11 @@ interface AppState extends PersistedState {
     eventId?: string;
   }) => void;
   replyToAnnouncement: (announcementId: string, body: string) => void;
-  sendDirectMessage: (threadId: string, body: string) => void;
+  sendDirectMessage: (threadId: string, body: string) => { ok: boolean; error?: string };
+  markThreadRead: (threadId: string) => void;
+  setParentChat: (on: boolean) => void;
+  blockThread: (threadId: string, blocked: boolean) => void;
+  reportThread: (threadId: string, reason: string) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   saveRecapDraft: (recap: SessionRecap) => void;
@@ -206,7 +218,27 @@ function mergeFollowedIds(ids?: string[]) {
   return [...new Set([...(ids?.length ? ids : defaultFollowedIds), 'nova-royals-35plus', 'veterans-soccer'])];
 }
 
+function mergeById<T extends { id: string }>(base: T[], extra: T[]) {
+  const ids = new Set(base.map((item) => item.id));
+  return [...base, ...extra.filter((item) => !ids.has(item.id))];
+}
+
 function keepClubComms(next: PersistedState, current: PersistedState): PersistedState {
+  const kept = keepRecapComms(next, current);
+  // A message you sent as a parent has to be waiting for the coach, and the other way round.
+  const messageAlerts = (current.notifications ?? []).filter((item) => item.type === 'message');
+  return {
+    ...kept,
+    messages: mergeById(next.messages ?? [], current.messages ?? []),
+    threadReads: { ...(next.threadReads ?? {}), ...(current.threadReads ?? {}) },
+    parentChatOn: current.parentChatOn ?? next.parentChatOn,
+    blockedThreads: current.blockedThreads ?? next.blockedThreads,
+    reports: current.reports ?? next.reports,
+    notifications: mergeById(messageAlerts, kept.notifications.filter((item) => item.type !== 'message' || !messageAlerts.some((alert) => alert.id === item.id))),
+  };
+}
+
+function keepRecapComms(next: PersistedState, current: PersistedState): PersistedState {
   const sent = (current.coachUpdates ?? []).length > 0;
   return {
     ...next,
@@ -256,6 +288,14 @@ function visitorSeed(role: UserRole = 'guest'): PersistedState {
     managerCanSendRecap: false,
     venueUpdates: [],
     audit: [],
+    // Both sides had read the September exchange; only newer messages are unread.
+    threadReads: {
+      'guardian:household-demo|coach-priya': '2026-09-12T20:25:00-04:00',
+      'coach:priya|coach-priya': '2026-09-12T20:30:00-04:00',
+    },
+    parentChatOn: false,
+    blockedThreads: [],
+    reports: [],
   };
 }
 
@@ -281,6 +321,10 @@ function demoSeed(role: UserRole): PersistedState {
     managerCanSendRecap: false,
     venueUpdates: [],
     audit: [],
+    threadReads: {},
+    parentChatOn: false,
+    blockedThreads: [],
+    reports: [],
   };
 }
 
@@ -322,6 +366,11 @@ function readPersistedState(saved: string | null): PersistedState {
       household: householdForRole(role),
       venueUpdates: parsed.venueUpdates ?? [],
       audit: parsed.audit ?? [],
+      threadReads: parsed.threadReads ?? {},
+      parentChatOn: parsed.parentChatOn ?? false,
+      blockedThreads: parsed.blockedThreads ?? [],
+      reports: parsed.reports ?? [],
+      messages: mergeById(demoDirectMessages, parsed.messages ?? []),
       recaps: (parsed.recaps ?? [demoDraftRecap()]).map((item) => ({ ...item, coachName: ACTIVE_COACH.displayName })),
       coachUpdates: (parsed.coachUpdates ?? []).map((item) => ({ ...item, coachName: ACTIVE_COACH.displayName })),
       managerCanSendRecap: parsed.managerCanSendRecap ?? false,
@@ -346,11 +395,20 @@ function readPersistedState(saved: string | null): PersistedState {
     managerCanSendRecap: parsed.managerCanSendRecap ?? false,
     venueUpdates: parsed.venueUpdates ?? [],
     audit: parsed.audit ?? [],
+    threadReads: parsed.threadReads ?? {},
+    parentChatOn: parsed.parentChatOn ?? false,
+    blockedThreads: parsed.blockedThreads ?? [],
+    reports: parsed.reports ?? [],
   };
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PersistedState>(initialState);
+  // The latest state, for actions that must validate before they change anything.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
   const [hydrated, setHydrated] = useState(false);
 
   hydrateTrace('AppProvider', {
@@ -1234,22 +1292,98 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     hapticLight();
   }, []);
 
-  const sendDirectMessage = useCallback((threadId: string, body: string) => {
+  const sendDirectMessage = useCallback((threadId: string, body: string): { ok: boolean; error?: string } => {
+    const current = stateRef.current;
+    const viewer = viewerFor(current.role, current.household.id);
+    const check = checkSend({ viewer, threadId, body, parentChatOn: current.parentChatOn, blocked: current.blockedThreads });
+    if (!check.ok) return { ok: false, error: check.error };
+    const sentAt = new Date().toISOString();
+    const message: DirectMessage = {
+      id: `dm-${Date.now()}-${Math.random().toString(16).slice(2, 5)}`,
+      threadId,
+      fromRole: current.role,
+      fromName: current.role === 'coach' ? ACTIVE_COACH.fullName : current.role === 'guardian' ? current.household.guardianName : 'Staff',
+      fromId: senderIdFor(current.role, current.household.id),
+      body: body.trim(),
+      createdAt: sentAt,
+    };
+    setState((latest) => {
+      // The other side gets an alert, in their own role's feed.
+      const toCoach = latest.role === 'guardian' && (threadId === 'coach-priya' || threadId.startsWith('family-'));
+      const toParent = latest.role === 'coach' && threadId === 'coach-priya';
+      const alert =
+        toCoach || toParent
+          ? notice({
+              type: 'message',
+              title: toCoach ? latest.household.guardianName : ACTIVE_COACH.fullName,
+              body: message.body.length > 110 ? `${message.body.slice(0, 107)}…` : message.body,
+              route: `/message/${threadId}`,
+              urgency: 'normal',
+              wouldPush: true,
+              forRole: toCoach ? 'coach' : 'guardian',
+              threadId,
+            })
+          : null;
+      const key = readKey(viewer!, threadId);
+      return {
+        ...latest,
+        messages: [...latest.messages, message],
+        // Sending counts as having seen the thread.
+        threadReads: { ...latest.threadReads, [key]: sentAt },
+        notifications: alert ? [alert, ...latest.notifications] : latest.notifications,
+      };
+    });
+    hapticLight();
+    return { ok: true };
+  }, []);
+
+  const markThreadRead = useCallback((threadId: string) => {
+    setState((current) => {
+      const viewer = viewerFor(current.role, current.household.id);
+      if (!viewer) return current;
+      const key = readKey(viewer, threadId);
+      const now = new Date().toISOString();
+      const unreadNote = current.notifications.some((item) => item.type === 'message' && item.threadId === threadId && item.forRole === current.role && !item.read);
+      return {
+        ...current,
+        threadReads: { ...current.threadReads, [key]: now },
+        notifications: unreadNote
+          ? current.notifications.map((item) => (item.type === 'message' && item.threadId === threadId && item.forRole === current.role ? { ...item, read: true } : item))
+          : current.notifications,
+      };
+    });
+  }, []);
+
+  const setParentChat = useCallback((on: boolean) => {
+    setState((current) => ({ ...current, parentChatOn: on }));
+    hapticLight();
+  }, []);
+
+  const blockThread = useCallback((threadId: string, blocked: boolean) => {
     setState((current) => ({
       ...current,
-      messages: [
-        ...current.messages,
-        {
-          id: `dm-${Date.now()}`,
-          threadId,
-          fromRole: current.role,
-          fromName: current.role === 'coach' || current.role === 'admin' ? 'Staff' : current.household.guardianName,
-          body,
-          createdAt: new Date().toISOString(),
-        },
-      ],
+      blockedThreads: blocked ? [...new Set([...current.blockedThreads, threadId])] : current.blockedThreads.filter((id) => id !== threadId),
     }));
     hapticLight();
+  }, []);
+
+  const reportThread = useCallback((threadId: string, reason: string) => {
+    setState((current) => ({
+      ...current,
+      reports: [{ id: `report-${Date.now()}`, threadId, reason, createdAt: new Date().toISOString() }, ...current.reports],
+      blockedThreads: [...new Set([...current.blockedThreads, threadId])],
+      audit: [
+        auditEntry({
+          action: 'message_report',
+          targetId: threadId,
+          actorName: current.household.guardianName,
+          actorRole: current.role,
+          detail: `Reported a conversation: ${reason}`,
+        }),
+        ...current.audit,
+      ],
+    }));
+    haptic('warning');
   }, []);
 
   const markNotificationRead = useCallback((id: string) => {
@@ -1431,6 +1565,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createAnnouncement,
       replyToAnnouncement,
       sendDirectMessage,
+      markThreadRead,
+      setParentChat,
+      blockThread,
+      reportThread,
       markNotificationRead,
       markAllNotificationsRead,
       saveRecapDraft,
@@ -1471,6 +1609,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createAnnouncement,
       replyToAnnouncement,
       sendDirectMessage,
+      markThreadRead,
+      setParentChat,
+      blockThread,
+      reportThread,
       markNotificationRead,
       markAllNotificationsRead,
       saveRecapDraft,

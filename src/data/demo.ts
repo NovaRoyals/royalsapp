@@ -970,6 +970,7 @@ export const demoDirectMessages: DirectMessage[] = [
     threadId: 'coach-priya',
     fromRole: 'guardian',
     fromName: 'Jordan Williams',
+    fromId: 'guardian:household-demo',
     body: 'Hi Coach — Maya still has a mild cough. OK to train if we sit out sprints?',
     createdAt: '2026-09-12T20:10:00-04:00',
   },
@@ -978,10 +979,49 @@ export const demoDirectMessages: DirectMessage[] = [
     threadId: 'coach-priya',
     fromRole: 'coach',
     fromName: 'Coach Priya Sharma',
+    fromId: 'coach:priya',
     body: 'Sit out the first 15 and we will reassess. Thanks for the heads up.',
     createdAt: '2026-09-12T20:22:00-04:00',
   },
+  {
+    id: 'dm-3',
+    threadId: 'coach-priya',
+    fromRole: 'coach',
+    fromName: 'Coach Priya Sharma',
+    fromId: 'coach:priya',
+    body: 'Quick reminder for Sunday: shin guards and a water bottle, please. We’re on Field 3A at 9:00. Arriving by 8:45 helps us start on time.',
+    createdAt: '2026-10-03T08:10:00-04:00',
+  },
+  // Another parent on the team. Only visible once parent chat is switched on.
+  {
+    id: 'dm-4',
+    threadId: 'parent-u8-em',
+    fromRole: 'guardian',
+    fromName: 'Parent of Elena',
+    fromId: 'guardian:family-u8-em',
+    body: 'Hi! Maya and Elena seem to get along at training. Want to sit together on the sideline Sunday?',
+    createdAt: '2026-10-02T19:40:00-04:00',
+  },
+  // Another family's thread with the coach. Only the coach can see it.
+  {
+    id: 'dm-5',
+    threadId: 'family-u8-lc',
+    fromRole: 'guardian',
+    fromName: 'Parent of Lila',
+    fromId: 'guardian:family-u8-lc',
+    body: 'Hi Coach, Lila will be about 15 minutes late on Sunday. Is that okay?',
+    createdAt: '2026-10-03T07:30:00-04:00',
+  },
 ];
+
+/** How the coach sees each family's thread. Coaches see first names, parents see only their own. */
+export const familyThreadLabels: Record<string, { title: string; subtitle: string }> = {
+  'coach-priya': { title: 'Williams family', subtitle: 'Maya · Noah' },
+  'family-u8-lc': { title: 'Chen family', subtitle: 'Lila' },
+};
+
+/** Demo only: parents on the U8 team who switched parent chat on. Everyone else stays unreachable. */
+export const parentChatOptedIn = new Set(['u8-ap', 'u8-jl', 'u8-em', 'u8-lc', 'u8-td']);
 
 export const demoDocuments: HouseholdDocument[] = [
   {
@@ -1004,6 +1044,32 @@ export const demoDocuments: HouseholdDocument[] = [
 
 export const demoNotifications: AppNotification[] = [
   demoCoachReminder(),
+  {
+    id: 'notification-message-coach',
+    type: 'message',
+    title: 'Coach Priya',
+    body: 'Quick reminder for Sunday: shin guards and a water bottle, please. We’re on Field 3A at 9:00.',
+    createdAt: '2026-10-03T08:10:00-04:00',
+    read: false,
+    route: '/message/coach-priya',
+    urgency: 'normal',
+    wouldPush: true,
+    forRole: 'guardian',
+    threadId: 'coach-priya',
+  },
+  {
+    id: 'notification-message-lila',
+    type: 'message',
+    title: 'Chen family',
+    body: 'Hi Coach, Lila will be about 15 minutes late on Sunday. Is that okay?',
+    createdAt: '2026-10-03T07:30:00-04:00',
+    read: false,
+    route: '/message/family-u8-lc',
+    urgency: 'normal',
+    wouldPush: true,
+    forRole: 'coach',
+    threadId: 'family-u8-lc',
+  },
   {
     id: 'notification-1',
     type: 'reminder',

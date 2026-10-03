@@ -41,6 +41,9 @@ export function notificationsForRole<T extends { type: string; title: string; bo
   childIds: string[] = ['child-maya'],
 ) {
   return items.filter((item) => {
+    const only = (item as { forRole?: UserRole }).forRole;
+    if (only && only !== role) return false;
+    if (item.type === 'message' && !only) return false;
     if (item.childId && role === 'guardian' && !childIds.includes(item.childId)) return false;
     if (item.childId && (role === 'guest' || role === 'adult_player' || role === 'volunteer')) return false;
     if (role === 'guest' || role === 'volunteer') {

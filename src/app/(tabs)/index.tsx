@@ -6,6 +6,9 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions,
 import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ClubDirectory } from '@/components/home/ClubDirectory';
+import { MessagesBar } from '@/components/messages/MessagesBar';
+import { UnreadBadge } from '@/components/messages/ChatPieces';
+import { useThreads } from '@/components/messages/useThreads';
 import { HeroStoryCard } from '@/components/home/HeroStoryCard';
 import { royPoseSource, type RoyPose } from '@/components/mascot/poses';
 import { SeasonDots } from '@/components/interactions/SeasonDots';
@@ -34,6 +37,7 @@ import { colors, radius, tints, typography } from '@/theme/tokens';
 export default function HomeScreen() {
   const { role, household, registrations, schedule, notifications, hydrated, persona, pendingStaffRole, recaps, setSupporter } = useApp();
   const reduced = useReducedMotion();
+  const chat = useThreads();
   const { width } = useWindowDimensions();
   const wide = width >= 760;
   const view = useSyncExternalStore(subscribeHomeView, getHomeView, () => 'you' as const);
@@ -118,6 +122,14 @@ export default function HomeScreen() {
           <Text style={styles.mark}>NOVA ROYALS</Text>
           <Text style={styles.hello}>{hello}</Text>
         </View>
+        {chat.viewer ? (
+          <Link href={'/messages' as never} asChild>
+            <Pressable accessibilityLabel={chat.unread ? `Open messages, ${chat.unread} unread` : 'Open messages'} style={styles.bell}>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.ink} />
+              {chat.unread ? <View style={styles.chatBadge}><UnreadBadge count={chat.unread} /></View> : null}
+            </Pressable>
+          </Link>
+        ) : null}
         <Link href={'/notifications' as never} asChild>
           <Pressable accessibilityLabel="Open notifications" style={styles.bell}>
             <Ionicons name="notifications-outline" size={20} color={colors.ink} />
@@ -135,6 +147,9 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={wide ? styles.columns : undefined}>
             <View style={wide ? styles.mainCol : undefined}>
+              <Animated.View entering={rise(0)}>
+                <MessagesBar />
+              </Animated.View>
               {role === 'guardian' && hasChildren ? (
                 <View style={styles.childSwitch}>
                   {household.children.map((child) => (
@@ -145,7 +160,7 @@ export default function HomeScreen() {
                 </View>
               ) : null}
               {primary ? (
-                <Animated.View entering={rise(0)}>
+                <Animated.View entering={rise(1)}>
                   <Text style={styles.section}>Next up</Text>
                   <StoryCard
                     story={primary}
@@ -159,7 +174,7 @@ export default function HomeScreen() {
                 </Animated.View>
               ) : null}
               {registration ? (
-                <Animated.View entering={rise(1)}>
+                <Animated.View entering={rise(2)}>
                   <Brief
                     title={registration.childName ? `Register ${registration.childName}` : 'Register a child'}
                     detail={offerHeadline(joinOffer(nowIso))?.line ?? 'Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A.'}
@@ -171,7 +186,7 @@ export default function HomeScreen() {
               ) : null}
               {attention.length ? <Text style={styles.section}>Needs attention</Text> : null}
               {attention.map((row, index) => (
-                <Animated.View key={row.id} entering={rise(2 + index)}>
+                <Animated.View key={row.id} entering={rise(3 + index)}>
                   <Brief title={row.title} detail={row.detail} href={row.href} look={briefLook[row.id]} />
                 </Animated.View>
               ))}
@@ -184,7 +199,7 @@ export default function HomeScreen() {
             <View style={wide ? styles.sideCol : undefined}>
               <Text style={styles.section}>Around the club</Text>
               {clubEvents.length ? clubEvents.map((event, index) => (
-                <Animated.View key={event.id} entering={rise(3 + index)}>
+                <Animated.View key={event.id} entering={rise(4 + index)}>
                   <CompactStory event={event} role={role} childId={viewingChild?.id} childName={viewingChild?.firstName} onSupport={setSupporter} showImage={wide} />
                 </Animated.View>
               )) : (
@@ -588,6 +603,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chatBadge: { position: 'absolute', top: -6, right: -6 },
   bellDot: {
     position: 'absolute',
     top: 9,
