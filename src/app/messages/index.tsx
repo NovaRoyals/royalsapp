@@ -79,13 +79,23 @@ export default function MessagesScreen() {
         </PressableScale>
       ) : null}
 
-      <Pressable accessibilityRole="link" onPress={() => router.push('/updates' as never)} style={styles.linkRow}>
+      <Pressable accessibilityRole="link" onPress={() => router.push('/announcements' as never)} style={styles.linkRow}>
         <View style={[styles.linkIcon, { backgroundColor: colors.sky }]}>
           <Ionicons accessible={false} name="megaphone-outline" size={18} color={colors.blue} />
         </View>
         <View style={styles.flex}>
-          <Text style={styles.linkTitle}>Team updates and recaps</Text>
-          <Text style={styles.linkSub}>Announcements and session notes from your coach</Text>
+          <Text style={styles.linkTitle}>Announcements</Text>
+          <Text style={styles.linkSub}>Cancellations, schedule changes and club news</Text>
+        </View>
+        <Ionicons accessible={false} name="chevron-forward" size={18} color={colors.stone} />
+      </Pressable>
+      <Pressable accessibilityRole="link" onPress={() => router.push('/updates' as never)} style={[styles.linkRow, styles.linkGap]}>
+        <View style={[styles.linkIcon, { backgroundColor: colors.mint }]}>
+          <Ionicons accessible={false} name="document-text-outline" size={18} color={colors.greenBright} />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.linkTitle}>Session recaps</Text>
+          <Text style={styles.linkSub}>What your coach wrote after training</Text>
         </View>
         <Ionicons accessible={false} name="chevron-forward" size={18} color={colors.stone} />
       </Pressable>
@@ -185,6 +195,7 @@ const styles = StyleSheet.create({
   coachTime: { color: 'rgba(255,255,255,0.6)', fontSize: 12, ...typography.body },
   replyPill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white },
   replyText: { color: colors.ink, fontSize: 14, ...typography.label },
+  linkGap: { marginTop: 8 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 22, backgroundColor: colors.paper },
   linkIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   linkTitle: { color: colors.ink, fontSize: 15, ...typography.heading },

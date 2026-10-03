@@ -6,6 +6,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { EmptyState, Screen } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { notificationsForRole } from '@/lib/membership';
+import { categoryOf, partitionByPriority } from '@/lib/notificationPriority';
+import { useViewer } from '@/state/useViewer';
 import { safeBack } from '@/lib/nav';
 import { formatEventParts } from '@/lib/datetime';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -30,8 +32,38 @@ const icons = {
 export default function NotificationsScreen() {
   const { notifications, markNotificationRead, markAllNotificationsRead, role, household } = useApp();
   const toast = useToast();
-  const visible = notificationsForRole(role, notifications, household.children.map((child) => child.id));
+  const viewer = useViewer();
+  const visible = notificationsForRole(role, notifications, household.children.map((child) => child.id), viewer.teamIds);
+  const { critical, rest } = partitionByPriority(visible);
   const reduced = useReducedMotion();
+
+  const renderRow = (notice: (typeof visible)[number], index: number, urgent: boolean) => (
+    <Animated.View key={notice.id} entering={reduced || index > 0 ? undefined : FadeInDown.duration(240)}>
+      <Pressable
+        onPress={() => {
+          markNotificationRead(notice.id);
+          if (notice.route) router.push(notice.route as never);
+        }}
+        style={[styles.notice, !notice.read && styles.unread, urgent && !notice.read && styles.unreadUrgent]}
+      >
+        <View style={[styles.icon, !notice.read && styles.iconUnread, urgent && styles.iconUrgent]}>
+          <Ionicons name={icons[notice.type]} size={21} color={urgent ? colors.danger : !notice.read ? colors.orangeDark : colors.stone} />
+        </View>
+        <View style={styles.flex}>
+          <View style={styles.noticeTop}>
+            <Text style={styles.noticeTitle}>{notice.title}</Text>
+            {!notice.read ? <View style={styles.dot} /> : null}
+          </View>
+          <Text style={styles.noticeBody}>{notice.body}</Text>
+          <Text style={[styles.time, urgent && { color: colors.danger }]}>
+            {formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}
+            {notice.type === 'announcement' ? ' · Club news' : ''}
+            {categoryOf(notice) === 'critical' ? ' · Cancellation or urgent change' : ''}
+          </Text>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
 
   return (
     <Screen>
@@ -48,36 +80,21 @@ export default function NotificationsScreen() {
           <Text style={styles.markAllText}>Read all</Text>
         </Pressable>
       </View>
-      <Text style={styles.section}>RECENT</Text>
       {visible.length === 0 ? (
         <EmptyState pose="thumbsup" title="You’re all caught up" message="New game-day changes and coach updates will land here." />
       ) : null}
-      <View style={styles.list}>
-        {visible.map((notice, index) => (
-          <Animated.View key={notice.id} entering={reduced || index > 0 ? undefined : FadeInDown.duration(240)}>
-          <Pressable
-            key={notice.id}
-            onPress={() => {
-              markNotificationRead(notice.id);
-              if (notice.route) router.push(notice.route as never);
-            }}
-            style={[styles.notice, !notice.read && styles.unread]}
-          >
-            <View style={[styles.icon, !notice.read && styles.iconUnread]}>
-              <Ionicons name={icons[notice.type]} size={21} color={!notice.read ? colors.orangeDark : colors.stone} />
-            </View>
-            <View style={styles.flex}>
-              <View style={styles.noticeTop}>
-                <Text style={styles.noticeTitle}>{notice.title}</Text>
-                {!notice.read ? <View style={styles.dot} /> : null}
-              </View>
-              <Text style={styles.noticeBody}>{notice.body}</Text>
-              <Text style={styles.time}>{formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}{notice.type === 'announcement' ? ' · Club-wide' : ''}{notice.urgency === 'urgent' || notice.urgency === 'high' ? ` · ${notice.urgency}` : ''}</Text>
-            </View>
-          </Pressable>
-          </Animated.View>
-        ))}
-      </View>
+      {critical.length > 0 ? (
+        <>
+          <Text style={[styles.section, { color: colors.danger }]}>IMPORTANT · CAN’T BE MUTED</Text>
+          <View style={[styles.list, styles.criticalList]}>{critical.map((notice, index) => renderRow(notice, index, true))}</View>
+        </>
+      ) : null}
+      {rest.length > 0 ? (
+        <>
+          <Text style={styles.section}>{critical.length > 0 ? 'EVERYTHING ELSE' : 'RECENT'}</Text>
+          <View style={styles.list}>{rest.map((notice, index) => renderRow(notice, index + critical.length, false))}</View>
+        </>
+      ) : null}
       <View style={styles.safety}>
         <Ionicons name="shield-checkmark-outline" size={22} color={colors.success} />
         <Text style={styles.safetyText}>Youth accounts do not receive public community or open-chat notifications by default.</Text>
@@ -101,6 +118,9 @@ const styles = StyleSheet.create({
   list: { borderRadius: 22, overflow: 'hidden', backgroundColor: colors.paper },
   notice: { padding: 14, flexDirection: 'row', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   unread: { backgroundColor: colors.goldSoft },
+  unreadUrgent: { backgroundColor: colors.dangerSoft },
+  criticalList: { borderWidth: 1.5, borderColor: colors.danger },
+  iconUrgent: { backgroundColor: colors.white },
   icon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
   iconUnread: { backgroundColor: colors.white },
   noticeTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

@@ -301,6 +301,9 @@ export interface AnnouncementReply {
   createdAt: string;
 }
 
+export type AnnouncementKind = 'update' | 'schedule' | 'cancellation' | 'weather' | 'reminder';
+export type AudienceGroup = 'youth_families' | 'adult_players' | 'supporters';
+
 export interface Announcement {
   id: string;
   title: string;
@@ -310,9 +313,19 @@ export interface Announcement {
   publishedAt: string;
   pinned?: boolean;
   urgency?: NoticeUrgency;
+  /** Older announcements have none; they read as a plain update. */
+  kind?: AnnouncementKind;
+  /** For club-wide announcements: which groups it goes to. */
+  groups?: AudienceGroup[];
   teamId?: string;
+  /** For team announcements: every team it goes to. Wins over `teamId`. */
+  teamIds?: string[];
   programId?: string;
   eventId?: string;
+  /** Sessions a cancellation or schedule change is about. */
+  eventIds?: string[];
+  authorName?: string;
+  authorRole?: UserRole;
   replies?: AnnouncementReply[];
 }
 
@@ -350,6 +363,12 @@ export interface AppNotification {
   /** Set on message alerts: only this role sees it, so a coach's alert never reaches a parent. */
   forRole?: UserRole;
   threadId?: string;
+  /** Set on announcement alerts, so only the audience sees them. */
+  announcementId?: string;
+  teamIds?: string[];
+  roles?: UserRole[];
+  /** How much the club cares that you see this. Critical alerts cannot be muted. */
+  category?: 'critical' | 'important' | 'normal';
   /** Skip an identical unread alert. Demo stand-in for a server uniqueness key. */
   dedupeKey?: string;
 }

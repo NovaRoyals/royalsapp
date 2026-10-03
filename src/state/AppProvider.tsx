@@ -19,6 +19,7 @@ import { can, canSendSessionRecap } from '@/lib/capabilities';
 import { ACTIVE_COACH, demoDraftRecap, parentUpdatesFromRecap, recapAudience, recapBody } from '@/lib/coachRecap';
 import { PAST_DELIVERY_ERROR } from '@/lib/deliveryTiming';
 import { hydrateTrace, hydrateTraceEffect } from '@/lib/hydrateTrace';
+import { canCancelTeam, toAnnouncement, validateDraft, type Draft } from '@/lib/announcements';
 import { checkSend, readKey, senderIdFor, viewerFor } from '@/lib/messaging';
 import { applyDecision, canWaive, money, normalizeRegistration, waiveFee, type Decision } from '@/lib/registrationFlow';
 import { COACH_TEAM_ID } from '@/lib/membership';
@@ -51,7 +52,6 @@ import type {
   FieldStatus,
   Household,
   HouseholdDocument,
-  NoticeUrgency,
   NotificationPrefs,
   Person,
   Registration,
@@ -156,12 +156,8 @@ interface AppState extends PersistedState {
   assignRegistrationTeam: (registrationId: string, teamId: string, coachName: string) => void;
   updateEventResult: (eventId: string, result: string) => void;
   upsertEvent: (event: ScheduleEvent) => void;
-  createAnnouncement: (announcement: Pick<Announcement, 'title' | 'body' | 'audience' | 'scopeLabel'> & {
-    urgency?: NoticeUrgency;
-    teamId?: string;
-    programId?: string;
-    eventId?: string;
-  }) => void;
+  publishAnnouncement: (draft: Draft) => { ok: boolean; error?: string; id?: string };
+  postWeatherWatch: (event: ScheduleEvent, outlook: { level: 'good' | 'watch' | 'risky'; family: string; staff: string }) => void;
   replyToAnnouncement: (announcementId: string, body: string) => void;
   sendDirectMessage: (threadId: string, body: string) => { ok: boolean; error?: string };
   markThreadRead: (threadId: string) => void;
@@ -226,15 +222,16 @@ function mergeById<T extends { id: string }>(base: T[], extra: T[]) {
 function keepClubComms(next: PersistedState, current: PersistedState): PersistedState {
   const kept = keepRecapComms(next, current);
   // A message you sent as a parent has to be waiting for the coach, and the other way round.
-  const messageAlerts = (current.notifications ?? []).filter((item) => item.type === 'message');
+  const messageAlerts = (current.notifications ?? []).filter((item) => item.type === 'message' || Boolean(item.announcementId));
   return {
     ...kept,
     messages: mergeById(next.messages ?? [], current.messages ?? []),
+    announcements: mergeById(current.announcements ?? [], next.announcements ?? []),
     threadReads: { ...(next.threadReads ?? {}), ...(current.threadReads ?? {}) },
     parentChatOn: current.parentChatOn ?? next.parentChatOn,
     blockedThreads: current.blockedThreads ?? next.blockedThreads,
     reports: current.reports ?? next.reports,
-    notifications: mergeById(messageAlerts, kept.notifications.filter((item) => item.type !== 'message' || !messageAlerts.some((alert) => alert.id === item.id))),
+    notifications: mergeById(messageAlerts, kept.notifications.filter((item) => !messageAlerts.some((alert) => alert.id === item.id))),
   };
 }
 
@@ -1226,52 +1223,130 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     hapticLight();
   }, []);
 
-  const createAnnouncement = useCallback(
-    (
-      announcement: Pick<Announcement, 'title' | 'body' | 'audience' | 'scopeLabel'> & {
-        urgency?: NoticeUrgency;
-        teamId?: string;
-        programId?: string;
-        eventId?: string;
-      },
-    ) => {
-      setState((current) => {
-        if (!can(current.role, 'send_announcement')) return current;
-        const scoped =
-          announcement.audience === 'club' && !can(current.role, 'send_club_announcement')
-            ? {
-                ...announcement,
-                audience: 'team' as const,
-                teamId: announcement.teamId ?? COACH_TEAM_ID,
-                scopeLabel: 'U8 training',
-              }
-            : announcement;
-        const created: Announcement = {
-          ...scoped,
-          id: `announcement-${Date.now()}`,
-          publishedAt: new Date().toISOString(),
-          urgency: scoped.urgency ?? 'normal',
-          replies: [],
-        };
-        const urgency = created.urgency ?? 'normal';
-        const alert = notice({
-          type: 'announcement',
-          title: created.title,
-          body: created.body,
-          route: `/message/${created.id}`,
-          urgency,
-          wouldPush: urgency !== 'low',
+  const publishAnnouncement = useCallback((draft: Draft): { ok: boolean; error?: string; id?: string } => {
+    const current = stateRef.current;
+    const problem = validateDraft(draft, current.role);
+    if (problem) return { ok: false, error: problem };
+    const schedule = mergeClubSchedule(current.schedule);
+    const targets = draft.kind === 'cancellation' ? schedule.filter((event) => draft.eventIds.includes(event.id)) : [];
+    if (draft.kind === 'cancellation') {
+      if (targets.length !== draft.eventIds.length) return { ok: false, error: 'One of those sessions is no longer on the schedule.' };
+      if (targets.some((event) => !draft.teamIds.includes(event.teamId ?? '') || !canCancelTeam(current.role, event.teamId))) {
+        return { ok: false, error: 'You can only cancel your own team’s sessions.' };
+      }
+    }
+    const authorName = current.role === 'coach' ? ACTIVE_COACH.displayName : current.role === 'admin' ? 'Club office' : 'Team manager';
+    const id = `announcement-${Date.now()}`;
+    const publishedAt = new Date().toISOString();
+    const created: Announcement = { ...toAnnouncement(draft, { name: authorName, role: current.role }), id, publishedAt, replies: [] };
+
+    setState((latest) => {
+      let nextSchedule = mergeClubSchedule(latest.schedule);
+      let audit = latest.audit;
+      if (draft.kind === 'cancellation') {
+        nextSchedule = nextSchedule.map((event) => {
+          if (!draft.eventIds.includes(event.id)) return event;
+          const change = changeEntry({
+            kind: 'cancellation',
+            reason: draft.reason,
+            actorName: authorName,
+            actorRole: latest.role,
+            approval: 'published',
+            reschedulePending: true,
+          });
+          return {
+            ...event,
+            status: 'cancelled' as const,
+            cancellationReason: draft.reason,
+            reschedulePending: true,
+            pendingChange: undefined,
+            changes: [change, ...(event.changes ?? [])],
+          };
         });
-        return {
-          ...current,
-          announcements: [created, ...current.announcements],
-          notifications: [alert, ...current.notifications],
-        };
+        audit = [
+          ...draft.eventIds.map((eventId) =>
+            auditEntry({ action: 'cancellation', targetId: eventId, actorName: authorName, actorRole: latest.role, detail: `${draft.reason}. Announced to ${created.scopeLabel}.` }),
+          ),
+          ...audit,
+        ];
+      }
+      audit = [
+        auditEntry({ action: 'announcement_published', targetId: id, actorName: authorName, actorRole: latest.role, detail: `${draft.kind} · ${created.scopeLabel} · ${created.title}` }),
+        ...audit,
+      ];
+
+      const staff: UserRole[] = ['coach', 'competition_manager', 'admin'];
+      const roles: UserRole[] =
+        created.audience === 'club'
+          ? [
+              ...staff,
+              ...(draft.groups.includes('youth_families') ? (['guardian'] as UserRole[]) : []),
+              ...(draft.groups.includes('adult_players') ? (['adult_player'] as UserRole[]) : []),
+              ...(draft.groups.includes('supporters') ? (['guest', 'volunteer'] as UserRole[]) : []),
+            ]
+          : [...staff, 'guardian', 'adult_player'];
+      const first = targets[0];
+      const alert = notice({
+        type: draft.kind === 'cancellation' ? 'change' : draft.kind === 'weather' ? 'weather' : 'announcement',
+        title: created.title,
+        body: created.body.length > 140 ? `${created.body.slice(0, 137)}…` : created.body,
+        route: `/message/${id}`,
+        urgency: created.urgency,
+        eventId: first?.id,
+        wouldPush: true,
+        announcementId: id,
+        roles,
+        teamIds: created.audience === 'team' ? draft.teamIds : undefined,
+        category: draft.kind === 'cancellation' ? 'critical' : draft.kind === 'weather' || draft.kind === 'schedule' || draft.important ? 'important' : 'normal',
+        dedupeKey: `announcement:${id}`,
       });
-      hapticLight();
-    },
-    [],
-  );
+      return {
+        ...latest,
+        schedule: nextSchedule,
+        announcements: [created, ...latest.announcements],
+        notifications: pushUnique(latest.notifications, alert),
+        audit,
+      };
+    });
+    haptic(draft.kind === 'cancellation' ? 'warning' : 'success');
+    return { ok: true, id };
+  }, []);
+
+  // A heads-up only appears once per session: reading it must not make it come back.
+  const postWeatherWatch = useCallback((event: ScheduleEvent, outlook: { level: 'good' | 'watch' | 'risky'; family: string; staff: string }) => {
+    if (outlook.level !== 'risky' || !event.teamId || event.status === 'cancelled') return;
+    setState((current) => {
+      const key = `weather:${event.id}:${event.startsAt.slice(0, 10)}`;
+      if (current.notifications.some((item) => item.dedupeKey === key || item.dedupeKey === `${key}:staff`)) return current;
+      const families = notice({
+        type: 'weather',
+        title: 'Weather watch',
+        body: outlook.family,
+        route: `/event/${event.id}`,
+        eventId: event.id,
+        urgency: 'high',
+        wouldPush: true,
+        roles: ['guardian', 'adult_player'],
+        teamIds: [event.teamId as string],
+        category: 'important',
+        dedupeKey: key,
+      });
+      const staff = notice({
+        type: 'weather',
+        title: 'Weather watch for your session',
+        body: outlook.staff,
+        route: '/announcements/new',
+        eventId: event.id,
+        urgency: 'high',
+        wouldPush: true,
+        roles: ['coach', 'competition_manager'],
+        teamIds: [event.teamId as string],
+        category: 'important',
+        dedupeKey: `${key}:staff`,
+      });
+      return { ...current, notifications: [families, staff, ...current.notifications] };
+    });
+  }, []);
 
   const replyToAnnouncement = useCallback((announcementId: string, body: string) => {
     setState((current) => {
@@ -1562,7 +1637,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       assignRegistrationTeam,
       updateEventResult,
       upsertEvent,
-      createAnnouncement,
+      publishAnnouncement,
+      postWeatherWatch,
       replyToAnnouncement,
       sendDirectMessage,
       markThreadRead,
@@ -1606,7 +1682,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       assignRegistrationTeam,
       updateEventResult,
       upsertEvent,
-      createAnnouncement,
+      publishAnnouncement,
+      postWeatherWatch,
       replyToAnnouncement,
       sendDirectMessage,
       markThreadRead,

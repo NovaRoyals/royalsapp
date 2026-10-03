@@ -6,7 +6,11 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions,
 import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ClubDirectory } from '@/components/home/ClubDirectory';
+import { AnnouncementCard } from '@/components/announcements/AnnouncementCard';
 import { MessagesBar } from '@/components/messages/MessagesBar';
+import { WeatherCard } from '@/components/weather/WeatherCard';
+import { homeHeadline, splitAnnouncements, visibleTo } from '@/lib/announcements';
+import { useViewer } from '@/state/useViewer';
 import { UnreadBadge } from '@/components/messages/ChatPieces';
 import { useThreads } from '@/components/messages/useThreads';
 import { HeroStoryCard } from '@/components/home/HeroStoryCard';
@@ -35,9 +39,10 @@ import { motion } from '@/theme/motion';
 import { colors, radius, tints, typography } from '@/theme/tokens';
 
 export default function HomeScreen() {
-  const { role, household, registrations, schedule, notifications, hydrated, persona, pendingStaffRole, recaps, setSupporter } = useApp();
+  const { role, household, registrations, schedule, notifications, hydrated, persona, pendingStaffRole, recaps, setSupporter, announcements } = useApp();
   const reduced = useReducedMotion();
   const chat = useThreads();
+  const viewer = useViewer();
   const { width } = useWindowDimensions();
   const wide = width >= 760;
   const view = useSyncExternalStore(subscribeHomeView, getHomeView, () => 'you' as const);
@@ -59,7 +64,7 @@ export default function HomeScreen() {
   }, [view, paneFade, reduced]);
   const paneFadeStyle = useAnimatedStyle(() => ({ flex: 1, opacity: paneFade.value }));
   const rise = (index: number) => (reduced ? undefined : FadeInDown.delay(Math.min(index, 5) * 60).duration(260).easing(Easing.out(Easing.cubic)));
-  const unread = notificationsForRole(role, notifications, household.children.map((child) => child.id)).filter((item) => !item.read);
+  const unread = notificationsForRole(role, notifications, household.children.map((child) => child.id), viewer.teamIds).filter((item) => !item.read);
   const urgent = unread.find((item) => item.urgency === 'urgent');
   const [nowIso, setNowIso] = useState('2026-09-25T12:00:00-04:00');
   useEffect(() => {
@@ -71,6 +76,8 @@ export default function HomeScreen() {
       clearInterval(tick);
     };
   }, []);
+  const headline = useMemo(() => homeHeadline(announcements, viewer, new Date(nowIso)), [announcements, nowIso, viewer]);
+  const currentCount = useMemo(() => splitAnnouncements(announcements.filter((item) => visibleTo(item, viewer)), new Date(nowIso)).latest.length, [announcements, nowIso, viewer]);
   const kidsEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === COACH_TEAM_ID), nowIso);
   const menEvent = nextUpcomingEvent(schedule.filter((event) => event.teamId === PLAYER_TEAM_ID), nowIso);
   const pendingRegs = registrations.filter((item) => isInReview(item.status));
@@ -147,6 +154,11 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={wide ? styles.columns : undefined}>
             <View style={wide ? styles.mainCol : undefined}>
+              {headline ? (
+                <Animated.View entering={rise(0)}>
+                  <AnnouncementCard announcement={headline} lines={3} onPress={() => router.push(`/message/${headline.id}` as never)} />
+                </Animated.View>
+              ) : null}
               <Animated.View entering={rise(0)}>
                 <MessagesBar />
               </Animated.View>
@@ -171,6 +183,7 @@ export default function HomeScreen() {
                     nowIso={nowIso}
                     onSupport={setSupporter}
                   />
+                  <WeatherCard event={primaryEvent} />
                 </Animated.View>
               ) : null}
               {registration ? (
@@ -190,11 +203,18 @@ export default function HomeScreen() {
                   <Brief title={row.title} detail={row.detail} href={row.href} look={briefLook[row.id]} />
                 </Animated.View>
               ))}
-              <Link href="/(tabs)/schedule" asChild>
-                <Pressable accessibilityRole="link" style={styles.scheduleLink}>
-                  <Text style={styles.scheduleLinkText}>See schedule</Text>
-                </Pressable>
-              </Link>
+              <View style={styles.linkRow}>
+                <Link href="/(tabs)/schedule" asChild>
+                  <Pressable accessibilityRole="link" style={styles.scheduleLink}>
+                    <Text style={styles.scheduleLinkText}>See schedule</Text>
+                  </Pressable>
+                </Link>
+                <Link href={'/announcements' as never} asChild>
+                  <Pressable accessibilityRole="link" accessibilityLabel={`All announcements, ${currentCount} current`} style={styles.scheduleLink}>
+                    <Text style={styles.scheduleLinkText}>Announcements{currentCount ? ` · ${currentCount}` : ''}</Text>
+                  </Pressable>
+                </Link>
+              </View>
             </View>
             <View style={wide ? styles.sideCol : undefined}>
               <Text style={styles.section}>Around the club</Text>
@@ -586,6 +606,7 @@ const styles = StyleSheet.create({
   accountDetail: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, ...typography.body },
   accountAction: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   accountActionText: { color: colors.ink, fontSize: 13, ...typography.label },
+  linkRow: { flexDirection: 'row', gap: 20, flexWrap: 'wrap' },
   scheduleLink: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', marginBottom: 8 },
   scheduleLinkText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
   top: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8, marginBottom: 16 },

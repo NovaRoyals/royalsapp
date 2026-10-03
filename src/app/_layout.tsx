@@ -61,6 +61,8 @@ export default function RootLayout() {
             <Stack.Screen name="cricket/player/[id]" />
             <Stack.Screen name="season/[registrationId]" />
             <Stack.Screen name="messages/index" />
+            <Stack.Screen name="announcements/index" />
+            <Stack.Screen name="announcements/new" />
             <Stack.Screen name="message/[id]" />
             <Stack.Screen name="about" />
             <Stack.Screen name="notifications" />

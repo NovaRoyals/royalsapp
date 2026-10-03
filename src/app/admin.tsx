@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoPrograms, demoTeams } from '@/data/demo';
@@ -14,7 +13,6 @@ import { canWaive, paymentLine, statusWord } from '@/lib/registrationFlow';
 import { safeBack } from '@/lib/nav';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import type { NoticeUrgency } from '@/types/domain';
 
 type AdminTab = 'registrations' | 'announcements' | 'teams' | 'games';
 
@@ -27,7 +25,6 @@ export default function AdminScreen() {
     decideRegistration,
     waiveRegistrationFee,
     updateEventResult,
-    createAnnouncement,
     assignRegistrationTeam,
     setFieldStatus,
     upsertEvent,
@@ -36,18 +33,13 @@ export default function AdminScreen() {
     setManagerCanSendRecap,
   } = useApp();
   const [tab, setTab] = useState<AdminTab>(can(role, 'review_registrations') ? 'registrations' : 'announcements');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
   const [result, setResult] = useState('');
-  const [urgency, setUrgency] = useState<NoticeUrgency>('normal');
   const [newTitle, setNewTitle] = useState('');
   const [newVenue, setNewVenue] = useState('');
   const [funnelStats, setFunnelStats] = useState<{ views: number; starts: number; done: number } | null>(null);
   const [reasonFor, setReasonFor] = useState<{ id: string; kind: 'reject' | 'waive' } | null>(null);
-  const [audience, setAudience] = useState<'team' | 'club'>(can(role, 'send_club_announcement') ? 'team' : 'team');
   const allowed = role === 'admin' || role === 'coach' || role === 'competition_manager';
   const canReview = can(role, 'review_registrations');
-  const canClubAnnounce = can(role, 'send_club_announcement');
   const canEditSchedule = can(role, 'edit_schedules');
   const assignedEvents = schedule.filter((event) => (role === 'coach' ? event.teamId === 'nova-royals-kids-u8' : Boolean(event.teamId)));
 
@@ -68,20 +60,6 @@ export default function AdminScreen() {
       </Screen>
     );
   }
-
-  const publish = () => {
-    if (!title.trim() || !body.trim()) return;
-    createAnnouncement({
-      title,
-      body,
-      audience: canClubAnnounce && audience === 'club' ? 'club' : 'team',
-      scopeLabel: canClubAnnounce && audience === 'club' ? 'Nova Royals' : 'U8 training',
-      teamId: canClubAnnounce && audience === 'club' ? undefined : 'nova-royals-kids-u8',
-      urgency,
-    });
-    setTitle('');
-    setBody('');
-  };
 
   return (
     <Screen>
@@ -193,41 +171,18 @@ export default function AdminScreen() {
 
       {tab === 'announcements' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Publish announcement</Text>
+          <Text style={styles.sectionTitle}>Announcements</Text>
           <Text style={styles.sectionCopy}>
-            {canClubAnnounce
-              ? 'Choose an audience first. Club-wide messages are never the default.'
-              : 'Messages send to your assigned team only. Club-wide publishing is not available to this role.'}
+            Write to the whole club, or to specific teams. Cancellations take the session off the schedule and can’t be muted.
           </Text>
-          <View style={styles.form}>
-            {canClubAnnounce ? (
-              <View style={styles.inline}>
-                <Button label="Assigned team" variant={audience === 'team' ? 'primary' : 'secondary'} onPress={() => setAudience('team')} style={styles.flex} />
-                <Button label="Club-wide" variant={audience === 'club' ? 'primary' : 'secondary'} onPress={() => setAudience('club')} style={styles.flex} />
-              </View>
-            ) : null}
-            <Field label="Headline" value={title} onChangeText={setTitle} placeholder="What should members know?" />
-            <Field label="Message" value={body} onChangeText={setBody} multiline numberOfLines={4} placeholder="Keep it clear and actionable." />
-            <Text style={styles.subheading}>URGENCY</Text>
-            <View style={styles.inline}>
-              {(['urgent', 'high', 'normal', 'low'] as NoticeUrgency[]).map((level) => (
-                <Button
-                  key={level}
-                  label={level}
-                  variant={urgency === level ? 'primary' : 'secondary'}
-                  onPress={() => setUrgency(level)}
-                  style={styles.flex}
-                />
-              ))}
-            </View>
-            <Button label="Publish demo announcement" icon="megaphone-outline" disabled={!title || !body} onPress={publish} />
-          </View>
-          <Text style={styles.subheading}>Published</Text>
-          {announcements.map((announcement, index) => (
-            <Animated.View key={announcement.id} entering={index === 0 ? FadeInDown.duration(240) : undefined} style={styles.announcement}>
-              <Ionicons name="megaphone-outline" size={20} color={colors.orangeDark} />
+          <Button label="Write an announcement" icon="create-outline" onPress={() => router.push('/announcements/new' as never)} />
+          <Button label="See all announcements" variant="secondary" icon="megaphone-outline" onPress={() => router.push('/announcements' as never)} style={styles.flexTop} />
+          <Text style={styles.subheading}>Recently sent</Text>
+          {announcements.slice(0, 5).map((announcement) => (
+            <Pressable key={announcement.id} accessibilityRole="link" onPress={() => router.push(`/message/${announcement.id}` as never)} style={styles.announcement}>
+              <Ionicons accessible={false} name="megaphone-outline" size={20} color={colors.orangeDark} />
               <View style={styles.flex}><Text style={styles.cardTitle}>{announcement.title}</Text><Text style={styles.cardMeta}>{announcement.scopeLabel} · {formatEventParts(announcement.publishedAt).month} {formatEventParts(announcement.publishedAt).day}</Text></View>
-            </Animated.View>
+            </Pressable>
           ))}
         </View>
       )}
@@ -299,6 +254,7 @@ function Metric({ value, label }: { value: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  flexTop: { marginTop: spacing.sm },
   reasonBox: { marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.sand, gap: spacing.sm },
   reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   reasonChip: { minHeight: 40, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },

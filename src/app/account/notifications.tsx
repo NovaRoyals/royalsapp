@@ -10,8 +10,8 @@ export default function AccountNotificationsScreen() {
         <SettingRow
           icon="alert-circle-outline"
           tint="blush"
-          label="Urgent changes"
-          detail="Field closures, cancellations and moved sessions always reach you."
+          label="Cancellations and urgent changes"
+          detail="A cancelled session, a field closure or a safety alert always reaches you, even with everything else off."
           toggle={{ on: true, locked: true }}
           last
         />
@@ -21,14 +21,14 @@ export default function AccountNotificationsScreen() {
         <SettingRow
           icon="chatbubble-ellipses-outline"
           tint="gold"
-          label="Team and coach alerts"
-          detail="Messages from your coach, session recaps and reminders."
+          label="Coach messages and team news"
+          detail="Messages from your coach, schedule changes, weather heads-ups and recaps."
           toggle={{ on: notificationPrefs.team, onChange: (next) => setNotificationPrefs({ ...notificationPrefs, team: next }) }}
         />
         <SettingRow
           icon="megaphone-outline"
           tint="sky"
-          label="Club news"
+          label="Club news and reminders"
           detail="Events, fundraisers and community days."
           toggle={{ on: notificationPrefs.community, onChange: (next) => setNotificationPrefs({ ...notificationPrefs, community: next }) }}
         />

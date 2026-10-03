@@ -22,6 +22,7 @@ import { royPoseSource, type RoyPose } from '@/components/mascot/poses';
 import { TabScene } from '@/components/motion';
 import { haptic } from '@/lib/haptics';
 import { notificationsForRole } from '@/lib/membership';
+import { useViewer } from '@/state/useViewer';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { backendModeLabel, isDemoMode } from '@/lib/supabase';
 import { useApp } from '@/state/AppProvider';
@@ -105,7 +106,8 @@ export function AppHeader({
   style?: StyleProp<ViewStyle>;
 }) {
   const { hydrated, notifications, role, household } = useApp();
-  const unread = hydrated ? notificationsForRole(role, notifications, household.children.map((child) => child.id)).filter((item) => !item.read).length : 0;
+  const viewer = useViewer();
+  const unread = hydrated ? notificationsForRole(role, notifications, household.children.map((child) => child.id), viewer.teamIds).filter((item) => !item.read).length : 0;
   const reduced = useReducedMotion();
   return (
     <View style={[styles.header, style]}>

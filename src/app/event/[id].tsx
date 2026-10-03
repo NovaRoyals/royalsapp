@@ -9,6 +9,7 @@ import { AttendanceRoster } from '@/components/interactions/AttendanceRoster';
 import { RsvpChoices } from '@/components/interactions/RsvpChoices';
 import { SupporterButton } from '@/components/interactions/SupporterButton';
 import { CalendarPrep } from '@/components/operations/CalendarPrep';
+import { WeatherCard } from '@/components/weather/WeatherCard';
 import { PressableScale } from '@/components/motion';
 import { useToast } from '@/components/Toast';
 import { Button, Screen, StatusPill } from '@/components/ui';
@@ -193,6 +194,9 @@ export default function EventDetailScreen() {
             <CalendarPrep event={event} season={season.length ? season : [event]} />
           </View>
         ) : null}
+        <View style={styles.weather}>
+          <WeatherCard event={event} />
+        </View>
 
         {event.fieldStatus === 'closed' || event.status === 'cancelled' || event.previousVenue || event.pendingChange ? (
           <View style={[styles.banner, event.fieldStatus === 'closed' || event.status === 'cancelled' ? styles.bannerDanger : styles.bannerAttention]}>
@@ -761,6 +765,7 @@ const styles = StyleSheet.create({
   aboutTitle: { color: colors.ink, fontSize: 16, ...typography.heading },
   aboutBody: { color: colors.charcoal, fontSize: 13, marginTop: 2, ...typography.body },
   hero: { marginTop: 4, borderRadius: 26, overflow: 'hidden', backgroundColor: colors.greenDeep },
+  weather: { marginTop: 10 },
   quickRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   quick: { flex: 1, minHeight: 48, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border },
   quickPrimary: { backgroundColor: colors.ink, borderColor: colors.ink },

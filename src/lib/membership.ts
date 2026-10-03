@@ -1,3 +1,4 @@
+import { addressedTo } from '@/lib/notificationPriority';
 import type { Registration, ScheduleEvent, UserRole } from '@/types/domain';
 
 export const COACH_TEAM_ID = 'nova-royals-kids-u8';
@@ -35,12 +36,15 @@ export function canPlayerRsvp(role: UserRole, event: ScheduleEvent, registration
   return isTeamParticipant(role, event, registrations);
 }
 
-export function notificationsForRole<T extends { type: string; title: string; body: string; childId?: string; urgency?: string }>(
+export function notificationsForRole<T extends { type: string; title: string; body: string; childId?: string; urgency?: string; roles?: UserRole[]; teamIds?: string[] }>(
   role: UserRole,
   items: T[],
   childIds: string[] = ['child-maya'],
+  teamIds: string[] = [],
 ) {
   return items.filter((item) => {
+    // Announcement alerts are written for certain roles and teams; nobody else sees them.
+    if (!addressedTo(item, role, teamIds)) return false;
     const only = (item as { forRole?: UserRole }).forRole;
     if (only && only !== role) return false;
     if (item.type === 'message' && !only) return false;

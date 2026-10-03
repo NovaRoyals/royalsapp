@@ -29,6 +29,7 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 const menu = [
+  { icon: 'megaphone-outline' as const, label: 'Announcements', detail: 'Cancellations and club news', href: '/announcements' },
   { icon: 'person-outline' as const, label: 'Personal information', detail: 'Name, phone, address', href: '/account/personal' },
   { icon: 'card-outline' as const, label: 'Payments', detail: 'Receipts and status', href: '/account/payments' },
   { icon: 'document-text-outline' as const, label: 'Waivers & consents', detail: 'Signed documents', href: '/account/waivers' },
