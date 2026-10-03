@@ -308,7 +308,7 @@ export function EmptyState({
           source={royPoseSource[pose]}
           style={styles.emptyRoy}
           contentFit="contain"
-          accessible={false}
+          alt=""
           accessibilityIgnoresInvertColors
         />
       ) : icon ? (

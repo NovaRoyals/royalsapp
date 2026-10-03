@@ -19,6 +19,11 @@ export const colors = {
   stone: '#5F736B',
   white: '#FFFFFF',
   greenDeep: '#0B3527',
+  night: '#06241A',
+  gold: '#F2B63D',
+  goldSoft: '#FBF0CF',
+  lilac: '#6B5FB5',
+  lilacSoft: '#E7E4F7',
   greenBright: '#2E7D5B',
   blue: '#3B7FB8',
   blueSoft: '#E1ECF7',
@@ -37,6 +42,21 @@ export const colors = {
   info: '#315F78',
   border: '#DCE8E0',
   overlay: 'rgba(11, 53, 39, 0.58)',
+} as const;
+
+/** Card tints for color play. Each pairs a soft fill with a stronger accent for icons and small text. */
+export const tints = {
+  mint: { bg: colors.mint, accent: colors.greenBright },
+  gold: { bg: colors.goldSoft, accent: '#B7791F' },
+  sky: { bg: colors.sky, accent: colors.blue },
+  blush: { bg: colors.roseSoft, accent: colors.rose },
+  lilac: { bg: colors.lilacSoft, accent: colors.lilac },
+} as const;
+
+export type TintName = keyof typeof tints;
+
+export const gradients = {
+  night: [colors.night, colors.greenDeep, colors.inkSoft] as const,
 } as const;
 
 export const spacing = {

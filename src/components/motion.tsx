@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from 'expo-router';
 import { useEffect, type ReactNode } from 'react';
 import { Platform, Pressable, type PressableProps, View } from 'react-native';
-import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { haptic } from '@/lib/haptics';
 import { useReducedMotion } from '@/lib/reducedMotion';
@@ -27,6 +27,10 @@ export function PressableScale({ style, children, accessibilityRole, ...props }:
   );
 }
 
+/**
+ * Icon on the dark floating bar. The selected tab sits in a soft mint tile that grows in
+ * with a short spring, so the move from one tab to the next is visible, not just a color swap.
+ */
 export function TabBarIcon({
   outline,
   filled,
@@ -38,18 +42,28 @@ export function TabBarIcon({
   focused: boolean;
   size: number;
 }) {
+  const reduced = useReducedMotion();
+  const on = useSharedValue(focused ? 1 : 0);
+  useEffect(() => {
+    on.value = reduced ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, motion.spring.press);
+  }, [focused, on, reduced]);
+  const tileStyle = useAnimatedStyle(() => ({
+    opacity: on.value,
+    transform: [{ scale: 0.7 + on.value * 0.3 }],
+  }));
   return (
     <View
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      style={{ width: 52, height: 44, alignItems: 'center', justifyContent: 'center' }}
     >
+      <Animated.View style={[{ position: 'absolute', width: 52, height: 44, borderRadius: 22, backgroundColor: colors.mint }, tileStyle]} />
       <Ionicons
         accessible={false}
         name={focused ? filled : outline}
         size={size}
-        color={focused ? colors.ink : colors.stone}
+        color={focused ? colors.ink : 'rgba(220, 239, 226, 0.72)'}
       />
     </View>
   );

@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 
 import { onTabPressHaptic, TabBarIcon } from '@/components/motion';
-import { colors, typography } from '@/theme/tokens';
+import { colors, radius } from '@/theme/tokens';
 
 const iconMap = {
   index: ['home-outline', 'home'],
@@ -20,19 +20,31 @@ export default function TabsLayout() {
         headerShown: false,
         sceneStyle: { backgroundColor: colors.cream },
         animation: 'none',
-        tabBarActiveTintColor: colors.ink,
-        tabBarInactiveTintColor: colors.stone,
-        tabBarLabelStyle: { fontSize: 10, fontFamily: typography.label.fontFamily, letterSpacing: 0.1 },
+        tabBarShowLabel: false,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 82 : 64,
-          paddingTop: 6,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          backgroundColor: colors.paper,
-          borderTopColor: colors.border,
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          bottom: Platform.OS === 'ios' ? 26 : 14,
+          height: 64,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingHorizontal: 6,
+          borderRadius: radius.pill,
+          backgroundColor: colors.night,
+          borderTopWidth: 0,
+          maxWidth: 440,
+          alignSelf: 'center',
+          ...Platform.select({
+            web: { boxShadow: '0 12px 32px rgba(6, 36, 26, 0.32)' },
+            default: { shadowColor: colors.night, shadowOpacity: 0.32, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
+          }),
         },
+        tabBarItemStyle: { height: 64, paddingVertical: 0, justifyContent: 'center', alignItems: 'center' },
+        tabBarIconStyle: { width: 52, height: 44, marginTop: 0, marginBottom: 0 },
         tabBarIcon: ({ focused, size }) => {
           const icons = iconMap[route.name as keyof typeof iconMap] ?? iconMap.index;
-          return <TabBarIcon outline={icons[0]} filled={icons[1]} focused={focused} size={size} />;
+          return <TabBarIcon outline={icons[0]} filled={icons[1]} focused={focused} size={Math.min(size, 24)} />;
         },
       })}
     >

@@ -3,11 +3,14 @@ import { Image } from 'expo-image';
 import { Href, Link, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ClubDirectory } from '@/components/home/ClubDirectory';
+import { HeroStoryCard } from '@/components/home/HeroStoryCard';
+import { royPoseSource, type RoyPose } from '@/components/mascot/poses';
 import { SeasonDots } from '@/components/interactions/SeasonDots';
 import { PressableScale } from '@/components/motion';
+import { haptic } from '@/lib/haptics';
 import { Screen } from '@/components/ui';
 import { demoPrograms, kidsProgramId } from '@/data/demo';
 import { mayaAttendanceHistory } from '@/lib/attendance';
@@ -21,9 +24,11 @@ import { homeGreeting } from '@/lib/greeting';
 import { contextualStory, storyViewerFor } from '@/lib/matchStory';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
 import { joinOffer, offerHeadline } from '@/lib/pricing';
+import { tintFor } from '@/lib/tint';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
-import { colors, radius, typography } from '@/theme/tokens';
+import { motion } from '@/theme/motion';
+import { colors, radius, tints, typography } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const { role, household, registrations, schedule, notifications, hydrated, persona, pendingStaffRole, recaps, setSupporter } = useApp();
@@ -33,9 +38,22 @@ export default function HomeScreen() {
   const view = useSyncExternalStore(subscribeHomeView, getHomeView, () => 'you' as const);
   const [childId, setChildId] = useState(household.children[0]?.id);
   const choose = (next: 'you' | 'club') => {
+    if (next === view) return;
+    haptic('light');
     setHomeView(next);
     router.setParams({ view: next === 'club' ? 'club' : '' });
   };
+  const paneFade = useSharedValue(1);
+  useEffect(() => {
+    if (reduced) {
+      paneFade.value = 1;
+      return;
+    }
+    paneFade.value = 0.12;
+    paneFade.value = withTiming(1, { duration: 170, easing: Easing.out(Easing.cubic) });
+  }, [view, paneFade, reduced]);
+  const paneFadeStyle = useAnimatedStyle(() => ({ flex: 1, opacity: paneFade.value }));
+  const rise = (index: number) => (reduced ? undefined : FadeInDown.delay(Math.min(index, 5) * 60).duration(260).easing(Easing.out(Easing.cubic)));
   const unread = notificationsForRole(role, notifications, household.children.map((child) => child.id)).filter((item) => !item.read);
   const urgent = unread.find((item) => item.urgency === 'urgent');
   const [nowIso, setNowIso] = useState('2026-09-25T12:00:00-04:00');
@@ -92,6 +110,9 @@ export default function HomeScreen() {
   return (
     <Screen scroll={false} tabScene contentStyle={styles.frame}>
       <View style={styles.top}>
+        <View style={styles.avatar}>
+          <Image source={royPoseSource.smile} style={styles.avatarImage} contentFit="cover" contentPosition="top" alt="" accessibilityIgnoresInvertColors />
+        </View>
         <View style={styles.flex}>
           <Text style={styles.mark}>NOVA ROYALS</Text>
           <Text style={styles.hello}>{hello}</Text>
@@ -104,6 +125,7 @@ export default function HomeScreen() {
         </Link>
       </View>
       <HomeSwitch value={view} onChange={choose} />
+      <Animated.View style={paneFadeStyle}>
       <View
         style={[styles.pane, view !== 'you' && styles.paneHidden]}
         accessibilityElementsHidden={view !== 'you'}
@@ -121,19 +143,8 @@ export default function HomeScreen() {
                   ))}
                 </View>
               ) : null}
-              {registration ? (
-                <Brief
-                  title={registration.childName ? `Register ${registration.childName}` : 'Register a child'}
-                  detail={offerHeadline(joinOffer(nowIso))?.line ?? 'Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A.'}
-                  href={`/registration/${registration.programId}`}
-                />
-              ) : null}
-              {attention.length ? <Text style={styles.section}>Needs attention</Text> : null}
-              {attention.map((row) => (
-                <Brief key={row.id} title={row.title} detail={row.detail} href={row.href} />
-              ))}
               {primary ? (
-                <>
+                <Animated.View entering={rise(0)}>
                   <Text style={styles.section}>Next up</Text>
                   <StoryCard
                     story={primary}
@@ -141,10 +152,28 @@ export default function HomeScreen() {
                     role={role}
                     childId={viewingChild?.id}
                     childName={viewingChild?.firstName}
+                    nowIso={nowIso}
                     onSupport={setSupporter}
                   />
-                </>
+                </Animated.View>
               ) : null}
+              {registration ? (
+                <Animated.View entering={rise(1)}>
+                  <Brief
+                    title={registration.childName ? `Register ${registration.childName}` : 'Register a child'}
+                    detail={offerHeadline(joinOffer(nowIso))?.line ?? 'Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A.'}
+                    href={`/registration/${registration.programId}`}
+                    look={{ icon: 'person-add-outline', tint: 'gold' }}
+                    badge={offerHeadline(joinOffer(nowIso))?.badge}
+                  />
+                </Animated.View>
+              ) : null}
+              {attention.length ? <Text style={styles.section}>Needs attention</Text> : null}
+              {attention.map((row, index) => (
+                <Animated.View key={row.id} entering={rise(2 + index)}>
+                  <Brief title={row.title} detail={row.detail} href={row.href} look={briefLook[row.id]} />
+                </Animated.View>
+              ))}
               <Link href="/(tabs)/schedule" asChild>
                 <Pressable accessibilityRole="link" style={styles.scheduleLink}>
                   <Text style={styles.scheduleLinkText}>See schedule</Text>
@@ -153,8 +182,10 @@ export default function HomeScreen() {
             </View>
             <View style={wide ? styles.sideCol : undefined}>
               <Text style={styles.section}>Around the club</Text>
-              {clubEvents.length ? clubEvents.map((event) => (
-                <CompactStory key={event.id} event={event} role={role} childId={viewingChild?.id} childName={viewingChild?.firstName} onSupport={setSupporter} showImage={wide} />
+              {clubEvents.length ? clubEvents.map((event, index) => (
+                <Animated.View key={event.id} entering={rise(3 + index)}>
+                  <CompactStory event={event} role={role} childId={viewingChild?.id} childName={viewingChild?.firstName} onSupport={setSupporter} showImage={wide} />
+                </Animated.View>
               )) : (
                 <PressableScale onPress={() => choose('club')} style={styles.brief}>
                   <View style={styles.flex}>
@@ -175,13 +206,14 @@ export default function HomeScreen() {
                 </Animated.View>
               ) : null}
               {role === 'guest' ? (
-                <View style={styles.accountCard}>
-                  <Text style={styles.briefTitle}>Create account or sign in</Text>
-                  <Text style={styles.briefDetail}>RSVP for your family and keep the sessions you follow in one place.</Text>
+                <Animated.View entering={rise(5)} style={styles.accountCard}>
+                  <Image source={royPoseSource.wave} style={styles.accountRoy} contentFit="contain" alt="" accessibilityIgnoresInvertColors />
+                  <Text style={styles.accountTitle}>Join the club</Text>
+                  <Text style={styles.accountDetail}>RSVP for your family and keep the sessions you follow in one place.</Text>
                   <Pressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={styles.accountAction}>
-                    <Text style={styles.storyActionText}>Create account or sign in</Text>
+                    <Text style={styles.accountActionText}>Create account or sign in</Text>
                   </Pressable>
-                </View>
+                </Animated.View>
               ) : null}
             </View>
           </View>
@@ -196,6 +228,7 @@ export default function HomeScreen() {
           <ClubDirectory nowIso={nowIso} />
         </ScrollView>
       </View>
+      </Animated.View>
     </Screen>
   );
 }
@@ -205,7 +238,18 @@ function HomeSwitch({ value, onChange }: { value: 'you' | 'club'; onChange: (nex
     { id: 'you' as const, label: 'For you' },
     { id: 'club' as const, label: 'Club' },
   ];
+  const reduced = useReducedMotion();
   const ref = useRef<View>(null);
+  const [width, setWidth] = useState(0);
+  const index = value === 'you' ? 0 : 1;
+  const pill = useSharedValue(index);
+  useEffect(() => {
+    pill.value = reduced ? index : withTiming(index, { duration: motion.duration.base, easing: Easing.out(Easing.cubic) });
+  }, [index, pill, reduced]);
+  const pillStyle = useAnimatedStyle(() => {
+    const segment = Math.max((width - 8) / 2, 0);
+    return { width: segment, transform: [{ translateX: pill.value * segment }] };
+  });
   useEffect(() => {
     const root = ref.current as unknown as { querySelectorAll?: (query: string) => Iterable<HTMLElement> } | null;
     if (!root?.querySelectorAll) return;
@@ -214,7 +258,8 @@ function HomeSwitch({ value, onChange }: { value: 'you' | 'club'; onChange: (nex
     }
   }, [value]);
   return (
-    <View ref={ref} accessibilityRole="tablist" style={styles.switchRow}>
+    <View ref={ref} accessibilityRole="tablist" onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={styles.switchRow}>
+      <Animated.View pointerEvents="none" style={[styles.switchPill, pillStyle]} />
       {options.map((option) => {
         const selected = value === option.id;
         return (
@@ -224,7 +269,7 @@ function HomeSwitch({ value, onChange }: { value: 'you' | 'club'; onChange: (nex
             accessibilityState={{ selected }}
             accessibilityLabel={option.label}
             onPress={() => onChange(option.id)}
-            style={[styles.switchOption, selected && styles.switchOptionOn]}
+            style={styles.switchOption}
           >
             <Text style={[styles.switchText, selected && styles.switchTextOn]}>{option.label}</Text>
           </Pressable>
@@ -234,12 +279,21 @@ function HomeSwitch({ value, onChange }: { value: 'you' | 'club'; onChange: (nex
   );
 }
 
+function heroPose(kind: HomeStory['kind'], role: ReturnType<typeof useApp>['role'], startsAt: string, nowIso: string): RoyPose {
+  if (kind === 'live') return 'run';
+  if (kind === 'result') return 'thumbsup';
+  const hours = (new Date(startsAt).getTime() - new Date(nowIso).getTime()) / 3_600_000;
+  if (hours <= 24) return 'excited';
+  return role === 'guest' ? 'wave' : 'idle';
+}
+
 function StoryCard({
   story,
   event,
   role,
   childId,
   childName,
+  nowIso,
   onSupport,
 }: {
   story: HomeStory;
@@ -247,50 +301,33 @@ function StoryCard({
   role: ReturnType<typeof useApp>['role'];
   childId?: string;
   childName?: string;
+  nowIso: string;
   onSupport: (eventId: string, going: boolean) => void;
 }) {
   const parts = formatEventParts(story.startsAt);
   const card = event ? contextualStory(event, storyViewerFor({ role, event, childId, childName })) : null;
-  const action = () => {
+  const run = () => {
     if (!card?.action || !event) return;
     if (card.action.kind === 'signin') router.push('/onboarding');
     else if (card.action.kind === 'support') onSupport(event.id, !event.supporterGoing);
     else router.push(story.href as never);
   };
   return (
-    <View style={StyleSheet.flatten([styles.featured, story.kind === 'result' && styles.featuredResult, story.kind === 'live' && styles.featuredLive])}>
-      <View style={styles.storyRow}>
-        <Link href={story.href as Href} asChild>
-          <Pressable style={styles.featuredDate}>
-            <Text style={styles.featuredDow}>{parts.weekday}</Text>
-            <Text style={styles.featuredDay}>{parts.day}</Text>
-          </Pressable>
-        </Link>
-        <View style={styles.flex}>
-          <Link href={story.href as Href} asChild>
-            <Pressable>
-              <Text style={styles.featuredKicker}>{(card?.eyebrow ?? story.kicker).toUpperCase()}</Text>
-              <Text style={styles.featuredTitle}>{card?.headline ?? story.title}</Text>
-              {card ? <SupportLine headline={card.headline} supporting={card.supporting} opponent={event?.opponent} /> : null}
-              <Text style={styles.featuredMeta}>{card?.facts ?? story.meta}</Text>
-              {card?.signal ? <Text style={styles.featuredMeta}>{card.signal}</Text> : null}
-            </Pressable>
-          </Link>
-          {card?.action ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={card.action.label} onPress={action} style={styles.storyAction}>
-              <Text style={styles.storyActionText}>{card.action.label}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-    </View>
+    <HeroStoryCard
+      href={story.href as Href}
+      kicker={card?.eyebrow ?? story.kicker}
+      weekday={parts.weekday}
+      day={parts.day}
+      month={parts.month}
+      headline={card?.headline ?? story.title}
+      support={card ? conciseSupport(card.headline, card.supporting, event?.opponent) : undefined}
+      facts={card?.facts ?? story.meta}
+      signal={card?.signal}
+      action={card?.action ? { label: card.action.label, onPress: run } : undefined}
+      tone={story.kind}
+      pose={heroPose(story.kind, role, story.startsAt, nowIso)}
+    />
   );
-}
-
-function SupportLine({ headline, supporting, opponent }: { headline: string; supporting: string; opponent?: string }) {
-  const line = conciseSupport(headline, supporting, opponent);
-  if (!line) return null;
-  return <Text style={styles.featuredMeta}>{line}</Text>;
 }
 
 function CompactStory({
@@ -313,13 +350,16 @@ function CompactStory({
   const support = conciseSupport(card.headline, card.supporting, event.opponent);
   const program = demoPrograms.find((item) => item.id === event.programId) ?? demoPrograms.find((item) => item.teamId && item.teamId === event.teamId);
   const href = (event.sport === 'cricket' ? cricketEventHref(event) : `/event/${event.id}`) as Href;
+  const tint = tints[tintFor(event)];
+  // The hero and the join card already ask guests to sign in; repeating it on every row is noise.
+  const rowAction = card.action?.kind === 'signin' ? undefined : card.action;
   const action = () => {
     if (card.action?.kind === 'signin') router.push('/onboarding');
     else if (card.action?.kind === 'support') onSupport(event.id, !event.supporterGoing);
     else router.push(href);
   };
   return (
-    <View style={styles.compact}>
+    <View style={[styles.compact, { backgroundColor: tint.bg }]}>
       <View style={styles.storyRow}>
         {showImage && program?.heroImage ? (
           <Image source={{ uri: program.heroImage }} style={styles.compactImage} contentFit="cover" />
@@ -334,21 +374,21 @@ function CompactStory({
         <View style={styles.flex}>
           <Link href={href} asChild>
             <Pressable>
-              <Text style={styles.featuredKicker}>{card.eyebrow.toUpperCase()}</Text>
+              <Text style={[styles.featuredKicker, { color: tint.accent }]}>{card.eyebrow.toUpperCase()}</Text>
               <Text style={styles.secondaryTitle}>{card.headline}</Text>
               {support ? <Text style={styles.featuredMeta}>{support}</Text> : null}
               <Text style={styles.featuredMeta}>{parts.time} · {event.venue}</Text>
               {card.signal ? <Text style={styles.featuredMeta}>{card.signal}</Text> : null}
             </Pressable>
           </Link>
-          {card.action ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={card.action.label} onPress={action} style={styles.storyAction}>
-              <Text style={styles.storyActionText}>{card.action.label}</Text>
+          {rowAction ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={rowAction.label} onPress={action} style={styles.storyAction}>
+              <Text style={styles.storyActionText}>{rowAction.label}</Text>
             </Pressable>
           ) : (
             <Link href={href} asChild>
-              <Pressable accessibilityRole="link" style={styles.storyAction}>
-                <Ionicons name="chevron-forward" size={16} color={colors.orangeDark} />
+              <Pressable accessibilityRole="link" accessibilityLabel={`Open ${card.headline}`} style={styles.storyAction}>
+                <Ionicons name="arrow-forward" size={16} color={tint.accent} />
               </Pressable>
             </Link>
           )}
@@ -448,15 +488,38 @@ function attentionRows(input: {
   return rows.slice(0, 2);
 }
 
-function Brief({ title, detail, href }: { title: string; detail: string; href: string }) {
+type BriefLook = { icon: keyof typeof Ionicons.glyphMap; tint: keyof typeof tints };
+
+const briefLook: Record<string, BriefLook> = {
+  urgent: { icon: 'alert-circle-outline', tint: 'blush' },
+  field: { icon: 'warning-outline', tint: 'blush' },
+  staff: { icon: 'time-outline', tint: 'sky' },
+  conflict: { icon: 'git-compare-outline', tint: 'lilac' },
+  payment: { icon: 'card-outline', tint: 'gold' },
+  'coach-update': { icon: 'chatbubble-ellipses-outline', tint: 'mint' },
+  attendance: { icon: 'checkbox-outline', tint: 'mint' },
+  recap: { icon: 'mic-outline', tint: 'mint' },
+  'player-rsvp': { icon: 'calendar-outline', tint: 'sky' },
+  regs: { icon: 'people-outline', tint: 'lilac' },
+};
+
+function Brief({ title, detail, href, look, badge }: { title: string; detail: string; href: string; look?: BriefLook; badge?: string }) {
+  const tint = tints[look?.tint ?? 'mint'];
   return (
     <Link href={href as never} asChild>
-      <PressableScale style={styles.brief}>
+      <PressableScale style={StyleSheet.flatten([styles.brief, { backgroundColor: tint.bg }])}>
+        <View style={styles.briefIcon}>
+          <Ionicons accessible={false} name={look?.icon ?? 'sparkles-outline'} size={19} color={tint.accent} />
+        </View>
         <View style={styles.flex}>
           <Text style={styles.briefTitle}>{title}</Text>
           <Text style={styles.briefDetail}>{detail}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.stone} />
+        {badge ? (
+          <View style={styles.badge}><Text style={styles.badgeText}>{badge.toUpperCase()}</Text></View>
+        ) : (
+          <Ionicons accessible={false} name="arrow-forward" size={16} color={tint.accent} />
+        )}
       </PressableScale>
     </Link>
   );
@@ -471,17 +534,15 @@ const styles = StyleSheet.create({
   mainCol: { flex: 1.15, minWidth: 0 },
   sideCol: { flex: 0.85, minWidth: 280 },
   section: { ...typography.label, color: colors.stone, fontSize: 11, letterSpacing: 1.1, marginTop: 6, marginBottom: 8 },
-  switchRow: { flexDirection: 'row', backgroundColor: colors.sand, borderRadius: 14, padding: 4, marginBottom: 14 },
-  switchOption: { flex: 1, minHeight: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  switchOptionOn: { backgroundColor: colors.ink },
+  switchRow: { flexDirection: 'row', backgroundColor: colors.sand, borderRadius: 16, padding: 4, marginBottom: 14, position: 'relative' },
+  switchPill: { position: 'absolute', top: 4, bottom: 4, left: 4, borderRadius: 12, backgroundColor: colors.ink },
+  switchOption: { flex: 1, minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   switchText: { color: colors.stone, fontSize: 14, ...typography.label },
   switchTextOn: { color: colors.white },
   compact: {
-    padding: 12,
-    borderRadius: 18,
+    padding: 14,
+    borderRadius: 22,
     backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.border,
     marginBottom: 10,
   },
   compactDate: {
@@ -496,20 +557,26 @@ const styles = StyleSheet.create({
   compactImage: { width: 72, height: 72, borderRadius: 12, backgroundColor: colors.sand },
   secondaryTitle: { color: colors.ink, fontSize: 14, marginTop: 2, ...typography.heading },
   accountCard: {
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.border,
+    padding: 18,
+    paddingRight: 112,
+    borderRadius: 22,
+    backgroundColor: colors.greenDeep,
     marginBottom: 10,
     gap: 6,
+    overflow: 'hidden',
   },
-  accountAction: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center' },
+  accountRoy: { position: 'absolute', right: -6, bottom: -14, width: 118, height: 118 },
+  accountTitle: { color: colors.white, fontSize: 17, ...typography.heading },
+  accountDetail: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, ...typography.body },
+  accountAction: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  accountActionText: { color: colors.ink, fontSize: 13, ...typography.label },
   scheduleLink: { alignSelf: 'flex-start', minHeight: 36, justifyContent: 'center', marginBottom: 8 },
   scheduleLinkText: { color: colors.orangeDark, fontSize: 13, ...typography.label },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 8, marginBottom: 18 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8, marginBottom: 16 },
+  avatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: colors.mint },
+  avatarImage: { width: 48, height: 60 },
   mark: { color: colors.ink, fontSize: 11, ...typography.label, letterSpacing: 1.8 },
-  hello: { color: colors.ink, fontSize: 22, lineHeight: 28, marginTop: 4, marginBottom: 8, ...typography.pageTitle },
+  hello: { color: colors.ink, fontSize: 22, lineHeight: 26, marginTop: 2, ...typography.pageTitle },
   bell: {
     width: 40,
     height: 40,
@@ -585,18 +652,19 @@ const styles = StyleSheet.create({
   tileLabel: { color: colors.ink, fontSize: 15, ...typography.heading },
   tileDetail: { color: colors.stone, fontSize: 12, marginTop: 2, ...typography.body },
   brief: {
-    minHeight: 64,
+    minHeight: 68,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
+    gap: 12,
+    borderRadius: 22,
     backgroundColor: colors.paper,
     marginBottom: 10,
   },
+  briefIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.orange },
+  badgeText: { color: colors.white, fontSize: 11, ...typography.label, letterSpacing: 0.8 },
   briefTitle: { color: colors.ink, fontSize: 14, ...typography.heading },
   briefDetail: { color: colors.stone, fontSize: 12, marginTop: 2, ...typography.body },
   urgent: { flexDirection: 'row', gap: 10, padding: 14, borderRadius: 18, backgroundColor: colors.danger, marginBottom: 10 },
