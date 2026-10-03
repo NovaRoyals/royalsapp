@@ -135,7 +135,7 @@ insert into public.competitions (
 insert into public.teams (id, sport_id, name, short_name, audience_label) values
   ('40000000-0000-0000-0000-000000000001', (select id from public.sports where code = 'soccer'), 'Nova Royals AC', 'ROYALS', 'Men''s Open 8v8'),
   ('40000000-0000-0000-0000-000000000002', (select id from public.sports where code = 'soccer'), 'Nova Royals Women · Demo', 'ROYALS W', 'Adult women'),
-  ('40000000-0000-0000-0000-000000000003', (select id from public.sports where code = 'cricket'), 'Nova Royals Cricket', 'ROYALS CC', 'Adult · CCPL T20'),
+  ('40000000-0000-0000-0000-000000000003', (select id from public.sports where code = 'cricket'), 'Nova Royals Cricket', 'ROYALS CC', 'Adult · CCPL T20');
 
 insert into public.events (
   sport_id, program_id, competition_id, event_type, title, home_team_id,

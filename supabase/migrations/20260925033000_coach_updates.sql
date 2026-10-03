@@ -63,25 +63,16 @@ alter table public.coach_polish_logs enable row level security;
 -- Club admin: audit polish logs and delivery.
 -- Child player profiles: no SELECT on coach_updates / session_recap_notes.
 
+-- Assignment lives in team_staff. private.can_manage_team also lets a club admin through.
 create policy recaps_assigned_coach on public.session_recaps
   for all to authenticated
   using (
-    created_by = auth.uid()
-    or exists (
-      select 1 from public.team_memberships tm
-      where tm.team_id = session_recaps.team_id
-        and tm.user_id = auth.uid()
-        and tm.role in ('coach', 'club_admin')
-    )
+    created_by = (select auth.uid())
+    or private.can_manage_team(session_recaps.team_id)
   )
   with check (
-    created_by = auth.uid()
-    and exists (
-      select 1 from public.team_memberships tm
-      where tm.team_id = session_recaps.team_id
-        and tm.user_id = auth.uid()
-        and tm.role in ('coach', 'club_admin')
-    )
+    created_by = (select auth.uid())
+    and private.can_manage_team(session_recaps.team_id)
   );
 
 create policy updates_guardian_read on public.coach_updates

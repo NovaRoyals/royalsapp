@@ -18,8 +18,9 @@
 --   * Stripe-side tables exist (payment_events, refunds, donations) for the webhook and
 --     refund functions to use, with no access for the app at all.
 --
--- NOT YET RUN against a database in this repository's history. Run supabase db reset and
--- supabase/tests/registration_security.sql before relying on it.
+-- Run against a local Supabase database on 2026-10-03: supabase db reset, then
+-- supabase/tests/registration_security.sql, which ends in ALL PASSED. Running it caught one
+-- real hole (a NULL in the child-authority check) that is fixed below.
 
 -- ---------------------------------------------------------------------------------------
 -- 0. Move saved rows onto the new vocabulary
@@ -278,7 +279,9 @@ begin
     from unnest(p_participants) as x
     left join public.participants pt on pt.id = x
     where pt.id is null
-       or not (pt.profile_id = v_user
+       -- coalesce: profile_id is NULL for a child, and NULL = uuid is NULL, not false. Without it
+       -- the whole condition is NULL and NOT NULL is NULL, so another family's child slipped through.
+       or not (coalesce(pt.profile_id = v_user, false)
                or (pt.household_id is not null and private.can_manage_household(pt.household_id)))
   ) then
     raise exception 'you cannot register one or more of these participants' using errcode = '42501';

@@ -6,8 +6,10 @@
 -- Everything runs inside one transaction that is rolled back, so it leaves no data behind.
 -- A failed check raises an exception that names it. A clean run ends with "ALL PASSED".
 --
--- Status: written alongside migration 20261003100100 but NOT YET EXECUTED. Docker was not
--- running when it was written. Treat a first run as part of verifying the migration.
+-- Status: run against a local database on 2026-10-03 and passing. Its first run found a
+-- three-valued-logic hole in submit_registration (a parent could register another family's
+-- child), now fixed. Re-run it after any change to the registration functions or policies:
+--   npm run db:test
 
 begin;
 

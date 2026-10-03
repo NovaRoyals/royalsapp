@@ -52,8 +52,9 @@ that count, but "$10/session across N Sundays" copy was removed rather than gues
 - Database hardening migration (`20261003100100`): families cannot write registrations or money
   columns; `submit_registration` recomputes price, checks authority, age and capacity, snapshots
   waiver text from the database and is idempotent; Stripe-side tables exist for the webhook.
-  **Not yet run against a database.** Run `supabase db reset`, then
-  `supabase/tests/registration_security.sql`.
+  Verified against a local database: `supabase db reset`, then `npm run db:test`
+  (`supabase/tests/registration_security.sql`, ends in ALL PASSED). The first run caught a real hole
+  (a parent could register another family's child) that is now fixed.
 
 ## What waits for Stripe (test mode first, never live keys in the repo)
 
