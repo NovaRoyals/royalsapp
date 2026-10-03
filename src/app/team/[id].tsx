@@ -31,24 +31,28 @@ export default function TeamDetailScreen() {
       <View style={styles.topbar}>
         <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/?view=club')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
         <Text style={styles.topTitle}>Team</Text>
-        <Pressable accessibilityLabel="Team options" style={styles.back}><Ionicons name="ellipsis-horizontal" size={21} /></Pressable>
+        <View style={styles.spacer} />
       </View>
       <View style={styles.hero}>
         <View style={[styles.mark, { backgroundColor: team.accent }]}><Text style={styles.markText}>{team.shortName.split(' ').pop()}</Text></View>
         <Text style={styles.name}>{team.name}</Text>
         <Text style={styles.meta}>{team.competitionName} · {team.season}</Text>
         <View style={styles.heroStats}>
-          <View><Text style={styles.statValue}>{team.record}</Text><Text style={styles.statLabel}>{team.id === 'nova-royals-men' ? 'FORMAT' : 'RECORD'}</Text></View>
-          <View style={styles.statRule} />
           <View><Text style={styles.statValue}>{team.memberCount}</Text><Text style={styles.statLabel}>SQUAD</Text></View>
           <View style={styles.statRule} />
-          <View><Text style={styles.statValue}>{team.id === 'nova-royals-kids-u8' || team.id === 'nova-royals-men' ? '—' : team.record}</Text><Text style={styles.statLabel}>{team.id === 'nova-royals-kids-u8' ? 'TRAINING' : team.id === 'nova-royals-men' ? 'TABLE' : 'RECORD'}</Text></View>
+          <View><Text style={styles.statValue}>{team.season}</Text><Text style={styles.statLabel}>SEASON</Text></View>
+          <View style={styles.statRule} />
+          <View><Text style={styles.statValue}>{team.coachName ? team.coachName.replace('Coach ', '').split(' ')[0] : '—'}</Text><Text style={styles.statLabel}>COACH</Text></View>
         </View>
       </View>
 
       <View style={styles.actions}>
+        {role === 'guardian' && team.id === 'nova-royals-kids-u8' ? (
+          <Button label="Message coach" icon="chatbubble-ellipses-outline" style={styles.flexWide} onPress={() => router.push('/message/coach-priya' as never)} />
+        ) : (
+          <Button label="Announcement" icon="megaphone-outline" style={styles.flex} onPress={() => router.push((teamNote ? `/message/${teamNote.id}` : '/(tabs)/schedule') as never)} />
+        )}
         <Button label="Schedule" icon="calendar-outline" variant="secondary" style={styles.flex} onPress={() => router.push('/(tabs)/schedule')} />
-        <Button label="Announcement" icon="megaphone-outline" variant="secondary" style={styles.flex} onPress={() => router.push((teamNote ? `/message/${teamNote.id}` : '/(tabs)/schedule') as never)} />
       </View>
 
       {next && (
@@ -137,19 +141,21 @@ export default function TeamDetailScreen() {
 const styles = StyleSheet.create({
   topbar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  spacer: { width: 44, height: 44 },
   topTitle: { color: colors.ink, fontSize: 15, ...typography.heading },
-  hero: { marginTop: spacing.md, padding: spacing.xl, borderRadius: radius.lg, alignItems: 'center', backgroundColor: colors.ink },
+  hero: { marginTop: spacing.sm, padding: 18, borderRadius: 26, alignItems: 'center', backgroundColor: colors.ink },
   mark: { width: 74, height: 82, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   markText: { color: colors.white, fontSize: 23, ...typography.display },
-  name: { color: colors.white, fontSize: 27, marginTop: spacing.lg, ...typography.heading },
+  name: { color: colors.white, fontSize: 22, textAlign: 'center', marginTop: spacing.md, ...typography.heading },
   meta: { color: colors.sand, fontSize: 12, marginTop: 5, textAlign: 'center', ...typography.body },
-  heroStats: { width: '100%', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.charcoal },
+  heroStats: { width: '100%', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.14)' },
   statValue: { color: colors.white, fontSize: 16, textAlign: 'center', ...typography.heading },
-  statLabel: { color: colors.stone, fontSize: 8, marginTop: 3, ...typography.label, letterSpacing: 1 },
+  statLabel: { color: colors.mint, fontSize: 9, marginTop: 3, ...typography.label, letterSpacing: 1.2 },
   statRule: { width: 1, height: 26, backgroundColor: colors.charcoal },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   flex: { flex: 1 },
-  nextCard: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  flexWide: { flex: 1.5 },
+  nextCard: { padding: 14, borderRadius: 22, backgroundColor: colors.paper, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   nextDate: { width: 54, height: 62, borderRadius: radius.md, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center' },
   nextDay: { color: colors.white, fontSize: 23, ...typography.heading },
   nextMonth: { color: colors.white, fontSize: 9, ...typography.label },
@@ -159,15 +165,15 @@ const styles = StyleSheet.create({
   resultLabel: { color: colors.orangeDark, fontSize: 9, ...typography.label, letterSpacing: 1 },
   result: { color: colors.ink, fontSize: 22, marginTop: spacing.sm, ...typography.heading },
   resultMeta: { color: colors.stone, fontSize: 11, marginTop: 4, ...typography.body },
-  roster: { borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.paper },
-  player: { minHeight: 64, paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  roster: { borderRadius: 22, overflow: 'hidden', backgroundColor: colors.paper },
+  player: { minHeight: 52, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   number: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   numberText: { color: colors.orange, fontSize: 12, ...typography.label },
   playerName: { color: colors.ink, fontSize: 14, ...typography.heading },
   position: { color: colors.stone, fontSize: 11, marginTop: 2, ...typography.body },
   privateRoster: { minHeight: 48, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   privateText: { color: colors.stone, fontSize: 10, ...typography.body },
-  announcement: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.paper, flexDirection: 'row', gap: spacing.md },
+  announcement: { padding: 14, borderRadius: 22, backgroundColor: colors.goldSoft, flexDirection: 'row', gap: spacing.md },
   announcementTitle: { color: colors.ink, fontSize: 14, ...typography.heading },
   announcementBody: { color: colors.stone, fontSize: 12, lineHeight: 18, marginTop: 4, ...typography.body },
 });

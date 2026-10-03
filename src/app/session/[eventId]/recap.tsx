@@ -653,7 +653,7 @@ function Topbar() {
         <Ionicons name="arrow-back" size={21} />
       </Pressable>
       <Text style={styles.topTitle}>Session recap</Text>
-      <View style={styles.back} />
+      <View style={{ width: 44, height: 44 }} />
     </View>
   );
 }

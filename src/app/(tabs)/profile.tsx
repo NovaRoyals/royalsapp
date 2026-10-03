@@ -6,6 +6,7 @@ import { AppHeader, Button, DemoBadge, Screen, SectionHeading, StatusPill } from
 import { SeasonDots } from '@/components/interactions/SeasonDots';
 import { demoPrograms, followCatalog } from '@/data/demo';
 import { funnelCounts, getEvents } from '@/lib/analytics';
+import { useThreads } from '@/components/messages/useThreads';
 import { paymentLine, statusWord } from '@/lib/registrationFlow';
 import { mayaAttendanceHistory } from '@/lib/attendance';
 import { sessionIdentity } from '@/lib/coachRecap';
@@ -35,6 +36,11 @@ const menu = [
   { icon: 'heart-outline' as const, label: 'About the club', detail: 'Story, contact, support', href: '/about' },
 ];
 
+function programTitle(programId: string, title?: string) {
+  if (title) return title;
+  return programId.startsWith('fall-kids') ? 'Fall Soccer Training' : 'Program registration';
+}
+
 export default function ProfileScreen() {
   const {
     role,
@@ -51,6 +57,7 @@ export default function ProfileScreen() {
     schedule,
     pendingStaffRole,
   } = useApp();
+  const chat = useThreads();
   const staff = isStaff(role);
   const parentView = role === 'guardian';
   const [funnel, setFunnel] = useState<ReturnType<typeof funnelCounts> | null>(null);
@@ -130,10 +137,10 @@ export default function ProfileScreen() {
               const program = demoPrograms.find((item) => item.id === registration.programId);
               return (
                 <View key={registration.id} style={styles.registration}>
-                  <Pressable accessibilityRole="link" accessibilityLabel={`${program?.title ?? 'Program registration'}, ${registration.participantNames.join(', ')}`} onPress={() => router.push(`/season/${registration.id}` as never)}>
+                  <Pressable accessibilityRole="link" accessibilityLabel={`${programTitle(registration.programId, program?.title)}, ${registration.participantNames.join(', ')}`} onPress={() => router.push(`/season/${registration.id}` as never)}>
                     <View style={styles.registrationTop}>
                       <View style={styles.flex}>
-                        <Text style={styles.registrationTitle}>{program?.title ?? 'Program registration'}</Text>
+                        <Text style={styles.registrationTitle}>{programTitle(registration.programId, program?.title)}</Text>
                         <Text style={styles.registrationPeople}>{registration.participantNames.join(', ')}</Text>
                       </View>
                       <StatusPill
@@ -254,7 +261,7 @@ export default function ProfileScreen() {
 
       <SectionHeading title="Account & settings" />
       <View style={styles.menu}>
-        {(role === 'guest' ? menu.filter((item) => item.href === '/about') : menu).map((item, index, items) => (
+        {(role === 'guest' ? menu.filter((item) => item.href === '/about') : chat.viewer ? [{ icon: 'chatbubble-ellipses-outline' as const, label: 'Messages', detail: chat.unread ? `${chat.unread} unread` : role === 'coach' ? 'Families waiting on you' : 'Coach and parents', href: '/messages' }, ...menu] : menu).map((item, index, items) => (
           <Pressable
             key={item.label}
             accessibilityRole="link"
@@ -271,14 +278,6 @@ export default function ProfileScreen() {
           </Pressable>
         ))}
       </View>
-      <Pressable accessibilityRole="link" accessibilityLabel="About ROYALS" onPress={() => router.push('/about')} style={[styles.adminCard, { marginTop: 12 }]}>
-        <View style={styles.flex}>
-          <Text style={styles.adminTitle}>About ROYALS</Text>
-          <Text style={styles.adminCopy}>About, Support Us, Sponsors, Volunteer, Contact</Text>
-        </View>
-        <Ionicons accessible={false} importantForAccessibility="no" name="arrow-forward" size={20} color={colors.orange} />
-      </Pressable>
-
       {isDemoMode ? (
         <View style={styles.reviewBlock}>
           <SectionHeading title="Preview roles" />

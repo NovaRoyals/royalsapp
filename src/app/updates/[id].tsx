@@ -31,7 +31,7 @@ export default function CoachUpdateDetailScreen() {
           <Ionicons name="arrow-back" size={21} />
         </Pressable>
         <Text style={styles.topTitle}>Coach update</Text>
-        <View style={styles.back} />
+        <View style={{ width: 44, height: 44 }} />
       </View>
       {!item ? (
         <Text style={styles.empty}>This update isn’t available on this account.</Text>

@@ -1,35 +1,61 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
-
-import { Screen } from '@/components/ui';
+import { AccountScreen, Note, SettingRow, SettingsCard, SignInGate } from '@/components/account/Settings';
 import { useApp } from '@/state/AppProvider';
-import { colors, spacing, typography } from '@/theme/tokens';
-
-import { Header, SignInRequired } from './personal';
 
 export default function AccountNotificationsScreen() {
-  const { notificationPrefs, setNotificationPrefs, role } = useApp();
-  if (role === 'guest') return <SignInRequired title="Notification settings" />;
+  const { notificationPrefs, setNotificationPrefs, role, parentChatOn, setParentChat } = useApp();
+  if (role === 'guest') return <SignInGate title="Notification settings" />;
   return (
-    <Screen>
-      <Header title="Notification settings" />
-      <Text style={styles.lead}>Never miss a schedule change. Choose what reaches this device — we ask before any OS permission.</Text>
-      <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, team: !notificationPrefs.team })} style={styles.row}>
-        <Text style={styles.label}>Team alerts {notificationPrefs.team ? 'on' : 'off'}</Text>
-      </Pressable>
-      <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, community: !notificationPrefs.community })} style={styles.row}>
-        <Text style={styles.label}>Community {notificationPrefs.community ? 'on' : 'off'}</Text>
-      </Pressable>
-      <Pressable onPress={() => setNotificationPrefs({ ...notificationPrefs, locationShare: !notificationPrefs.locationShare })} style={styles.row}>
-        <Text style={styles.label}>Find fields near you {notificationPrefs.locationShare ? 'on' : 'off'}</Text>
-      </Pressable>
-      <Text style={styles.note}>Location stays opt-in. Urgent field closures always appear in-app.</Text>
-    </Screen>
+    <AccountScreen title="Notifications">
+      <SettingsCard title="Always on">
+        <SettingRow
+          icon="alert-circle-outline"
+          tint="blush"
+          label="Urgent changes"
+          detail="Field closures, cancellations and moved sessions always reach you."
+          toggle={{ on: true, locked: true }}
+          last
+        />
+      </SettingsCard>
+
+      <SettingsCard title="You choose">
+        <SettingRow
+          icon="chatbubble-ellipses-outline"
+          tint="gold"
+          label="Team and coach alerts"
+          detail="Messages from your coach, session recaps and reminders."
+          toggle={{ on: notificationPrefs.team, onChange: (next) => setNotificationPrefs({ ...notificationPrefs, team: next }) }}
+        />
+        <SettingRow
+          icon="megaphone-outline"
+          tint="sky"
+          label="Club news"
+          detail="Events, fundraisers and community days."
+          toggle={{ on: notificationPrefs.community, onChange: (next) => setNotificationPrefs({ ...notificationPrefs, community: next }) }}
+        />
+        <SettingRow
+          icon="location-outline"
+          tint="mint"
+          label="Fields near you"
+          detail="Uses your location only while you choose to look."
+          toggle={{ on: notificationPrefs.locationShare, onChange: (next) => setNotificationPrefs({ ...notificationPrefs, locationShare: next }) }}
+          last
+        />
+      </SettingsCard>
+
+      {role === 'guardian' ? (
+        <SettingsCard title="Parent chat">
+          <SettingRow
+            icon="people-outline"
+            tint="lilac"
+            label="Let team parents message me"
+            detail="Off unless you turn it on. Parents are shown as “Parent of” a first name, never by phone or email."
+            toggle={{ on: parentChatOn, onChange: setParentChat }}
+            last
+          />
+        </SettingsCard>
+      ) : null}
+
+      <Note>We ask before sending anything to this device. Push messages need your permission in your phone’s settings.</Note>
+    </AccountScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  lead: { color: colors.stone, marginBottom: spacing.lg, ...typography.body },
-  row: { minHeight: 52, justifyContent: 'center' },
-  label: { color: colors.ink, fontSize: 16, ...typography.heading },
-  note: { color: colors.stone, marginTop: spacing.md, ...typography.body },
-});

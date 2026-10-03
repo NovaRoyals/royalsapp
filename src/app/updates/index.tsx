@@ -36,7 +36,7 @@ export default function CoachUpdatesScreen() {
           <Ionicons name="arrow-back" size={21} />
         </Pressable>
         <Text style={styles.topTitle}>Coach updates</Text>
-        <View style={styles.back} />
+        <View style={{ width: 44, height: 44 }} />
       </View>
       <Text style={styles.lead}>Notes from training — encouraging, specific, and only about your child when a private note is included.</Text>
       {!items.length ? (

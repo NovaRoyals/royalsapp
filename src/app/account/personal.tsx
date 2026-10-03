@@ -1,64 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-
-import { Button, Screen } from '@/components/ui';
-import { safeBack } from '@/lib/nav';
+import { AccountScreen, Note, SettingRow, SettingsCard, SignInGate } from '@/components/account/Settings';
 import { useApp } from '@/state/AppProvider';
-import { colors, spacing, typography } from '@/theme/tokens';
-
-export function SignInRequired({ title }: { title: string }) {
-  return (
-    <Screen>
-      <Header title={title} />
-      <Text style={styles.note}>This is part of your account. Create an account or sign in to continue.</Text>
-      <Button label="Create account or sign in" onPress={() => router.push('/onboarding')} />
-    </Screen>
-  );
-}
 
 export default function AccountPersonalScreen() {
   const { household, role } = useApp();
-  if (role === 'guest') return <SignInRequired title="Personal information" />;
-  const name = household.guardianName.trim() || 'No name yet';
-  const email = household.email.trim() || 'No email yet';
+  if (role === 'guest') return <SignInGate title="Personal information" />;
   return (
-    <Screen>
-      <Header title="Personal information" />
-      <Row label="Name" value={name} />
-      <Row label="Email" value={email} />
-      <Row label="Phone" value={household.phone.trim() || 'Add from Profile later'} />
-      <Row label="Address" value={household.address.trim() || 'Add when you need travel times'} last />
-      <Text style={styles.note}>Change this anytime. Username is optional and lives in Profile later.</Text>
-    </Screen>
+    <AccountScreen title="Personal information">
+      <SettingsCard>
+        <SettingRow icon="person-outline" label="Name" value={household.guardianName.trim() || 'No name yet'} />
+        <SettingRow icon="mail-outline" tint="sky" label="Email" value={household.email.trim() || 'No email yet'} />
+        <SettingRow icon="call-outline" tint="gold" label="Phone" value={household.phone.trim() || 'Not added'} />
+        <SettingRow icon="home-outline" tint="blush" label="Address" value={household.address.trim() || 'Add when you need travel times'} last />
+      </SettingsCard>
+      <Note>Only you and the club office can see this. Coaches and other parents never see your phone, email or address.</Note>
+    </AccountScreen>
   );
 }
-
-export function Header({ title }: { title: string }) {
-  return (
-    <View style={styles.top}>
-      <Pressable accessibilityLabel="Go back" onPress={() => safeBack('/(tabs)/profile')} style={styles.back}><Ionicons name="arrow-back" size={21} /></Pressable>
-      <Text style={styles.title}>{title}</Text>
-    </View>
-  );
-}
-
-export function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <View style={[styles.row, !last && styles.border]}>
-      <Text style={styles.label}>{label}</Text>
-      <Text selectable style={styles.value}>{value}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  top: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  title: { color: colors.ink, fontSize: 22, ...typography.pageTitle },
-  row: { minHeight: 64, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  border: {},
-  label: { color: colors.stone, fontSize: 12, ...typography.label },
-  value: { color: colors.ink, fontSize: 16, marginTop: 4, ...typography.body },
-  note: { color: colors.stone, fontSize: 13, marginTop: 16, ...typography.body },
-});

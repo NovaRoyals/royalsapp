@@ -31,7 +31,7 @@ export default function VenueScreen() {
           <Ionicons name="arrow-back" size={21} color={colors.ink} />
         </Pressable>
         <Text style={styles.kicker}>Venue</Text>
-        <View style={styles.back} />
+        <View style={{ width: 44, height: 44 }} />
       </View>
       {place ? (
         <>

@@ -48,10 +48,6 @@ export default function NotificationsScreen() {
           <Text style={styles.markAllText}>Read all</Text>
         </Pressable>
       </View>
-      <View style={styles.preferences}>
-        <Ionicons name="notifications-outline" size={21} color={colors.orangeDark} />
-        <View style={styles.flex}><Text style={styles.preferenceTitle}>Reminders</Text><Text style={styles.preferenceCopy}>Game-day changes, field closures and coach updates show up here first.</Text></View>
-      </View>
       <Text style={styles.section}>RECENT</Text>
       {visible.length === 0 ? (
         <EmptyState pose="thumbsup" title="You’re all caught up" message="New game-day changes and coach updates will land here." />
@@ -76,7 +72,7 @@ export default function NotificationsScreen() {
                 {!notice.read ? <View style={styles.dot} /> : null}
               </View>
               <Text style={styles.noticeBody}>{notice.body}</Text>
-              <Text style={styles.time}>{formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}{notice.type === 'announcement' ? ' · Club-wide' : ''}{notice.urgency ? ` · ${notice.urgency}` : ''}</Text>
+              <Text style={styles.time}>{formatEventParts(notice.createdAt).month} {formatEventParts(notice.createdAt).day}{notice.type === 'announcement' ? ' · Club-wide' : ''}{notice.urgency === 'urgent' || notice.urgency === 'high' ? ` · ${notice.urgency}` : ''}</Text>
             </View>
           </Pressable>
           </Animated.View>
@@ -95,18 +91,18 @@ const styles = StyleSheet.create({
   back: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
   eyebrow: { color: colors.orangeDark, fontSize: 9, ...typography.label, letterSpacing: 1.1 },
-  title: { color: colors.ink, fontSize: 27, ...typography.heading },
+  title: { color: colors.ink, fontSize: 24, ...typography.heading },
   markAll: { minHeight: 44, justifyContent: 'center' },
   markAllText: { color: colors.orangeDark, fontSize: 11, ...typography.label },
   preferences: { marginTop: spacing.md, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.orangeSoft, flexDirection: 'row', gap: spacing.md },
   preferenceTitle: { color: colors.orangeDark, fontSize: 14, ...typography.heading },
   preferenceCopy: { color: colors.charcoal, fontSize: 11, lineHeight: 17, marginTop: 3, ...typography.body },
-  section: { color: colors.stone, fontSize: 10, marginTop: spacing.xxl, marginBottom: spacing.sm, ...typography.label, letterSpacing: 1 },
-  list: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.paper },
-  notice: { minHeight: 104, padding: spacing.lg, flexDirection: 'row', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  unread: { backgroundColor: '#FFF7F0' },
-  icon: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.sand, alignItems: 'center', justifyContent: 'center' },
-  iconUnread: { backgroundColor: colors.orangeSoft },
+  section: { color: colors.stone, fontSize: 11, marginTop: 6, marginBottom: 8, marginLeft: 6, ...typography.label, letterSpacing: 1.1 },
+  list: { borderRadius: 22, overflow: 'hidden', backgroundColor: colors.paper },
+  notice: { padding: 14, flexDirection: 'row', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  unread: { backgroundColor: colors.goldSoft },
+  icon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
+  iconUnread: { backgroundColor: colors.white },
   noticeTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeTitle: { flex: 1, color: colors.ink, fontSize: 14, ...typography.heading },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.orange },

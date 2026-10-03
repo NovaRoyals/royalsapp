@@ -42,7 +42,7 @@ export default function AdminScreen() {
   const [urgency, setUrgency] = useState<NoticeUrgency>('normal');
   const [newTitle, setNewTitle] = useState('');
   const [newVenue, setNewVenue] = useState('');
-  const [funnel, setFunnel] = useState<string>('');
+  const [funnelStats, setFunnelStats] = useState<{ views: number; starts: number; done: number } | null>(null);
   const [reasonFor, setReasonFor] = useState<{ id: string; kind: 'reject' | 'waive' } | null>(null);
   const [audience, setAudience] = useState<'team' | 'club'>(can(role, 'send_club_announcement') ? 'team' : 'team');
   const allowed = role === 'admin' || role === 'coach' || role === 'competition_manager';
@@ -54,7 +54,7 @@ export default function AdminScreen() {
   useEffect(() => {
     getEvents().then((events) => {
       const counts = funnelCounts(events);
-      setFunnel(`${counts.programViewed} views · ${counts.registrationStarted} starts · ${counts.registrationCompleted} completions`);
+      setFunnelStats({ views: counts.programViewed, starts: counts.registrationStarted, done: counts.registrationCompleted });
     });
   }, [registrations]);
 
@@ -94,7 +94,11 @@ export default function AdminScreen() {
       <View style={styles.metrics}>
         {canReview ? <Metric value={String(registrations.length)} label="REGISTRATIONS" /> : <Metric value="U8" label="ASSIGNED TEAM" />}
         <Metric value={String(role === 'coach' ? 1 : demoTeams.length)} label="TEAMS" />
-        <Metric value={canReview && funnel ? 'FUNNEL' : 'STAFF'} label={canReview ? funnel || 'ANALYTICS' : 'SCOPED ACCESS'} />
+        {canReview ? (
+          <Metric value={funnelStats ? `${funnelStats.done}/${funnelStats.starts}` : '—'} label="SIGN-UPS DONE / STARTED" />
+        ) : (
+          <Metric value="Staff" label="SCOPED ACCESS" />
+        )}
       </View>
 
       {can(role, 'audit_coach_updates') ? (
@@ -310,9 +314,9 @@ const styles = StyleSheet.create({
   adminMark: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   adminText: { color: colors.orange, ...typography.heading },
   metrics: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  metric: { flex: 1, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.ink },
+  metric: { flex: 1, padding: 14, borderRadius: 22, backgroundColor: colors.ink },
   metricValue: { color: colors.white, fontSize: 24, ...typography.heading },
-  metricLabel: { color: colors.stone, fontSize: 7, marginTop: 4, ...typography.label, letterSpacing: 0.7 },
+  metricLabel: { color: colors.mint, fontSize: 9, marginTop: 4, ...typography.label, letterSpacing: 0.8 },
   tabs: { flexDirection: 'row', marginTop: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.border },
   tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: colors.orange },
