@@ -123,7 +123,7 @@ export function contextualStory(event: ScheduleEvent, viewer: StoryViewer): Cont
   const supporting = manual?.supporting?.trim() || supportingLine(event);
   const signal = viewer.canSeeSquad && typeof event.goingCount === 'number'
     ? `${event.goingCount} players going`
-    : typeof event.supporterCount === 'number'
+    : typeof event.supporterCount === 'number' && event.supporterCount > 0
       ? `${event.supporterCount} ${event.supporterCount === 1 ? 'supporter' : 'supporters'} coming`
       : undefined;
   return {

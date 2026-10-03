@@ -129,7 +129,7 @@ export function aroundTheClub(schedule: ScheduleEvent[], _followedIds: string[],
   const parts = formatEventParts(feature.startsAt);
   return {
     title: feature.title,
-    detail: `${parts.weekday} ${parts.time} · ${feature.supporterCount ?? 0} Royals are going`,
+    detail: feature.supporterCount ? `${parts.weekday} ${parts.time} · ${feature.supporterCount} Royals are going` : `${parts.weekday} ${parts.time}`,
     href: `/event/${feature.id}`,
     eventId: feature.id,
   };

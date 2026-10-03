@@ -597,7 +597,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
   {
     id: 'mens-2026-10-04',
@@ -615,7 +614,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
   {
     id: 'mens-2026-10-11',
@@ -633,7 +631,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
   {
     id: 'mens-2026-10-18',
@@ -651,7 +648,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
   {
     id: 'mens-2026-11-01',
@@ -669,7 +665,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
   {
     id: 'mens-2026-11-08',
@@ -687,7 +682,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
   {
     id: 'mens-2026-11-15',
@@ -705,7 +699,6 @@ const mensOpenMatches: ScheduleEvent[] = [
     parkingNotes: 'Use the Nottoway Park lot nearest Field 4. Lights stay on after 10 PM.',
     weatherSummary: 'Clear evening · stub forecast',
     coachName: 'Coach Kapil Adhikari',
-    supporterCount: 12,
   },
 ];
 
@@ -825,7 +818,6 @@ const ccplMatches: ScheduleEvent[] = [
     weatherSummary: 'Check match-morning conditions',
     whatToBring: 'Whites, water, club kit',
     coachName: 'Sujit Khanal',
-    supporterCount: 8,
   },
   {
     id: 'ccpl-2026-09-26',
@@ -845,7 +837,6 @@ const ccplMatches: ScheduleEvent[] = [
     weatherSummary: 'Check match-morning conditions',
     whatToBring: 'Whites, water, club kit',
     coachName: 'Sujit Khanal',
-    supporterCount: 8,
   },
 ];
 

@@ -90,4 +90,10 @@ describe('contextual home stories', () => {
     assert.equal(contextualStory(event({}), { ...supporter, supporterGoing: true }).action?.label, "You're coming");
     assert.equal(contextualStory(event({ storyOverride: manualStory({ headline: 'Tonight', showSupporterCta: false }) }), supporter).action, undefined);
   });
+
+  it('shows no supporter line until someone has actually said they are coming', () => {
+    assert.equal(contextualStory(event({ supporterCount: undefined }), guest).signal, undefined);
+    assert.equal(contextualStory(event({ supporterCount: 0 }), guest).signal, undefined);
+    assert.equal(contextualStory(event({ supporterCount: 1 }), guest).signal, '1 supporter coming');
+  });
 });
