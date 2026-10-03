@@ -139,14 +139,6 @@ export function crossClubSuggestion(role: UserRole, followedIds: string[], sched
   return aroundTheClub(schedule, followedIds, nowIso);
 }
 
-export function siblingPrice(count: number) {
-  if (count <= 0) return { total: 0, discount: 0, note: 'Select a child' };
-  const total = 120 + Math.max(0, count - 1) * 60;
-  const discount = count * 120 - total;
-  const note = count > 1 ? `Sibling rate applied · you save $${discount}` : 'First child $120 · siblings $60';
-  return { total, discount, note };
-}
-
 export function childRegistrationHints(children: Person[]) {
   return children.map((child) => {
     const rec = recommendKidsGroup(child.dateOfBirth);

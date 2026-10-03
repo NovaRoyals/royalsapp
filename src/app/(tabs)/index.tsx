@@ -20,6 +20,7 @@ import { homeStories, householdConflictStub, nextUpcomingEvent, type HomeStory }
 import { homeGreeting } from '@/lib/greeting';
 import { contextualStory, storyViewerFor } from '@/lib/matchStory';
 import { COACH_TEAM_ID, PLAYER_TEAM_ID, notificationsForRole } from '@/lib/membership';
+import { joinOffer, offerHeadline } from '@/lib/pricing';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, typography } from '@/theme/tokens';
@@ -123,7 +124,7 @@ export default function HomeScreen() {
               {registration ? (
                 <Brief
                   title={registration.childName ? `Register ${registration.childName}` : 'Register a child'}
-                  detail="Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A."
+                  detail={offerHeadline(joinOffer(nowIso))?.line ?? 'Fall Soccer Training is open · Sundays 9–10 AM · Arrowhead 3A.'}
                   href={`/registration/${registration.programId}`}
                 />
               ) : null}

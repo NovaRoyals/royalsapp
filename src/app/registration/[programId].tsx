@@ -13,7 +13,8 @@ import { Button, Field, Screen, StatusPill } from '@/components/ui';
 import { demoHousehold, demoPrograms, demoSchedule, kidsProgramId } from '@/data/demo';
 import { track } from '@/lib/analytics';
 import { safeBack } from '@/lib/nav';
-import { childRegistrationHints, siblingPrice } from '@/lib/intelligence';
+import { childRegistrationHints } from '@/lib/intelligence';
+import { dollars, offerHeadline, quoteRegistration, type Quote } from '@/lib/pricing';
 import {
   clearRegistrationDraft,
   loadRegistrationDraft,
@@ -22,6 +23,7 @@ import {
   type RegistrationDraftStep,
 } from '@/lib/registrationDraft';
 import { useReducedMotion } from '@/lib/reducedMotion';
+import { useClubNow } from '@/lib/useClubNow';
 import { calendarGateway } from '@/services/calendar';
 import { useApp } from '@/state/AppProvider';
 import { motion } from '@/theme/motion';
@@ -51,7 +53,7 @@ const steps: { id: Step; label: string }[] = [
   { id: 'household', label: 'Household' },
   { id: 'consent', label: 'Waiver' },
   { id: 'review', label: 'Review' },
-  { id: 'payment', label: 'Done' },
+  { id: 'payment', label: 'Submit' },
 ];
 
 export default function RegistrationScreen() {
@@ -97,9 +99,12 @@ export default function RegistrationScreen() {
     () => childrenPool.filter((child) => selected.includes(child.id)),
     [childrenPool, selected],
   );
-  const subtotal = selectedChildren.length > 0 ? 120 + Math.max(0, selectedChildren.length - 1) * 60 : 0;
-  const standardPrice = selectedChildren.length * 120;
-  const discount = standardPrice - subtotal;
+  const quoteNow = useClubNow({ tick: false });
+  const quote = useMemo(() => quoteRegistration(selectedChildren.length, quoteNow), [selectedChildren.length, quoteNow]);
+  const offer = quote.offer;
+  const promo = offerHeadline(offer);
+  const subtotal = quote.totalCents / 100;
+  const discount = quote.savingsCents / 100;
   const activeStepIndex = steps.findIndex((item) => item.id === step);
   const percent = Math.max(20, Math.round(((activeStepIndex + 1) / steps.length) * 100));
   // react-hook-form stores this outside React. watch() is the supported subscription,
@@ -299,27 +304,14 @@ export default function RegistrationScreen() {
           <Text style={styles.topEyebrow}>REGISTRATION</Text>
           <Text numberOfLines={1} style={styles.topTitle}>{program.title}</Text>
         </View>
-        <Text style={styles.stepCount}>{percent}%</Text>
+        <Text accessibilityLabel={`Step ${activeStepIndex + 1} of ${steps.length}`} style={styles.stepCount}>{activeStepIndex + 1}/{steps.length}</Text>
       </View>
       {draftSavedAt ? <Text style={styles.draftSaved}>Draft saved · kept on this device for 7 days</Text> : null}
 
       <View style={styles.progress}>
         <Animated.View style={[styles.progressFill, barStyle]} />
       </View>
-      <Text style={styles.currentLabel}>
-        {step === 'overview'
-          ? 'You’re on your way · Program selected ✓'
-          : step === 'children'
-            ? 'Program ✓ · Who’s playing'
-            : step === 'household'
-              ? 'Program ✓ Player ✓ · Household'
-              : step === 'consent'
-                ? 'Program ✓ Player ✓ Household ✓ · Waiver'
-                : step === 'review'
-                  ? 'Almost there · Review'
-                  : 'Last step · Submit'}
-      </Text>
-      <Text style={styles.stepBody}>Program ✓ → Player → Household → Waiver → Review → Done</Text>
+      <Text style={styles.currentLabel}>{steps[activeStepIndex]?.label}</Text>
 
       {step === 'overview' && (
         <View style={styles.step}>
@@ -330,9 +322,15 @@ export default function RegistrationScreen() {
             <SummaryRow label="Program" value={program.title} />
             <SummaryRow label="Ages" value="3–16" />
             <SummaryRow label="Dates" value="Sep 13 – Nov 22" />
-            <SummaryRow label="Sessions" value="11 Sundays · 9–10 AM" />
-            <SummaryRow label="Price" value="$120 first · $60 siblings" last />
+            <SummaryRow label="Sessions" value={offer.midSeason ? `${offer.sessionsLeft} of ${offer.sessionsTotal} Sundays left · 9–10 AM` : `${offer.sessionsTotal} Sundays · 9–10 AM`} />
+            <SummaryRow label="Price" value={promo ? `${dollars(offer.firstChildCents)} first · ${dollars(offer.siblingCents)} siblings` : '$120 first · $60 siblings'} last />
           </View>
+          {promo ? (
+            <View style={styles.promo}>
+              <Text style={styles.promoBadge}>{promo.badge.toUpperCase()}</Text>
+              <Text style={styles.promoCopy}>{promo.line}. Full season is $120. Pay only for the Sundays still to come.</Text>
+            </View>
+          ) : null}
           <View style={styles.trustRow}>
             <Ionicons name="shield-checkmark-outline" size={22} color={colors.success} />
             <Text style={styles.trustText}>Children’s information is private and visible only to authorized guardians and staff.</Text>
@@ -429,7 +427,7 @@ export default function RegistrationScreen() {
                     <Text style={styles.childMeta}>Age {hint.ages} · recommended {hint.group}</Text>
                     {hint.warning ? <Text style={styles.selectionError}>{hint.warning}</Text> : null}
                   </View>
-                  <Text style={styles.childPrice}>{selected.indexOf(child.id) > 0 ? '$60' : checked ? '$120' : index === 0 ? '$120' : '$60+'}</Text>
+                  <Text style={styles.childPrice}>{dollars(checked && selected.indexOf(child.id) > 0 ? offer.siblingCents : checked || index === 0 ? offer.firstChildCents : offer.siblingCents)}</Text>
                 </Pressable>
               );
             })}
@@ -452,8 +450,7 @@ export default function RegistrationScreen() {
             </Pressable>
           )}
           {selected.length === 0 ? <Text style={styles.selectionError}>Select at least one child to continue.</Text> : null}
-          <Text style={styles.stepBody}>{siblingPrice(selected.length).note}</Text>
-          <PriceCard count={selected.length} total={subtotal} discount={discount} />
+          <PriceCard quote={quote} />
             </>
           )}
         </View>
@@ -494,11 +491,11 @@ export default function RegistrationScreen() {
             </ReviewSection>
             <ReviewSection title="Players" icon="people-outline">
               {selectedChildren.map((child, index) => (
-                <SummaryRow key={child.id} label={`${child.firstName} ${child.lastName}`} value={index === 0 ? '$120' : '$60'} last={index === selectedChildren.length - 1} />
+                <SummaryRow key={child.id} label={`${child.firstName} ${child.lastName}`} value={dollars(index === 0 ? offer.firstChildCents : offer.siblingCents)} last={index === selectedChildren.length - 1} />
               ))}
             </ReviewSection>
           </View>
-          <PriceCard count={selected.length} total={subtotal} discount={discount} />
+          <PriceCard quote={quote} />
         </View>
       )}
 
@@ -510,8 +507,8 @@ export default function RegistrationScreen() {
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>TOTAL DUE</Text>
             <Text style={styles.totalValue}>${subtotal}</Text>
-            {discount > 0 ? <Text style={styles.saved}>You saved ${discount} with sibling pricing</Text> : null}
-            <Text style={styles.saved}>$10/session across 11 Sundays</Text>
+            {discount > 0 ? <Text style={styles.saved}>You save {dollars(quote.savingsCents)}{promo ? ` · ${promo.badge}` : ' with sibling pricing'}</Text> : null}
+            <Text style={styles.saved}>{offer.midSeason ? `$10 a Sunday · ${offer.sessionsLeft} Sundays left` : 'Full season · $10 a Sunday'}</Text>
           </View>
           <View style={styles.demoCheckout}>
             <Ionicons name="flask-outline" size={24} color={colors.warning} />
@@ -532,8 +529,8 @@ export default function RegistrationScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.footerLabel}>FALL 2026</Text>
-              <Text style={styles.footerPrice}>$120+</Text>
+              <Text style={styles.footerLabel}>{promo ? promo.badge.toUpperCase() : 'FALL 2026'}</Text>
+              <Text style={styles.footerPrice}>{dollars(offer.firstChildCents)}+</Text>
             </>
           )}
         </View>
@@ -629,14 +626,23 @@ function ReviewSection({ title, icon, children }: { title: string; icon: keyof t
   );
 }
 
-function PriceCard({ count, total, discount }: { count: number; total: number; discount: number }) {
+function PriceCard({ quote }: { quote: Quote }) {
+  const { childCount: count, offer } = quote;
+  const promo = offerHeadline(offer);
   return (
     <View style={styles.priceCard}>
       <View style={styles.priceHeader}><Text style={styles.priceTitle}>Price summary</Text><Text style={styles.priceCount}>{count} {count === 1 ? 'child' : 'children'}</Text></View>
-      {count > 0 ? <View style={styles.priceLine}><Text style={styles.priceLineLabel}>First child</Text><Text style={styles.priceLineValue}>$120</Text></View> : null}
-      {count > 1 ? <View style={styles.priceLine}><Text style={styles.priceLineLabel}>{count - 1} additional {count - 1 === 1 ? 'child' : 'children'}</Text><Text style={styles.priceLineValue}>${(count - 1) * 60}</Text></View> : null}
-      {discount > 0 ? <View style={styles.priceLine}><Text style={styles.priceLineLabel}>Sibling discount</Text><Text style={styles.priceDiscount}>−${discount}</Text></View> : null}
-      <View style={styles.priceTotal}><Text style={styles.priceTotalLabel}>Total</Text><Text style={styles.priceTotalValue}>${total}</Text></View>
+      {quote.lines.map((line) => (
+        <View key={line.label} style={styles.priceLine}>
+          <Text style={styles.priceLineLabel}>{line.label}</Text>
+          <View style={styles.priceLineAmounts}>
+            {line.cents !== line.listCents ? <Text style={styles.priceStruck}>{dollars(line.listCents)}</Text> : null}
+            <Text style={styles.priceLineValue}>{dollars(line.cents)}</Text>
+          </View>
+        </View>
+      ))}
+      {promo && count > 0 ? <View style={styles.priceLine}><Text style={styles.priceLineLabel}>Join-now offer · {offer.sessionsLeft} Sundays left</Text><Text style={styles.priceDiscount}>{promo.badge}</Text></View> : null}
+      <View style={styles.priceTotal}><Text style={styles.priceTotalLabel}>Total</Text><Text style={styles.priceTotalValue}>{dollars(quote.totalCents)}</Text></View>
     </View>
   );
 }
@@ -685,6 +691,11 @@ const styles = StyleSheet.create({
   priceLineLabel: { color: colors.sand, fontSize: 12, ...typography.body },
   priceLineValue: { color: colors.white, fontSize: 12, ...typography.label },
   priceDiscount: { color: colors.successSoft, fontSize: 12, ...typography.label },
+  priceLineAmounts: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  priceStruck: { color: colors.sand, fontSize: 11, textDecorationLine: 'line-through', opacity: 0.7, ...typography.body },
+  promo: { marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.orangeSoft, gap: 4 },
+  promoBadge: { color: colors.orangeDark, fontSize: 13, ...typography.label, letterSpacing: 1.2 },
+  promoCopy: { color: colors.charcoal, fontSize: 13, lineHeight: 19, ...typography.body },
   priceTotal: { minHeight: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   priceTotalLabel: { color: colors.white, fontSize: 14, ...typography.label },
   priceTotalValue: { color: colors.orange, fontSize: 24, ...typography.heading },

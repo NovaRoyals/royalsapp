@@ -16,6 +16,8 @@ import { safeBack } from '@/lib/nav';
 import { cricketPrivacyName } from '@/lib/cricket';
 import { privacyName } from '@/lib/attendance';
 import { formatEventParts } from '@/lib/datetime';
+import { dollars, joinOffer, offerHeadline } from '@/lib/pricing';
+import { useClubNow } from '@/lib/useClubNow';
 import { canSeeFullRoster } from '@/lib/membership';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
@@ -28,6 +30,9 @@ export default function ProgramDetailScreen() {
   const { id, pane: paneParam } = useLocalSearchParams<{ id: string; pane?: string }>();
   const { role, schedule } = useApp();
   const program = demoPrograms.find((item) => item.id === id) ?? demoPrograms[0];
+  const nowIso = useClubNow();
+  const kidsOffer = program.id === 'fall-kids-2026' ? joinOffer(nowIso) : null;
+  const kidsPromo = kidsOffer ? offerHeadline(kidsOffer) : null;
   const team = program.teamId ? demoTeams.find((item) => item.id === program.teamId) : undefined;
   const requestedPane = paneParam === 'squad' || paneParam === 'matches' || paneParam === 'fixtures' ? paneParam : 'about';
   const [paneChoice, setPaneChoice] = useState<{ key: string; pane: 'about' | 'squad' | 'matches' | 'fixtures' } | null>(null);
@@ -168,7 +173,12 @@ export default function ProgramDetailScreen() {
         <InfoRow icon="calendar-outline" label="Dates" value={program.dates} />
         <InfoRow icon="location-outline" label="Venue" value={program.venue} />
         <InfoRow icon="person-outline" label={cricket ? 'Captain' : 'Coach'} value={program.coachName ?? (team?.coachName ?? 'Club staff')} />
-        <InfoRow icon="wallet-outline" label="Price" value={program.id === 'fall-kids-2026' ? `${program.priceLabel} · $10/session across 11 Sundays` : program.priceLabel} last />
+        <InfoRow
+          icon="wallet-outline"
+          label="Price"
+          value={kidsOffer ? (kidsPromo ? `${dollars(kidsOffer.firstChildCents)} first child · ${dollars(kidsOffer.siblingCents)} siblings · ${kidsPromo.line}` : `$120 first child · $60 siblings · $10 a Sunday`) : program.priceLabel}
+          last
+        />
       </View>
 
       {program.id === 'fall-kids-2026' ? (
@@ -215,7 +225,7 @@ export default function ProgramDetailScreen() {
       <View style={styles.cta}>
         <View style={styles.flex}>
           <Text style={styles.ctaLabel}>{fxaSide ? 'FXA Sports' : program.registrationOpen ? 'Registration open' : 'Interest list'}</Text>
-          <Text style={styles.ctaPrice}>{program.priceLabel}</Text>
+          <Text style={styles.ctaPrice}>{kidsPromo ? `From ${dollars(kidsOffer!.firstChildCents)} · ${kidsPromo.badge}` : program.priceLabel}</Text>
         </View>
         <Button
           label={fxaSide ? 'Register on FXA Sports' : program.registrationOpen ? 'Register' : 'Join list'}
