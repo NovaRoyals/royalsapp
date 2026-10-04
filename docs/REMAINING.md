@@ -59,7 +59,7 @@ Docker runs the local Supabase stack (Postgres plus the API layer). I used it to
 
 ### I can build without any account
 
-1. **Connect the app to Supabase.** Sign-in, then move registrations, messages and announcements from local state to the database through the tested functions. This is the largest remaining piece. It can be done against the local Docker database first.
+1. **Connect the app's data to Supabase.** Sign-in is built and tested against the local database (email and password, Google button, sign-out; see `docs/AUTH.md`). Still to do: move registrations, messages and announcements from local state to the database through the tested functions. This is the largest remaining piece, and it can be done against the local Docker database first.
 2. **Database side of announcements.** The database has a simple `announcements` table. The richer model in the app (kinds, club or team or program audience, cancellation priority, which sessions a cancellation closes) needs a migration, a security-definer publish function and a SQL test, the same way messaging was done.
 3. **Fix WEB-001** (hydration error on refresh of saved routes) before any public web release. See `docs/known-issues.md`.
 4. **Regression test for hard refresh** on the main routes (listed in `known-issues.md`).

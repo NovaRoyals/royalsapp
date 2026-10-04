@@ -8,15 +8,20 @@ import { Wordmark } from '@/components/brand/Wordmark';
 import { FlowShell } from '@/components/onboarding/FlowShell';
 import { ChoiceCard, FlowField, OrRule, ProviderButton, type Tint } from '@/components/onboarding/Pieces';
 import { Button } from '@/components/ui';
+import { isEmail, passwordProblem } from '@/lib/authMessages';
+import type { AccountUser } from '@/lib/authService';
 import { RELATIONSHIP_TO_ROLE } from '@/lib/greeting';
 import { haptic } from '@/lib/haptics';
 import { leaveOnboarding, safeBack } from '@/lib/nav';
 import { useReducedMotion } from '@/lib/reducedMotion';
+import { isDemoMode } from '@/lib/supabase';
+import { account } from '@/services/account';
+import { useAccount } from '@/state/AccountProvider';
 import { defaultNotificationPrefs, useApp } from '@/state/AppProvider';
 import { colors, radius, typography } from '@/theme/tokens';
 import type { AuthProvider, ClubRelationship } from '@/types/domain';
 
-type Step = 'welcome' | 'account' | 'email' | 'identity' | 'role';
+type Step = 'welcome' | 'account' | 'email' | 'identity' | 'role' | 'confirm';
 type ProviderStatus = 'idle' | 'loading' | 'error';
 
 const ROLE_CHOICES: {
@@ -38,13 +43,11 @@ const PROVIDER_IDENTITY: Record<Exclude<AuthProvider, 'email'>, { firstName: str
   apple: { firstName: 'Jordan', lastName: 'Cole', email: 'jordan.cole@icloud.com' },
 };
 
-function isEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 export default function OnboardingScreen() {
-  const params = useLocalSearchParams<{ mode?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; returnTo?: string; from?: string }>();
   const { completeOnboarding, completeIntro, introCompleted } = useApp();
+  const accountState = useAccount();
+  const connected = !isDemoMode;
   const reduced = useReducedMotion();
   const signInIntent = params.mode === 'signin';
   const returnTo = (params.returnTo as Href | undefined) ?? '/(tabs)';
@@ -64,6 +67,10 @@ export default function OnboardingScreen() {
   const [providerError, setProviderError] = useState('');
   const [roleChoice, setRoleChoice] = useState<ClubRelationship | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [notice, setNotice] = useState('');
+  const appliedUser = useRef<string | null>(null);
   const connectGen = useRef(0);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -88,6 +95,7 @@ export default function OnboardingScreen() {
   const back = () => {
     if (advancing) return;
     if (step === 'email') return setStep('account');
+    if (step === 'confirm') return setStep('email');
     if (step === 'identity') return setStep(provider === 'email' ? 'email' : 'account');
     if (step === 'role') return setStep('identity');
     if (step === 'account') {
@@ -97,22 +105,76 @@ export default function OnboardingScreen() {
     if (introCompleted) return safeBack('/(tabs)');
   };
 
-  const finish = (choice: ClubRelationship) => {
-    if (advancing) return;
+  /** Put the person into the app on this device: their name, how they relate to the club, and where to land. */
+  const completeLocally = (choice: ClubRelationship, first: string, last: string, mail: string) => {
     setAdvancing(true);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     completeOnboarding({
       role: RELATIONSHIP_TO_ROLE[choice],
       relationship: choice,
       children: [],
       followedIds: [],
       notificationPrefs: defaultNotificationPrefs,
-      guardianName: fullName,
-      email: email.trim(),
+      guardianName: `${first.trim()} ${last.trim()}`.trim(),
+      email: mail.trim(),
       pendingStaffRole: choice === 'coach' ? 'coach' : choice === 'manager' ? 'competition_manager' : null,
     });
     leaveOnboarding(returnTo);
   };
+
+  const finish = async (choice: ClubRelationship) => {
+    if (advancing) return;
+    if (!connected) return completeLocally(choice, firstName, lastName, email);
+
+    setAdvancing(true);
+    const stepBack = (to: Step, message: string) => {
+      setAdvancing(false);
+      setRoleChoice(null);
+      setFormError(message);
+      setStep(to);
+    };
+    if (provider === 'email' && !accountState.user) {
+      const outcome = await account.signUp({ email, password, firstName, lastName, relationship: choice });
+      if (!outcome.ok) return stepBack('email', outcome.message);
+      if (outcome.status === 'confirm-email') {
+        setAdvancing(false);
+        setRoleChoice(null);
+        setFormError('');
+        setNotice('');
+        return setStep('confirm');
+      }
+      if (outcome.status === 'signed-in') return completeLocally(choice, firstName, lastName, outcome.user.email || email);
+      return stepBack('email', 'Something went wrong. Please try again.');
+    }
+    // Signed in already (Google, or an email link): keep the name and role as preferences on the account.
+    await account.saveProfile({ firstName, lastName, relationship: choice });
+    completeLocally(choice, firstName, lastName, email);
+  };
+
+  /** Someone has signed in. If we already know their name and role they are done; otherwise ask. */
+  const applyAccount = (user: AccountUser, via: AuthProvider) => {
+    setProvider(via);
+    setFirstName(user.firstName);
+    setLastName(user.lastName);
+    setEmail(user.email);
+    setPhotoOn(via === 'google');
+    setFormError('');
+    setProviderError('');
+    setBusyProvider(null);
+    if (user.firstName && user.relationship) {
+      completeLocally(user.relationship, user.firstName, user.lastName, user.email);
+      return;
+    }
+    setStep('identity');
+  };
+
+  // Coming back from a confirmation email or from Google: the account is signed in, finish the welcome.
+  useEffect(() => {
+    if (!connected || params.from !== 'link' || !accountState.ready || !accountState.user) return;
+    if (appliedUser.current === accountState.user.id) return;
+    appliedUser.current = accountState.user.id;
+    applyAccount(accountState.user, 'google');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, params.from, accountState.ready, accountState.user]);
 
   const applyProvider = (next: Exclude<AuthProvider, 'email'>) => {
     const identity = PROVIDER_IDENTITY[next];
@@ -126,8 +188,26 @@ export default function OnboardingScreen() {
     setStep('identity');
   };
 
+  const connectGoogle = async () => {
+    if (advancing || busyProvider) return;
+    setProviderError('');
+    setBusyProvider('google');
+    const outcome = await account.google();
+    if (!outcome.ok) {
+      setBusyProvider(null);
+      setProviderError(outcome.message);
+      return;
+    }
+    // On the web the page has gone to Google and comes back through the callback screen.
+    if (outcome.status === 'signed-in') applyAccount(outcome.user, 'google');
+  };
+
   const connectProvider = (next: Exclude<AuthProvider, 'email'>) => {
     if (advancing || busyProvider) return;
+    if (connected) {
+      if (next === 'google') void connectGoogle();
+      return;
+    }
     setProviderError('');
     if (next === 'apple' && process.env.EXPO_OS !== 'ios') {
       setProviderError('Apple sign-in isn’t available here. Try Google or email.');
@@ -148,16 +228,56 @@ export default function OnboardingScreen() {
     setProviderError('Google sign-in was cancelled.');
   };
 
-  const submitEmail = () => {
+  const submitEmail = async () => {
+    if (busy) return;
     const nextEmail = email.trim();
     const mailOk = isEmail(nextEmail);
-    const passOk = password.trim().length >= 8;
+    const passMessage = connected
+      ? intent === 'signin'
+        ? password ? '' : 'Enter your password.'
+        : passwordProblem(password)
+      : password.trim().length >= 8 ? '' : 'Use at least 8 characters.';
     setEmailError(mailOk ? '' : 'Enter a valid email address.');
-    setPasswordError(passOk ? '' : 'Use at least 8 characters.');
-    if (!mailOk || !passOk) return;
+    setPasswordError(passMessage);
+    setFormError('');
+    setNotice('');
+    if (!mailOk || passMessage) return;
+
+    if (connected && intent === 'signin') {
+      setBusy(true);
+      const outcome = await account.signIn({ email: nextEmail, password });
+      setBusy(false);
+      if (!outcome.ok) return setFormError(outcome.message);
+      if (outcome.status === 'signed-in') applyAccount(outcome.user, 'email');
+      return;
+    }
     setProvider('email');
     setPhotoOn(false);
     setStep('identity');
+  };
+
+  const forgotPassword = async () => {
+    if (busy) return;
+    if (!isEmail(email)) {
+      setEmailError('Enter your email first, then tap this again.');
+      return;
+    }
+    setBusy(true);
+    setFormError('');
+    const outcome = await account.forgotPassword(email);
+    setBusy(false);
+    if (!outcome.ok) return setFormError(outcome.message);
+    setNotice('If there’s an account for that email, we’ve sent a link to choose a new password.');
+  };
+
+  const resendEmail = async () => {
+    if (busy) return;
+    setBusy(true);
+    setFormError('');
+    const outcome = await account.resendConfirmation(email);
+    setBusy(false);
+    if (!outcome.ok) return setFormError(outcome.message);
+    setNotice('Sent again. It can take a minute to arrive. Check your spam folder too.');
   };
 
   const submitIdentity = () => {
@@ -180,7 +300,7 @@ export default function OnboardingScreen() {
 
   const statusFor = (id: Exclude<AuthProvider, 'email'>): ProviderStatus => {
     if (busyProvider === id) return 'loading';
-    if (providerError && ((id === 'google' && providerError.startsWith('Google')) || (id === 'apple' && providerError.startsWith('Apple')))) {
+    if (providerError && (connected ? id === 'google' : (id === 'google' && providerError.startsWith('Google')) || (id === 'apple' && providerError.startsWith('Apple')))) {
       return 'error';
     }
     return 'idle';
@@ -233,7 +353,7 @@ export default function OnboardingScreen() {
           onPress={() => connectProvider('google')}
           onCancel={cancelProvider}
         />
-        {process.env.EXPO_OS === 'ios' || Platform.OS === 'web' ? (
+        {!connected && (process.env.EXPO_OS === 'ios' || Platform.OS === 'web') ? (
           <ProviderButton
             icon="logo-apple"
             label="Continue with Apple"
@@ -274,7 +394,7 @@ export default function OnboardingScreen() {
         stepKey="email"
         title={intent === 'signin' ? 'Sign in with email' : 'Sign up with email'}
         subtitle="Use an email you check. You can change it later."
-        footer={<Button label="Continue" onPress={submitEmail} />}
+        footer={<Button label={connected && intent === 'signin' ? 'Sign in' : 'Continue'} onPress={submitEmail} loading={busy} />}
       >
         <FlowField
           label="Email"
@@ -293,15 +413,55 @@ export default function OnboardingScreen() {
           label="Password"
           value={password}
           onChangeText={setPassword}
-          placeholder="At least 8 characters"
+          placeholder={connected && intent === 'create' ? 'At least 8 characters, with a number' : intent === 'signin' ? 'Your password' : 'At least 8 characters'}
           secureTextEntry
-          autoComplete="password"
-          textContentType="newPassword"
+          autoComplete={intent === 'signin' ? 'current-password' : 'new-password'}
+          textContentType={intent === 'signin' ? 'password' : 'newPassword'}
           returnKeyType="done"
           onSubmitEditing={submitEmail}
           error={passwordError}
-          onBlur={() => setPasswordError(password.length > 0 && password.length < 8 ? 'Use at least 8 characters.' : '')}
+          onBlur={() => setPasswordError(intent === 'create' && password.length > 0 && password.length < 8 ? 'Use at least 8 characters.' : '')}
         />
+        {formError ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{formError}</Text>
+          </View>
+        ) : null}
+        {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+        {connected && intent === 'signin' ? (
+          <Pressable accessibilityRole="button" onPress={forgotPassword} style={styles.quiet}>
+            <Text style={styles.inlineLink}>Forgot your password?</Text>
+          </Pressable>
+        ) : null}
+      </FlowShell>
+    );
+  }
+
+  if (step === 'confirm') {
+    return (
+      <FlowShell
+        onBack={back}
+        stepKey="confirm"
+        roy={{ pose: 'smile', size: 120, decorative: true }}
+        title="Check your email"
+        subtitle={`We sent a link to ${email.trim()}. Open it on this device to finish signing up.`}
+        footer={<Button label="Send it again" variant="secondary" onPress={resendEmail} loading={busy} />}
+      >
+        {formError ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{formError}</Text>
+          </View>
+        ) : null}
+        {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+        <Text style={styles.noticeText}>Nothing in your inbox? Look in spam, or check you typed the address correctly.</Text>
+        <Pressable accessibilityRole="button" onPress={() => { setIntent('signin'); setFormError(''); setNotice(''); setStep('email'); }} style={styles.quiet}>
+          <Text style={styles.inlineMuted}>
+            Already confirmed? <Text style={styles.inlineStrong}>Sign in</Text>
+          </Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { setIntent('create'); setFormError(''); setNotice(''); setStep('email'); }} style={styles.quiet}>
+          <Text style={styles.inlineMuted}>Wrong address? <Text style={styles.inlineStrong}>Change it</Text></Text>
+        </Pressable>
       </FlowShell>
     );
   }
@@ -405,6 +565,7 @@ const styles = StyleSheet.create({
   errorBox: { padding: 12, borderRadius: radius.card, backgroundColor: colors.dangerSoft, marginBottom: 8, gap: 6 },
   errorText: { color: colors.danger, fontSize: 13, ...typography.body },
   retry: { color: colors.ink, fontSize: 13, ...typography.label },
+  noticeText: { color: colors.charcoal, fontSize: 13, lineHeight: 19, marginBottom: 8, ...typography.body },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   avatar: {
     width: 64,

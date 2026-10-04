@@ -1,16 +1,16 @@
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { isDemoMode } from '@/lib/supabase';
+import { DATA_ON_SERVER, isDemoMode } from '@/lib/supabase';
 import { colors, typography } from '@/theme/tokens';
 
 const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 82 : 64;
 
-/** Unobtrusive prototype marker — not a claim that data is saved to a server. */
+/** Unobtrusive marker. It never claims more than is true: demo data, or real accounts with club data still on this device. */
 export function PrototypeMark({ aboveTabs = false }: { aboveTabs?: boolean }) {
-  if (!isDemoMode) return null;
+  if (!isDemoMode && DATA_ON_SERVER) return null;
   return (
     <View pointerEvents="none" style={[styles.wrap, { bottom: aboveTabs ? TAB_BAR_HEIGHT + 6 : 4 }]}>
-      <Text style={styles.text}>Prototype</Text>
+      <Text style={styles.text}>{isDemoMode ? 'Prototype' : 'Accounts live · data on device'}</Text>
     </View>
   );
 }

@@ -13,6 +13,7 @@ import { sessionIdentity } from '@/lib/coachRecap';
 import { can, isStaff } from '@/lib/capabilities';
 import { showReviewerLabs } from '@/lib/prototype';
 import { isDemoMode } from '@/lib/supabase';
+import { useAccount } from '@/state/AccountProvider';
 import { useApp } from '@/state/AppProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { UserRole } from '@/types/domain';
@@ -59,6 +60,14 @@ export default function ProfileScreen() {
     pendingStaffRole,
   } = useApp();
   const chat = useThreads();
+  const accountState = useAccount();
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = async () => {
+    setSigningOut(true);
+    await accountState.signOut();
+    setRole('guest');
+    setSigningOut(false);
+  };
   const staff = isStaff(role);
   const parentView = role === 'guardian';
   const [funnel, setFunnel] = useState<ReturnType<typeof funnelCounts> | null>(null);
@@ -279,6 +288,15 @@ export default function ProfileScreen() {
           </Pressable>
         ))}
       </View>
+      {accountState.enabled && accountState.user ? (
+        <View style={styles.signedIn}>
+          <View style={styles.flex}>
+            <Text style={styles.menuLabel}>Signed in</Text>
+            <Text style={styles.menuDetail}>{accountState.user.email}</Text>
+          </View>
+          <Button label="Sign out" variant="secondary" onPress={signOut} loading={signingOut} />
+        </View>
+      ) : null}
       {isDemoMode ? (
         <View style={styles.reviewBlock}>
           <SectionHeading title="Preview roles" />
@@ -359,6 +377,7 @@ const styles = StyleSheet.create({
   menuBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   menuLabel: { color: colors.ink, fontSize: 14, ...typography.heading },
   menuDetail: { color: colors.stone, fontSize: 11, marginTop: 2, ...typography.body },
+  signedIn: { marginTop: spacing.md, padding: spacing.lg, gap: spacing.md, borderRadius: radius.lg, backgroundColor: colors.paper },
   reviewBlock: { marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
   previewNote: { color: colors.stone, fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md, ...typography.body },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

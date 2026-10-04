@@ -10,6 +10,9 @@ import { useApp } from '@/state/AppProvider';
 
 const TAB_PATHS = new Set(['/', '/programs', '/schedule', '/fields', '/profile']);
 
+/** Screens that must open as they are: the welcome flow itself, and the pages email links return to. */
+const isFlowPath = (pathname: string) => pathname === '/onboarding' || pathname.startsWith('/auth/');
+
 export function FirstOpenGate({ children }: { children: ReactNode }) {
   const { hasHydrated, introCompleted } = useApp();
   const pathname = usePathname();
@@ -22,14 +25,13 @@ export function FirstOpenGate({ children }: { children: ReactNode }) {
     hasHydrated,
     introCompleted,
     pathname,
-    willRedirectToOnboarding: hasHydrated && !introCompleted && pathname !== '/onboarding',
+    willRedirectToOnboarding: hasHydrated && !introCompleted && !isFlowPath(pathname),
   });
 
   useEffect(() => {
     hydrateTraceEffect('FirstOpenGate', { hasHydrated, introCompleted, pathname });
     if (!hasHydrated) return;
-    const onboarding = pathname === '/onboarding';
-    if (!introCompleted && !onboarding) {
+    if (!introCompleted && !isFlowPath(pathname)) {
       router.replace('/onboarding');
     }
   }, [hasHydrated, introCompleted, pathname, router]);
@@ -58,7 +60,7 @@ export function FirstOpenGate({ children }: { children: ReactNode }) {
 
   if (!hasHydrated) return <InkHold />;
 
-  const waitingForOnboarding = !introCompleted && pathname !== '/onboarding';
+  const waitingForOnboarding = !introCompleted && !isFlowPath(pathname);
 
   return (
     <View style={styles.fill}>

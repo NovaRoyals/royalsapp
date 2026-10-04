@@ -67,7 +67,8 @@
     "db:reset": "supabase db reset",
     "db:test": "docker exec -i supabase_db_royals psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/registration_security.sql",
     "db:test:messaging": "docker exec -i supabase_db_royals psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/messaging_security.sql",
-    "db:test:polish": "docker exec -i supabase_db_royals psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/polish_security.sql"
+    "db:test:polish": "docker exec -i supabase_db_royals psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/polish_security.sql",
+    "db:test:auth": "docker exec -i supabase_db_royals psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/auth_profiles.sql"
   },
   "private": true
 }

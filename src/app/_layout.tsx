@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 import { FirstOpenGate } from '@/components/FirstOpenGate';
 import { FontGate } from '@/components/FontGate';
+import { AccountProvider } from '@/state/AccountProvider';
 import { AppProvider } from '@/state/AppProvider';
 import { ToastHost } from '@/components/Toast';
 import { colors } from '@/theme/tokens';
@@ -35,6 +36,7 @@ export default function RootLayout() {
   return (
     <FontGate>
       <QueryClientProvider client={queryClient}>
+        <AccountProvider>
         <AppProvider>
           <FirstOpenGate>
           <ToastHost>
@@ -63,6 +65,8 @@ export default function RootLayout() {
             <Stack.Screen name="messages/index" />
             <Stack.Screen name="announcements/index" />
             <Stack.Screen name="announcements/new" />
+            <Stack.Screen name="auth/callback" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="auth/reset" options={{ gestureEnabled: false }} />
             <Stack.Screen name="message/[id]" />
             <Stack.Screen name="about" />
             <Stack.Screen name="notifications" />
@@ -86,6 +90,7 @@ export default function RootLayout() {
           </ToastHost>
           </FirstOpenGate>
         </AppProvider>
+        </AccountProvider>
       </QueryClientProvider>
     </FontGate>
   );
