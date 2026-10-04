@@ -29,6 +29,10 @@ Tests: `tests/auth.test.ts` (33) and `npm run db:test:auth`.
 
 Run against the local database in the browser: sign-up, weak password refused, wrong password, sign-in, the session surviving a full reload, sign-out clearing the stored login, a returning sign-in skipping the questions, Google refused politely. The server's real answers for duplicate email, wrong password and weak password were checked against the wording.
 
+## The hosted project's settings (2026-10-03)
+
+Email sign-in is on, Google is off, new sign-ups are allowed, and **email confirmation is required**. Until a proper email sender is set up (Supabase's built-in one is limited to 2 emails an hour and meant for testing), only a couple of people an hour can sign up. Add a custom email provider (for example Resend) before real families sign up, or sign them in with Google instead.
+
 ## Not tested yet
 
 - **Google sign-in end to end.** Needs the Google credential below.
@@ -43,7 +47,7 @@ Google Cloud now blocks any account without 2-step verification, so first turn i
 2. Google Auth Platform → set up the consent screen: External, app name "NOVA Royals", the club's support email, and only the basic scopes (`openid`, `email`, `profile`).
 3. Create an OAuth client of type **Web application**. Authorised JavaScript origins: the app's web address(es). Authorised redirect URI: `https://mvgzkxlekyoxmdaeupgo.supabase.co/auth/v1/callback`.
 4. In the Supabase dashboard → Authentication → Sign In / Providers → Google: switch on, paste the Client ID and Client Secret.
-5. Authentication → URL Configuration: set the Site URL to the app's web address and add the Redirect URLs `http://localhost:8083/**`, the deployed web address with `/**`, `royals://**` and `exp://**`.
+5. Authentication → URL Configuration. **Already done on your hosted project (2026-10-03):** Site URL `http://localhost:8083`, and Redirect URLs `http://localhost:8083/**`, `https://nova-royals--*.expo.app/**` (Expo preview deployments), `https://nova-royals.expo.app/**` and `royals://**`. When the club picks its real web address, change the Site URL to it and add it to the list. The broad `exp://**` pattern is deliberately left out, because it would let a crafted login link send a session to any machine; to test on a phone through Expo Go, add that one phone's `exp://<its address>/--/**` temporarily.
 6. While the consent screen is in "Testing", only listed test users can sign in. Publish it to production before parents use it; with only the basic scopes Google does not need to review it.
 
 Apple sign-in is hidden for now. Apple requires it only for apps in the App Store that offer Google, so it comes later, with the store release.
