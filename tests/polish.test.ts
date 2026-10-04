@@ -33,6 +33,13 @@ describe('hiding names', () => {
     assert.equal(unmask(masked.text, masked.tokens), RECAP);
   });
 
+  it('capitalises a name the coach typed in lower case, and leaves other spellings alone', () => {
+    const lower = maskNames('so maya passed to mary-anne and DEV', ['maya', 'mary-anne', 'dev']);
+    assert.equal(unmask(lower.text, lower.tokens), 'so Maya passed to Mary-Anne and DEV');
+    const mixed = maskNames("McDonald's cousin O'Brien", ['mcdonald', "o'brien"]);
+    assert.equal(unmask(mixed.text, mixed.tokens), "McDonald's cousin O'Brien");
+  });
+
   it('prefers the longer name and ignores one-letter names', () => {
     const { text } = maskNames('Mimi Rao and A B', ['rao', 'mimi rao', 'a', 'b']);
     assert.equal(text, '{player1} and A B');

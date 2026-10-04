@@ -51,9 +51,13 @@ export function maskNames(text: string, names: string[]): Masked {
   return { text: masked, tokens };
 }
 
+/** A name typed all in lower case ("maya") is capitalised when it goes back; one typed with capitals is left as written. */
+const properCase = (name: string) =>
+  name === name.toLowerCase() ? name.replace(/(^|[\s'’-])(\p{L})/gu, (_match, before: string, letter: string) => before + letter.toUpperCase()) : name;
+
 /** Put the names back. Only tokens that were handed out are known; anything else is left for the guard. */
 export function unmask(text: string, tokens: Record<string, string>): string {
-  return text.replace(/\{player\d+\}/g, (token) => tokens[token] ?? token);
+  return text.replace(/\{player\d+\}/g, (token) => (tokens[token] === undefined ? token : properCase(tokens[token])));
 }
 
 // ------------------------------------------------------------------------------------------
