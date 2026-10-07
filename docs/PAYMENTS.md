@@ -56,7 +56,25 @@ that count, but "$10/session across N Sundays" copy was removed rather than gues
   (`supabase/tests/registration_security.sql`, ends in ALL PASSED). The first run caught a real hole
   (a parent could register another family's child) that is now fixed.
 
-## What waits for Stripe (test mode first, never live keys in the repo)
+## Status: test-mode payments verified end to end (2026-10-07)
+
+Built: `create-checkout` and `stripe-webhook` Edge Functions, `checkout_context` and
+`apply_stripe_event` in the database (migration `20261007100000`), a Stripe gateway behind
+the payment seam (web only for now) and a return page that never says "paid" itself. Tests:
+`tests/stripe.test.ts` (21), `npm run db:test:stripe` (SQL), each safeguard checked by breaking it.
+
+Verified live on the hosted project in Stripe test mode, with a temporary family that was removed
+afterwards: the real `create-checkout` returned a Stripe payment page for the database's amount
+($120), a test card paid it, Stripe's signed event arrived at `stripe-webhook`, and the
+registration became `paid` about a minute and a half later with one payment record and the audit
+trail `checkout_started`, `payment_received`.
+
+Still to do: refunds (admin function), receipts, donations, paying inside the phone app, wiring the
+app's registrations to the database so a parent can reach this from the screens, and a decision on
+the club's existing website checkout (it runs on Stripe separately). Live payments stay off: the
+functions refuse a live key unless `STRIPE_ALLOW_LIVE=yes` is set on purpose.
+
+## What was planned for Stripe (kept for reference)
 
 1. Edge Function `create-payment`: authenticated, loads the registration, requires
    `awaiting_payment` (or `failed`), recomputes the amount from `program_pricing`, creates a hosted
