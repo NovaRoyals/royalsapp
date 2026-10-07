@@ -23,6 +23,8 @@ describe('what a parent reads when sign-in goes wrong', () => {
     const odd = authMessage({ message: 'duplicate key value violates unique constraint "users_pkey"' });
     assert.equal(odd, 'Something went wrong. Please try again.');
     assert.equal(authMessage(null), 'Something went wrong. Please try again.');
+    assert.equal(authMessage({ code: 'constructor' }), 'Something went wrong. Please try again.');
+    assert.equal(authMessage({ code: '__proto__' }), 'Something went wrong. Please try again.');
   });
 });
 

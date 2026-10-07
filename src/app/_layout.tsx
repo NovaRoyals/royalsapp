@@ -51,6 +51,7 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="program/[id]" />
+            <Stack.Screen name="registration/return" options={{ gestureEnabled: false }} />
             <Stack.Screen name="registration/[programId]" options={{ gestureEnabled: false, animation: 'slide_from_bottom', animationDuration: 280 }} />
             <Stack.Screen name="team/[id]" />
             <Stack.Screen name="competition/[id]" />

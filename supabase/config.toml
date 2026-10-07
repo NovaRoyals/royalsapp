@@ -389,6 +389,14 @@ deno_version = 2
 [functions.coach-polish]
 verify_jwt = false
 
+# create-checkout checks the signed-in parent itself; stripe-webhook is Stripe, not a user, and is
+# locked by the signature on every request instead.
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

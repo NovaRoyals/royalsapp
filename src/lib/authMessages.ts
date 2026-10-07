@@ -43,7 +43,7 @@ const FALLBACK = 'Something went wrong. Please try again.';
 export function authMessage(error: AuthErrorLike): string {
   if (!error) return FALLBACK;
   const code = (error.code ?? '').toLowerCase();
-  if (code && CODE_WORDS[code]) return CODE_WORDS[code];
+  if (code && Object.prototype.hasOwnProperty.call(CODE_WORDS, code)) return CODE_WORDS[code];
   const text = error.message ?? '';
   // Older servers answer in sentences rather than codes.
   if (/invalid login credentials/i.test(text)) return CODE_WORDS.invalid_credentials;
