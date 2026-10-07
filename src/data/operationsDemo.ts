@@ -43,7 +43,7 @@ function noahU6Sessions(venue: string, address: string | undefined, parkingNotes
     fieldStatus: 'open' as const,
     parkingNotes,
     whatToBring: 'Shin guards, water, labeled jacket',
-    coachName: 'Coach Priya Sharma',
+    coachName: 'Coach Sakchham Karki',
     rsvpDeadline: index === 0 ? '2026-09-26T18:00:00-04:00' : undefined,
     demo: true,
   }));

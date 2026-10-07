@@ -137,7 +137,8 @@ export function parentLabel(childFirstName: string) {
 }
 
 export function initialsOf(label: string) {
-  const words = label.replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  // A title in front of a name is not part of the initials: "Coach Sakchham Karki" is SK.
+  const words = label.replace(/[^A-Za-z ]/g, ' ').trim().replace(/^coach\s+(?=\S+\s+\S)/i, '').split(/\s+/).filter(Boolean);
   return ((words[0]?.[0] ?? '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase();
 }
 

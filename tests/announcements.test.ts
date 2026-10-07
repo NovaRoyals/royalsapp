@@ -170,7 +170,7 @@ describe('writing one', () => {
 
   it('turns a draft into an announcement with its audience and author', () => {
     const draft: Draft = { ...emptyDraft('coach'), kind: 'cancellation', teamIds: ['nova-royals-kids-u8'], eventIds: ['e1'], reason: 'Weather', title: ' Cancelled ', body: ' Off. ' };
-    const made = toAnnouncement(draft, { name: 'Coach Priya', role: 'coach' });
+    const made = toAnnouncement(draft, { name: 'Coach Sakchham', role: 'coach' });
     assert.equal(made.audience, 'team');
     assert.equal(made.title, 'Cancelled');
     assert.deepEqual(made.teamIds, ['nova-royals-kids-u8']);

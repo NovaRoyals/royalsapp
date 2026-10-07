@@ -958,7 +958,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const scheduleBase = mergeClubSchedule(current.schedule);
       const target = scheduleBase.find((item) => item.id === eventId);
       if (!target || !canRequestOperationalChange(current.role, target.teamId)) return current;
-      const actorName = current.role === 'coach' ? 'Coach Priya Sharma' : 'Team manager';
+      const actorName = current.role === 'coach' ? 'Coach Sakchham Karki' : 'Team manager';
       const pending = changeEntry({
         kind,
         reason,
@@ -1001,7 +1001,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState((current) => {
       const target = mergeClubSchedule(current.schedule).find((item) => item.id === eventId);
       if (!target || !canEditEventInstructions(current.role, target.teamId)) return current;
-      const actorName = current.role === 'admin' ? 'Club administrator' : current.role === 'coach' ? 'Coach Priya Sharma' : 'Team manager';
+      const actorName = current.role === 'admin' ? 'Club administrator' : current.role === 'coach' ? 'Coach Sakchham Karki' : 'Team manager';
       return {
         ...current,
         schedule: mergeClubSchedule(current.schedule).map((event) =>

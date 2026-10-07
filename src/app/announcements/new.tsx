@@ -113,7 +113,7 @@ export default function NewAnnouncementScreen() {
     router.replace('/announcements' as never);
   };
 
-  const preview = { ...toAnnouncement(draft, { name: role === 'coach' ? 'Coach Priya Sharma' : role === 'admin' ? 'Club office' : 'Team manager', role }), id: 'preview', publishedAt: new Date().toISOString() };
+  const preview = { ...toAnnouncement(draft, { name: role === 'coach' ? 'Coach Sakchham Karki' : role === 'admin' ? 'Club office' : 'Team manager', role }), id: 'preview', publishedAt: new Date().toISOString() };
   const reach = recipientEstimate(draft, COUNTS);
   const teams = AUDIENCE_TEAMS.filter((team) => allowedTeamIds(role).includes(team.id));
 

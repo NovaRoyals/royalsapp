@@ -7,10 +7,10 @@ export const RECAP_EVENT_ID = 'kids-2026-09-20';
 /** Single source for the active U8 coach identity in this demo. */
 export const ACTIVE_COACH = {
   id: 'coach-priya',
-  firstName: 'Priya',
-  lastName: 'Sharma',
-  fullName: 'Priya Sharma',
-  displayName: 'Coach Priya Sharma',
+  firstName: 'Sakchham',
+  lastName: 'Karki',
+  fullName: 'Sakchham Karki',
+  displayName: 'Coach Sakchham Karki',
   email: 'infonovaroyals@gmail.com',
 } as const;
 

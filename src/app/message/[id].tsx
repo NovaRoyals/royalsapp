@@ -188,7 +188,7 @@ function ChatThread({ threadId }: { threadId: string }) {
           <Button label="Open Messages" variant="secondary" onPress={() => router.replace('/messages' as never)} />
         </View>
       ) : (
-        <Composer placeholder={kind === 'coach' && viewer?.role === 'guardian' ? 'Message Coach Priya' : 'Write a message'} onSend={send} />
+        <Composer placeholder={kind === 'coach' && viewer?.role === 'guardian' ? 'Message Coach Sakchham' : 'Write a message'} onSend={send} />
       )}
     </Screen>
   );

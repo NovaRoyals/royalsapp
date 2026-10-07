@@ -24,7 +24,7 @@ function message(patch: Partial<DirectMessage>): DirectMessage {
     id: 'm1',
     threadId: COACH_THREAD,
     fromRole: 'coach',
-    fromName: 'Coach Priya Sharma',
+    fromName: 'Coach Sakchham Karki',
     fromId: 'coach:priya',
     body: 'Hello',
     createdAt: '2026-10-02T18:00:00-04:00',
@@ -133,7 +133,9 @@ describe('what parents may send each other', () => {
 
 describe('how messages are labelled', () => {
   it('makes initials from a label', () => {
-    assert.equal(initialsOf('Coach Priya Sharma'), 'CS');
+    assert.equal(initialsOf('Coach Sakchham Karki'), 'SK');
+    assert.equal(initialsOf('Maya'), 'M');
+    assert.equal(initialsOf('Parent of Maya'), 'PM');
     assert.equal(initialsOf('Parent of Elena'), 'PE');
   });
 
