@@ -44,10 +44,26 @@ Written 2026-10-07. Three tracks run side by side. The slow ones are the ones th
 
 Start Track A today because it waits on people. Do Track B 1.1 to 1.3 first (family, registration, payment), since that is what parents need on day one. Messaging and announcements follow. The store requirements in B2 are small and can be built in parallel with 1.4 and 1.5. A closed test can begin as soon as B1.1 to B1.3 and B2 are done; I would not wait for everything.
 
+## Decided (2026-10-07)
+
+- **Legal signer:** Ambika Sapkota. A club cannot sign for itself; Apple and Google need one named person with the authority to bind Nova Royals Athletic Club, and that person becomes the Account Holder.
+- **Store name:** "Nova Royals" (not "NOVA").
+- **Website:** moving the Register buttons to the app is a later job.
+
+## Apple enrollment, step by step (for the signer)
+
+1. Make sure `info@novaroyalsac.com` receives email. Create an Apple ID with it (appleid.apple.com) and turn on two-factor sign-in. This should be a club Apple ID, not a personal one, so the account survives people changing roles.
+2. Go to developer.apple.com/programs/enroll and sign in with that Apple ID.
+3. Choose **Organization**, then the type for a nonprofit.
+4. Enter the legal name exactly: **Nova Royals Athletic Club**; D-U-N-S **07-614-5506**; address 40851 Tulip Poplar Pl, Aldie, VA 20105; website https://www.novaroyalsac.com; the club phone number.
+5. Confirm the signer has legal authority (for example founder, president or director) and enter their details.
+6. Choose the **fee waiver** option when asked. Have the IRS determination letter (the 501(c)(3) letter, ruling year 2022, EIN 88-1537444) ready as a PDF in case Apple asks for it.
+7. Apple verifies the organization, often by phone or email to the signer, then approves. This is the slow step: allow days, sometimes longer.
+8. When approved, invite the club's app developer account as an App Manager so builds can be uploaded.
+
+Google Play is similar: play.google.com/console, create an organization account, $25, the same legal details and D-U-N-S, then identity verification.
+
 ## What the club needs to decide
 
-- Who the legal signer is for Apple and Google.
-- The name on the stores (suggest "NOVA Royals").
-- Whether registration on the website is retired in favour of the app (recommended).
 - Season length: 11 Sundays on the calendar against 12 sessions implied by $10 × 12.
 - Whether coaches may cancel directly (`COACH_MAY_CANCEL`).
