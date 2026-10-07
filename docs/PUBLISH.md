@@ -6,10 +6,10 @@ Written 2026-10-07. Three tracks run side by side. The slow ones are the ones th
 
 | Item | Who | Notes |
 | --- | --- | --- |
-| Apple Developer Program, as an organization | Club signer, with me guiding | Legal name **Nova Royals Athletic Club**, EIN 88-1537444, D-U-N-S **07-614-5506** (already exists at Dun & Bradstreet), address 40851 Tulip Poplar Pl, Aldie, VA 20105. Needs a work email on the club's domain (`info@novaroyalsac.com`), a real website (novaroyalsac.com) and the signer's authority. Apple verifies by phone or email, usually days. |
+| Apple Developer Program, as an organization | Club signer, with me guiding | Legal name **Nova Royals Athletic Club**, EIN 88-1537444, D-U-N-S **07-614-5506** (already exists at Dun & Bradstreet), address 40851 Tulip Poplar Pl, Aldie, VA 20105. Needs a work email on the club's own website domain, a real website (novaroyalsac.com) and the signer's authority. **Risk:** the club's email today is infonovaroyals@gmail.com, which is not on the domain, and Apple's rule is that the contact email must be associated with the organization's domain. If Apple rejects the Gmail address, create an address on novaroyalsac.com (for example through Google Workspace for Nonprofits, which is free for eligible 501(c)(3)s, or the domain host's email) and enrol with that. Apple verifies by phone or email, usually days. |
 | Apple fee waiver | Same signer | Nonprofits recognised by the IRS (501(c)(3)) can have the $99 waived. Apple may ask for the IRS determination letter. Only valid while the app sells no digital goods, which fits us: registrations are real-world services. |
 | Google Play organization account | Same signer | $25 one time, also needs the D-U-N-S number. Verification can take a few days. |
-| Website email on the club domain | Website builder or whoever runs the domain | Needed by Apple, and later by Resend to send sign-in emails. |
+| Email address on the club's domain | Whoever runs the domain | May be needed by Apple (see the risk above), and by Resend to send sign-in emails from the club's own address. |
 | Resend (email sending) | You, then me | Free tier. Needs DNS records on novaroyalsac.com. Replaces Supabase's 2-an-hour test sender. |
 | Google sign-in published | You approve, I do it | Consent screen is in Testing; it must be published before parents use it. Only basic scopes, so no review. |
 | Stripe live mode | You, deliberately, last | Everything is built and tested in test mode. Going live means entering live keys on purpose and turning on `STRIPE_ALLOW_LIVE`. Decide how the website's own Stripe checkout and the app share the one account. |
@@ -52,7 +52,7 @@ Start Track A today because it waits on people. Do Track B 1.1 to 1.3 first (fam
 
 ## Apple enrollment, step by step (for the signer)
 
-1. Make sure `info@novaroyalsac.com` receives email. Create an Apple ID with it (appleid.apple.com) and turn on two-factor sign-in. This should be a club Apple ID, not a personal one, so the account survives people changing roles.
+1. Create a club Apple ID at appleid.apple.com with the club's email (today infonovaroyals@gmail.com) and turn on two-factor sign-in. It should be a club Apple ID, not a personal one, so the account survives people changing roles. If Apple later insists on an address at novaroyalsac.com, make that address first and use it instead.
 2. Go to developer.apple.com/programs/enroll and sign in with that Apple ID.
 3. Choose **Organization**, then the type for a nonprofit.
 4. Enter the legal name exactly: **Nova Royals Athletic Club**; D-U-N-S **07-614-5506**; address 40851 Tulip Poplar Pl, Aldie, VA 20105; website https://www.novaroyalsac.com; the club phone number.
