@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import { Image } from 'expo-image';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { CricketMark } from '@/components/icons/CricketMark';
 import { PressableScale } from '@/components/motion';
+import { royPoseSource, type RoyPose } from '@/components/mascot/poses';
 import { useReducedMotion } from '@/lib/reducedMotion';
 import { colors, radius, typography } from '@/theme/tokens';
 
@@ -40,6 +42,36 @@ function IconTile({
   );
 }
 
+/**
+ * Roy's face in a round tile, in a different pose for each choice. Still until you pick one: then
+ * he cheers and hops once. No looping movement.
+ */
+function RoyTile({ pose, tint, selected, size = 58 }: { pose: RoyPose; tint: Tint; selected?: boolean; size?: number }) {
+  const reduced = useReducedMotion();
+  const hop = useSharedValue(0);
+  useEffect(() => {
+    if (selected && !reduced) {
+      hop.value = withSequence(withTiming(-10, { duration: 130, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: 260, easing: Easing.bounce }));
+    }
+  }, [hop, reduced, selected]);
+  const hopStyle = useAnimatedStyle(() => ({ transform: [{ translateY: hop.value }] }));
+  const scheme = tints[tint];
+  const image = size * 1.75;
+  return (
+    <View style={[styles.royTile, { width: size, height: size, borderRadius: size / 2, backgroundColor: selected ? scheme.fg : scheme.bg }]}>
+      <Animated.View style={hopStyle}>
+        <Image
+          source={royPoseSource[selected ? 'celebrate' : pose]}
+          alt=""
+          contentFit="contain"
+          contentPosition="top center"
+          style={{ width: image, height: image, marginLeft: (size - image) / 2, marginTop: -size * 0.04 }}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
 export function ChoiceCard({
   icon,
   tint = 'green',
@@ -48,10 +80,12 @@ export function ChoiceCard({
   selected,
   trailing = 'chevron',
   cricket,
+  roy,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   tint?: Tint;
+  roy?: RoyPose;
   title: string;
   detail?: string;
   selected?: boolean;
@@ -76,7 +110,11 @@ export function ChoiceCard({
       onPress={onPress}
       style={[styles.card, selected && { backgroundColor: scheme.bg, borderColor: scheme.fg }]}
     >
-      <IconTile icon={selected ? 'checkmark' : icon} tint={tint} cricket={selected ? false : cricket} filled={selected} />
+      {roy ? (
+        <RoyTile pose={roy} tint={tint} selected={selected} />
+      ) : (
+        <IconTile icon={selected ? 'checkmark' : icon} tint={tint} cricket={selected ? false : cricket} filled={selected} />
+      )}
       <View style={styles.flex}>
         <Text style={styles.cardTitle}>{title}</Text>
         {detail ? <Text style={styles.cardDetail}>{detail}</Text> : null}
@@ -195,6 +233,7 @@ export function ToggleRow({
 }
 
 const styles = StyleSheet.create({
+  royTile: { overflow: 'hidden', alignItems: 'center' },
   flex: { flex: 1 },
   tile: { alignItems: 'center', justifyContent: 'center' },
   card: {

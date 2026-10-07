@@ -38,7 +38,7 @@ export default function CoachUpdatesScreen() {
         <Text style={styles.topTitle}>Coach updates</Text>
         <View style={{ width: 44, height: 44 }} />
       </View>
-      <Text style={styles.lead}>Notes from training — encouraging, specific, and only about your child when a private note is included.</Text>
+      <Text style={styles.lead}>Notes from training: encouraging, specific, and only about your child when a private note is included.</Text>
       {!items.length ? (
         <EmptyState pose="lookRight" title="No coach updates yet" message="After a session, families get a recap when the coach chooses to send it." />
       ) : (

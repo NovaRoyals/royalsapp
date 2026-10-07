@@ -220,7 +220,7 @@ export default function CricketMatchScreen() {
               {inn.bowling.length ? <Text style={styles.bowlHead}>Bowling</Text> : null}
               {inn.bowling.map((row, index) => {
                 const royal = cricketSquad.find((p) => p.fullName === row.playerName || p.id === row.playerId);
-                const econ = row.overs ? (row.runs / row.overs).toFixed(2) : "—";
+                const econ = row.overs ? (row.runs / row.overs).toFixed(2) : "n/a";
                 const line = (
                   <Text style={styles.nums}>
                     {displayCricketName(row.playerName, signedIn)} · {row.overs}-{row.maidens}-{row.runs}-{row.wickets} · Econ {econ}
@@ -274,7 +274,7 @@ export default function CricketMatchScreen() {
           {match.venue ? <Text style={styles.body}>Venue · {match.venue}</Text> : null}
           {match.umpires ? <Text style={styles.body}>Umpires · {match.umpires}</Text> : null}
           {match.playerOfMatch ? <Text style={styles.body}>Player of the match · {match.playerOfMatch}</Text> : null}
-          <Text style={styles.body}>No points table or NRR is stored — CCPL owns the competition table.</Text>
+          <Text style={styles.body}>No points table or NRR is stored. CCPL owns the competition table.</Text>
         </View>
       ) : null}
     </Screen>

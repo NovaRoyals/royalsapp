@@ -118,7 +118,7 @@ export function SoccerFixturesPane({ side }: { side: SoccerSide }) {
 }
 
 function pillFor(match: SoccerMatch) {
-  if (match.royalsScore == null || match.opponentScore == null) return '—';
+  if (match.royalsScore == null || match.opponentScore == null) return '·';
   if (match.royalsScore === match.opponentScore) return 'T';
   return match.royalsScore > match.opponentScore ? 'W' : 'L';
 }

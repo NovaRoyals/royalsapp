@@ -50,8 +50,8 @@ export default function CricketPlayerScreen() {
         <View style={styles.stats}>
           <Stat label="Matches" value={String(profile.matches)} />
           <Stat label="Runs" value={String(profile.runs)} />
-          <Stat label="Avg" value={profile.average == null ? "—" : String(profile.average)} />
-          <Stat label="SR" value={profile.strikeRate == null ? "—" : String(profile.strikeRate)} />
+          <Stat label="Avg" value={profile.average == null ? "n/a" : String(profile.average)} />
+          <Stat label="SR" value={profile.strikeRate == null ? "n/a" : String(profile.strikeRate)} />
           <Stat label="50/100" value={`${profile.fifties}/${profile.hundreds}`} />
           <Stat label="Wkts" value={String(profile.wickets)} />
         </View>

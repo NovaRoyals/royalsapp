@@ -51,7 +51,7 @@ export default function SeasonHubScreen() {
       <Screen contentStyle={styles.empty}>
         <Text style={styles.kicker}>FIRST SESSION</Text>
         <Text style={styles.title}>First session: Sunday 9:00 AM · Arrowhead 3A</Text>
-        <Text style={styles.gateCopy}>Create an account to unlock your briefing — coach, kit, and the path through 11 Sundays.</Text>
+        <Text style={styles.gateCopy}>Create an account to unlock your briefing: coach, kit, and the path through 11 Sundays.</Text>
         <Button label="Create an account" onPress={() => router.replace('/onboarding')} />
         <Button label="Browse programs" variant="secondary" onPress={() => router.replace('/(tabs)/programs')} />
       </Screen>

@@ -51,6 +51,9 @@ export function maskNames(text: string, names: string[]): Masked {
   return { text: masked, tokens };
 }
 
+/** The club's style: no long dashes inside sentences. A model that writes one anyway gets a comma. */
+export const noLongDashes = (text: string) => text.replace(/\s*—\s*/g, ', ').replace(/,\s*,/g, ',');
+
 /** A name typed all in lower case ("maya") is capitalised when it goes back; one typed with capitals is left as written. */
 const properCase = (name: string) =>
   name === name.toLowerCase() ? name.replace(/(^|[\s'’-])(\p{L})/gu, (_match, before: string, letter: string) => before + letter.toUpperCase()) : name;
@@ -71,6 +74,7 @@ const BASE_RULES = [
   'Tokens like {player1} stand for a child’s name. Keep them exactly as written, do not guess who they are, and do not add new ones.',
   'Write plain text: no emojis, no headings, no sign-off, no greeting, and no bullet points unless the coach used them.',
   'Do not address any child or parent by name. Keep the numbers, days and times exactly as written.',
+  'Never use dashes to join clauses (no — and no –). Use commas or full stops instead.',
 ];
 
 const MODE_RULES: Record<Exclude<PolishMode, 'verbatim'>, string> = {
@@ -279,7 +283,7 @@ export async function handlePolish(request: PolishRequest, deps: PolishDeps): Pr
   const problems = findInventions(masked.text, maskedAnswer, mode);
   if (problems.length > 0) return { status: 422, body: { error: 'rejected', rejectedClaims: problems } };
 
-  const text = unmask(maskedAnswer, masked.tokens).trim();
+  const text = noLongDashes(unmask(maskedAnswer, masked.tokens)).trim();
   try {
     await deps.log({ teamId: request.teamId, recapId, original, generated: text, mode });
   } catch {

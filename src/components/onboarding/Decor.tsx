@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 
 import { CloudBackdrop } from '@/components/brand/CloudBackdrop';
+import { FlowLines } from '@/components/onboarding/FlowLines';
 import { colors, gradients } from '@/theme/tokens';
 
 function HillLayer({ d, fill }: { d: string; fill: string }) {
@@ -21,7 +22,7 @@ export function Hills({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
-export function FlowBackdrop({ tone }: { tone: 'dark' | 'light' }) {
+export function FlowBackdrop({ tone, lines = false }: { tone: 'dark' | 'light'; lines?: boolean }) {
   if (tone === 'dark') {
     return (
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -35,6 +36,7 @@ export function FlowBackdrop({ tone }: { tone: 'dark' | 'light' }) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <LinearGradient colors={[colors.mint, colors.cream]} style={styles.wash} />
+      {lines ? <FlowLines /> : null}
     </View>
   );
 }

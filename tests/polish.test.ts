@@ -13,6 +13,7 @@ import {
   openRouterCall,
   parseModelText,
   unmask,
+  noLongDashes,
   type PolishDeps,
 } from '../supabase/functions/_shared/polish.ts';
 
@@ -38,6 +39,11 @@ describe('hiding names', () => {
     assert.equal(unmask(lower.text, lower.tokens), 'so Maya passed to Mary-Anne and DEV');
     const mixed = maskNames("McDonald's cousin O'Brien", ['mcdonald', "o'brien"]);
     assert.equal(unmask(mixed.text, mixed.tokens), "McDonald's cousin O'Brien");
+  });
+
+  it('turns a long dash the model wrote into a comma', () => {
+    assert.equal(noLongDashes('Maya scored twice—great effort — well done.'), 'Maya scored twice, great effort, well done.');
+    assert.equal(noLongDashes('No dashes here.'), 'No dashes here.');
   });
 
   it('prefers the longer name and ignores one-letter names', () => {

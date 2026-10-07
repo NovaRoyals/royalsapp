@@ -229,7 +229,7 @@ export default function ProgramDetailScreen() {
           <Text style={styles.safetyText}>
             {isYouth
               ? 'One guardian account can register and safely manage multiple children without exposing private youth information.'
-              : 'Adult registration only asks for player and participation details—no irrelevant guardian fields.'}
+              : 'Adult registration only asks for player and participation details, with no irrelevant guardian fields.'}
           </Text>
         </View>
       </View>

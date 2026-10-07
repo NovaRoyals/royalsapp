@@ -629,7 +629,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const alert = event
         ? notice({
             type: 'rsvp',
-            title: `${child.firstName} — ${label}`,
+            title: `${child.firstName}: ${label}`,
             body: `${event.title} · ${event.venue}`,
             route: `/event/${eventId}`,
             eventId,

@@ -248,7 +248,7 @@ function EventRow({
   const own = names.map((name) => {
     const child = householdChildren.find((item) => item.firstName === name);
     const status = child ? rsvpFor(event, child.id) : undefined;
-    return status ? `${name} — ${rsvpLabel(status)}` : name;
+    return status ? `${name}: ${rsvpLabel(status)}` : name;
   });
   const childResponse = names
     .map((name) => {

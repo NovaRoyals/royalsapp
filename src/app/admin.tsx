@@ -73,7 +73,7 @@ export default function AdminScreen() {
         {canReview ? <Metric value={String(registrations.length)} label="REGISTRATIONS" /> : <Metric value="U8" label="ASSIGNED TEAM" />}
         <Metric value={String(role === 'coach' ? 1 : demoTeams.length)} label="TEAMS" />
         {canReview ? (
-          <Metric value={funnelStats ? `${funnelStats.done}/${funnelStats.starts}` : '—'} label="SIGN-UPS DONE / STARTED" />
+          <Metric value={funnelStats ? `${funnelStats.done}/${funnelStats.starts}` : 'n/a'} label="SIGN-UPS DONE / STARTED" />
         ) : (
           <Metric value="Staff" label="SCOPED ACCESS" />
         )}

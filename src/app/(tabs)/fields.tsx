@@ -328,7 +328,7 @@ export default function FieldsScreen() {
         {day.isError ? (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>
-              Couldn’t reach field schedules — showing data from {formatUpdatedAgo(updatedIso, true, now).replace(' · saved', '')}
+              Couldn’t reach field schedules. Showing data from {formatUpdatedAgo(updatedIso, true, now).replace(' · saved', '')}
             </Text>
             <Pressable onPress={() => day.refetch()} style={styles.retry}><Text style={styles.retryText}>Try again</Text></Pressable>
           </View>
@@ -378,7 +378,7 @@ export default function FieldsScreen() {
         {emptyDay ? <Text style={styles.empty}>No public-schedule events this day.</Text> : null}
 
         <Text style={styles.section}>{showAllPitches ? `PITCHES · ${pitches.length}` : 'Suggested pitches'}</Text>
-        <View style={[styles.list, twoCol && styles.listGrid]} accessibilityLabel="Tap a glowing pin to preview the pitch — green is clear at your time, orange has something on.">
+        <View style={[styles.list, twoCol && styles.listGrid]} accessibilityLabel="Tap a glowing pin to preview the pitch. Green is clear at your time, orange has something on.">
           {day.isPending && !day.data
             ? [0, 1, 2, 3].map((item) => <View key={item} style={[styles.skeleton, twoCol && styles.half]} />)
             : listed.map((pitch) => (

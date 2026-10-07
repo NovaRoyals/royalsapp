@@ -323,7 +323,7 @@ export default function RegistrationScreen() {
         <View style={styles.step}>
           <StatusPill label="Registration open" tone="orange" />
           <Text style={styles.stepTitle}>Let’s get your family on the field.</Text>
-          <Text style={styles.stepBody}>Your household details and child profiles are securely reusable next season—no starting over.</Text>
+          <Text style={styles.stepBody}>Your household details and child profiles are securely reusable next season, so there’s no starting over.</Text>
           <View style={styles.programCard}>
             <SummaryRow label="Program" value={program.title} />
             <SummaryRow label="Ages" value="3–16" />

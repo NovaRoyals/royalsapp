@@ -57,7 +57,7 @@ export default function PitchDetailScreen() {
         <Text style={styles.title}>{pitch?.name ?? 'Pitch'}</Text>
         <Text style={styles.meta}>{pitch ? `${pitch.pitch} · ${pitch.surface} · ${pitch.location}` : 'Loading catalog…'}</Text>
         <Text style={styles.when}>{formatTimeChip(time)} · {date}</Text>
-        {suggested ? <Text style={styles.suggest}>Top pick for this time — not a hold on the pitch.</Text> : null}
+        {suggested ? <Text style={styles.suggest}>Top pick for this time, not a hold on the pitch.</Text> : null}
       </View>
 
       <Text style={styles.updated}>{formatUpdatedAgo(day.data?.lastUpdated, day.data?.fromCache)}</Text>

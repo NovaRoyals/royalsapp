@@ -26,7 +26,7 @@ class DemoMapsProvider implements MapsProvider {
   directions(destination: MapDestination): DirectionsPreview {
     const place = [destination.name, destination.fieldNumber].filter(Boolean).join(' · ');
     return {
-      label: 'Open directions — demo',
+      label: 'Open directions (demo)',
       destination: place,
       detail: destination.address
         ? `${destination.address}. Turn-by-turn is not connected.`

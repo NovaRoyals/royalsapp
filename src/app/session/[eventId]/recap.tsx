@@ -254,7 +254,7 @@ export default function SessionRecapScreen() {
       return;
     }
     if (offline) {
-      setSendError('You’re offline. The draft is saved — send when you’re back.');
+      setSendError('You’re offline. The draft is saved. Send when you’re back.');
       return;
     }
     const approvedAt = new Date();
@@ -378,7 +378,7 @@ export default function SessionRecapScreen() {
           ) : null}
         </View>
 
-        {offline ? <Text style={styles.banner}>Offline — drafts save on this device.</Text> : null}
+        {offline ? <Text style={styles.banner}>Offline. Drafts save on this device.</Text> : null}
 
         {view === 'receipt' && draft.status === 'sent' ? (
           <Receipt recap={draft} identity={identity.kicker} />

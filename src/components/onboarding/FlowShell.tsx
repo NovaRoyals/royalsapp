@@ -45,6 +45,7 @@ export function FlowShell({
   footer,
   footnote,
   fill = false,
+  lively = false,
   stepKey,
 }: {
   tone?: 'dark' | 'light';
@@ -63,6 +64,8 @@ export function FlowShell({
   footer?: ReactNode;
   footnote?: ReactNode;
   fill?: boolean;
+  /** Soft lines drift across the background of a light step. */
+  lively?: boolean;
   /** Changes when the step changes, so the content can slide in. */
   stepKey?: string;
 }) {
@@ -72,7 +75,7 @@ export function FlowShell({
 
   return (
     <View style={[styles.root, dark && styles.rootDark]}>
-      <FlowBackdrop tone={tone} />
+      <FlowBackdrop tone={tone} lines={lively} />
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
         {showHeader ? (
           <View style={styles.headerInner}>

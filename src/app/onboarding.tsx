@@ -6,6 +6,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Wordmark } from '@/components/brand/Wordmark';
 import { FlowShell } from '@/components/onboarding/FlowShell';
+import type { RoyPose } from '@/components/mascot/poses';
 import { ChoiceCard, FlowField, OrRule, ProviderButton, type Tint } from '@/components/onboarding/Pieces';
 import { Button } from '@/components/ui';
 import { isEmail, passwordProblem } from '@/lib/authMessages';
@@ -28,14 +29,15 @@ const ROLE_CHOICES: {
   id: ClubRelationship;
   icon: keyof typeof Ionicons.glyphMap;
   tint: Tint;
+  roy: RoyPose;
   title: string;
   detail: string;
 }[] = [
-  { id: 'parent', icon: 'people-outline', tint: 'amber', title: 'Parent or guardian', detail: 'Sign up your kids and keep track of their Sundays.' },
-  { id: 'player', icon: 'football-outline', tint: 'green', title: 'Adult player', detail: 'Find your Open, 35+, women’s or cricket side.' },
-  { id: 'supporter', icon: 'heart-outline', tint: 'rose', title: 'Supporter or volunteer', detail: 'Cheer on the matches and lend a hand around the club.' },
-  { id: 'coach', icon: 'clipboard-outline', tint: 'blue', title: 'Coach', detail: 'Request staff access. Tools unlock once an admin assigns you.' },
-  { id: 'manager', icon: 'briefcase-outline', tint: 'teal', title: 'Team manager', detail: 'Request operations access. An admin assigns it.' },
+  { id: 'parent', icon: 'people-outline', tint: 'amber', roy: 'happy', title: 'Parent or guardian', detail: 'Sign up your kids and keep track of their Sundays.' },
+  { id: 'player', icon: 'football-outline', tint: 'green', roy: 'kick', title: 'Adult player', detail: 'Find your Open, 35+, women’s or cricket side.' },
+  { id: 'supporter', icon: 'heart-outline', tint: 'rose', roy: 'celebrate', title: 'Supporter or volunteer', detail: 'Cheer on the matches and lend a hand around the club.' },
+  { id: 'coach', icon: 'clipboard-outline', tint: 'blue', roy: 'think', title: 'Coach', detail: 'Request staff access. Tools unlock once an admin assigns you.' },
+  { id: 'manager', icon: 'briefcase-outline', tint: 'teal', roy: 'idea', title: 'Team manager', detail: 'Request operations access. An admin assigns it.' },
 ];
 
 const PROVIDER_IDENTITY: Record<Exclude<AuthProvider, 'email'>, { firstName: string; lastName: string; email: string }> = {
@@ -314,7 +316,7 @@ export default function OnboardingScreen() {
         above={<Wordmark light />}
         stepKey="welcome"
         roy={{ pose: 'excited', size: 268, decorative: true }}
-        title={'Same Lion.\nBigger Tomorrows.'}
+        title={'Your club.\nYour community.'}
         subtitle="Soccer, cricket, kids and community. Come play, cheer, or help out."
         footer={
           <>
@@ -522,7 +524,7 @@ export default function OnboardingScreen() {
       stepKey="role"
       step={progress?.step}
       total={progress?.total}
-      roy={{ pose: 'point', size: 128, decorative: true }}
+      lively
       title="Who’s joining the club?"
       subtitle="This shapes your Home. You can add more roles any time."
     >
@@ -534,6 +536,7 @@ export default function OnboardingScreen() {
           <ChoiceCard
             icon={choice.icon}
             tint={choice.tint}
+            roy={choice.roy}
             title={choice.title}
             detail={choice.detail}
             selected={roleChoice === choice.id}

@@ -59,7 +59,7 @@ export function householdConflictStub(role: UserRole, childNames: string[] = [])
   if (!childNames.includes('Maya') || !childNames.includes('Noah')) return null;
   return {
     title: 'Schedule conflict',
-    detail: 'Maya’s training and Noah’s U6 group overlap by 30 minutes. Household calendar stub — not a published club fixture.',
+    detail: 'Maya’s training and Noah’s U6 group overlap by 30 minutes. Household calendar stub, not a published club fixture.',
   };
 }
 
@@ -204,14 +204,14 @@ function cricketTodayStory(event: ScheduleEvent, nowIso: string): HomeStory | nu
       eventId: event.id,
       kicker: 'In play',
       title: event.title,
-      meta: 'Official live score is on CCPL — ROYALS does not guess the score.',
+      meta: 'Official live score is on CCPL. ROYALS does not guess the score.',
       href: cricketHref(event),
       startsAt: event.startsAt,
       kind: 'live',
     };
   }
   if (event.result) {
-    const line = event.result.replace(/^Lost — /, 'Lost today — ').replace(/^Won by /, 'Won today by ').replace(/^Tied — /, 'Tied today — ');
+    const line = event.result.replace(/^Lost: /, 'Lost today: ').replace(/^Won by /, 'Won today by ').replace(/^Tied: /, 'Tied today: ');
     return {
       id: `done-${event.id}`,
       eventId: event.id,

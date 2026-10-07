@@ -63,7 +63,7 @@ export const demoPrograms: Program[] = [
     title: 'Fall Soccer Training',
     sport: 'soccer',
     audience: 'Ages 3–16',
-    summary: 'Sunday mornings at Arrowhead 3A — skill, small-sided play, and a club to belong to.',
+    summary: 'Sunday mornings at Arrowhead 3A: skill, small-sided play, and a club to belong to.',
     description:
       'A welcoming fall training program for new and developing players. Age-aware groups meet every Sunday from 9:00–10:00 AM at Arrowhead Park Field 3A, Centreville.',
     dates: 'Sep 13 – Nov 22, 2026',
@@ -90,7 +90,7 @@ export const demoPrograms: Program[] = [
     title: "Women's Soccer",
     sport: 'soccer',
     audience: 'Adult players',
-    summary: 'Sunday morning practice at Arrowhead — no match season right now.',
+    summary: 'Sunday morning practice at Arrowhead. No match season right now.',
     description:
       'Women’s training runs every Sunday, 8:00–8:30 AM, on the same Arrowhead Park turf the kids use at 9:00. There is no women’s match season posted yet; this is practice only.',
     dates: 'Sunday practice · no match season',
@@ -114,7 +114,7 @@ export const demoPrograms: Program[] = [
     title: "Men's Soccer",
     sport: 'soccer',
     audience: 'Adult players',
-    summary: 'Sunday evening Men’s Open 8v8 — fixtures, squad and RSVP in one place.',
+    summary: 'Sunday evening Men’s Open 8v8: fixtures, squad and RSVP in one place.',
     description:
       'Nova Royals AC men’s open play 8v8 on Sunday evenings. Follow the current league schedule, squad and match-week RSVP without leaving ROYALS.',
     dates: 'Sep 13 – Nov 15, 2026',
@@ -134,7 +134,7 @@ export const demoPrograms: Program[] = [
     title: 'Veterans 35+',
     sport: 'soccer',
     audience: 'Players 35+',
-    summary: 'Thursday night Men’s 8v8 (35+) with FXA Sports — Fall ’26 Competitive.',
+    summary: 'Thursday night Men’s 8v8 (35+) with FXA Sports, Fall ’26 Competitive.',
     description:
       'Nova Royals AC 35+ play Thursday nights in FXA’s Men’s 8v8 (35+) Competitive division. Eight regular-season games on turf around Northern Virginia. Registration for this season is closed on FXA; roster names are not public.',
     dates: 'Sep 17 – Nov 5, 2026 · playoffs Nov 12 / Nov 19 if qualified',
@@ -194,7 +194,7 @@ export const demoPrograms: Program[] = [
     title: 'CCPL Cricket',
     sport: 'cricket',
     audience: 'Adult · Manassas1',
-    summary: 'Capital Cricket Premier League T20 — Fall 2026, Manassas1 division. Results follow the CCPL results page.',
+    summary: 'Capital Cricket Premier League T20, Fall 2026, Manassas1 division. Results follow the CCPL results page.',
     description:
       'Nova Royals play T20 in CCPL’s Manassas1 division. Captain Sujit Khanal and vice captain Biplav Gautam lead a 29-player verified squad. Results follow published scorecards; ROYALS does not invent a league table. CCPL record: 2W–2L–1T.',
     dates: 'Aug 2 – Sep 26, 2026',
@@ -547,7 +547,7 @@ export const demoCompetitions: Competition[] = [
     dates: 'Sep 13 – Nov 22, 2026',
     location: 'Arrowhead Park · Field 3A, Centreville, VA',
     format: 'Sunday training 9:00–10:00 AM',
-    description: 'Kids fall training every Sunday from September 13 through November 22. Not a league — no standings table.',
+    description: 'Kids fall training every Sunday from September 13 through November 22. Not a league, so no standings table.',
     teamIds: ['nova-royals-kids-u8'],
   },
   {
@@ -733,7 +733,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Lost — Golmaal Aces won by 15 runs',
+    result: 'Lost: Golmaal Aces won by 15 runs',
     fieldStatus: 'open',
   },
   {
@@ -749,7 +749,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Tied — Blitz won the super over',
+    result: 'Tied: Blitz won the super over',
     fieldStatus: 'open',
   },
   {
@@ -765,7 +765,7 @@ const ccplMatches: ScheduleEvent[] = [
     teamId: 'nova-royals-cricket',
     competitionId: 'ccpl-manassas1',
     status: 'completed',
-    result: 'Lost — Galaxy Legends won by 28 runs',
+    result: 'Lost: Galaxy Legends won by 28 runs',
     fieldStatus: 'open',
   },
   {
@@ -814,7 +814,7 @@ const ccplMatches: ScheduleEvent[] = [
     competitionId: 'ccpl-manassas1',
     status: 'scheduled',
     fieldStatus: 'open',
-    parkingNotes: 'Away T20 at Manassas Field 2. Arrive early — morning league slots fill the lot.',
+    parkingNotes: 'Away T20 at Manassas Field 2. Arrive early. Morning league slots fill the lot.',
     weatherSummary: 'Check match-morning conditions',
     whatToBring: 'Whites, water, club kit',
     coachName: 'Sujit Khanal',
@@ -957,7 +957,7 @@ export const demoAnnouncements: Announcement[] = [
         id: 'reply-2',
         authorName: 'Coach Priya Sharma',
         authorRole: 'coach',
-        body: 'Yes — tents go up on the south sideline. See you at 9.',
+        body: 'Yes, tents go up on the south sideline. See you at 9.',
         createdAt: '2026-09-12T13:05:00-04:00',
       },
     ],
@@ -971,7 +971,7 @@ export const demoDirectMessages: DirectMessage[] = [
     fromRole: 'guardian',
     fromName: 'Jordan Williams',
     fromId: 'guardian:household-demo',
-    body: 'Hi Coach — Maya still has a mild cough. OK to train if we sit out sprints?',
+    body: 'Hi Coach, Maya still has a mild cough. OK to train if we sit out sprints?',
     createdAt: '2026-09-12T20:10:00-04:00',
   },
   {

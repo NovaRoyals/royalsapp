@@ -84,7 +84,7 @@ export const venueCatalog: VenuePlace[] = [
     name: 'Manassas cricket ground',
     fieldNumber: 'Field 1',
     address: 'Manassas, VA',
-    arrival: 'Home T20. Allow extra time — morning league slots fill the lot.',
+    arrival: 'Home T20. Allow extra time. Morning league slots fill the lot.',
     parkingNotes: 'Ground lot. Arrive before the start, not at the toss.',
     entrance: 'Club tent on the Field 1 boundary.',
     surface: 'Grass',

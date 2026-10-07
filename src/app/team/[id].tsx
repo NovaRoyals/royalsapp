@@ -42,7 +42,7 @@ export default function TeamDetailScreen() {
           <View style={styles.statRule} />
           <View><Text style={styles.statValue}>{team.season}</Text><Text style={styles.statLabel}>SEASON</Text></View>
           <View style={styles.statRule} />
-          <View><Text style={styles.statValue}>{team.coachName ? team.coachName.replace('Coach ', '').split(' ')[0] : '—'}</Text><Text style={styles.statLabel}>COACH</Text></View>
+          <View><Text style={styles.statValue}>{team.coachName ? team.coachName.replace('Coach ', '').split(' ')[0] : 'n/a'}</Text><Text style={styles.statLabel}>COACH</Text></View>
         </View>
       </View>
 

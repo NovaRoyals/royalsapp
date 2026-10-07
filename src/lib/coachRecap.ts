@@ -102,7 +102,7 @@ export function demoCoachReminder(): AppNotification {
     id: 'notification-coach-recap-sep20',
     type: 'coach_reminder',
     title: 'Send families a quick session recap',
-    body: 'The session ended two hours ago. Attendance is in — a shared recap is optional and never sends by itself.',
+    body: 'The session ended two hours ago. Attendance is in. A shared recap is optional and never sends by itself.',
     createdAt: '2026-09-20T12:00:00-04:00',
     read: false,
     route: `/session/${RECAP_EVENT_ID}/recap`,
